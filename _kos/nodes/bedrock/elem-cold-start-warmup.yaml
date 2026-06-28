@@ -1,0 +1,36 @@
+id: elem-cold-start-warmup
+type: element
+confidence: bedrock
+title: "No rate/drift verdict before the process has turned (cold-start / warm-up)"
+tags: [beadle, metrics, cold-start, anti-goodhart, direction-health]
+content: |
+  An average rate (resolution rate, maintainer-engagement rate, net-flow) computed
+  over a window before the triage process has engaged is initialization bias, not
+  drift. A young backlog whose maintainers are busy-but-willing and have not yet
+  begun their first triage pass is in a cold-start / warm-up transient — the wheel
+  has not turned. Reporting "1% resolution / 0 maintainer engagement" as a DRIFTING
+  verdict in that state is a measurement error (and a Goodhart-style proxy abuse):
+  it indicts busy people for a denominator that covers time before they engaged.
+
+  beadle therefore gates direction verdicts on warm-up state:
+  - Until a baseline exists (>= 1 completed maintainer triage cycle, or a configured
+    warm-up threshold), the verdict is COLD START / BASELINE, never DRIFTING.
+  - In cold-start, the dashboard's job is to ESTABLISH the baseline and make the
+    maintainers' first pass cheap (surface high-leverage items, cluster structure),
+    NOT to compute average rates.
+  - Rate/trend/drift reporting begins only after the warm-up transient ends. Each
+    rate metric is tagged with whether the system has reached steady state.
+  - This is distinct from genuine steady-state drift (B3 maintainer-compass): drift
+    is a sustained divergence AFTER the process has demonstrably turned.
+
+  Surfaced by the Phase-0 dry run against vsdd-factory (2026-06-27): 94/107 open
+  issues from one filer, 0 maintainer comments, 1 lifetime close — which is a
+  cold-start signature, not a drift signature.
+edges:
+  - target: elem-maintainer-compass
+    type: refines
+  - target: grv-stale-autoclose
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

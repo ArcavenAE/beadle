@@ -89,6 +89,21 @@ The four multiclaude incidents are load-bearing constraints, not history:
 - **INC-004** (`SendMessage` silent-drop) → inter-agent comms use the platform
   channel, mechanically enforced (PreToolUse block), never the in-process tool.
 
+### B8: No rate/drift verdict before the process has turned (cold-start)
+
+An average rate computed over a window before the triage process has engaged is
+**initialization bias, not drift**. A young backlog whose maintainers are
+busy-but-willing and haven't begun their first pass is in a cold-start / warm-up
+transient — the wheel hasn't turned. beadle gates direction verdicts on warm-up
+state: until a baseline exists (≥1 completed maintainer triage cycle, or a
+configured threshold), the verdict is **COLD START / BASELINE**, never DRIFTING,
+and the dashboard's job is to *establish* the baseline and make the first pass
+cheap. Rate/trend/drift reporting begins only after the transient ends — the
+metrics are "not meaningful *yet*," not meaningless. Distinct from genuine
+steady-state drift (B3), which is a sustained divergence *after* the process has
+demonstrably turned. ADR-005.
+`_kos/nodes/bedrock/elem-cold-start-warmup.yaml`.
+
 ---
 
 ## Frontier

@@ -168,6 +168,9 @@ below secondary rate limits [@ghaw; @ghacceptableuse].
   and authorize work.
 - Not a metric-optimizer. It reports counts paired with outcomes; it never chases
   close-rate.
+- Not a cold-start indicter. Before the process has turned, an average rate is
+  initialization bias, not drift; the verdict is COLD START / BASELINE and the
+  dashboard establishes the baseline rather than judging busy maintainers (ADR-005).
 - Not a replacement for `arcavenai-issue-review` — it wraps and operationalizes
   that discipline at scale.
 
