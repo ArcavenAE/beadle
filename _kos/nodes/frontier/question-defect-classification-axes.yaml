@@ -1,0 +1,59 @@
+id: question-defect-classification-axes
+type: question
+confidence: frontier
+title: "The multi-axis defect-classification model for the classify engine"
+tags: [beadle, classify, taxonomy, defect, triage, frontier]
+content: |
+  beadle's `classify` engine scores each artifact on multiple axes. The deep-research
+  workflow (we6yrrcba, finding-005) grounded the model in standards and real OSS schemes
+  and named the superset beadle now carries. "Defect" is the industry term (IEEE 1044
+  classifies anomalies/defects; ODC = Orthogonal Defect Classification).
+
+  ## The committed model (finding-005) — research-grounded + beadle-original
+
+  Research-grounded axes:
+  - report-type — GitHub Issue Types (Task/Bug/Feature) primary + kind/* long-tail
+    (Kubernetes / Rust C-*/T-*/A-*/P-* precedent).
+  - defect-nature — IEEE 1044 / ODC Defect Type, mechanical→conceptual spectrum
+    (syntax → off-by-one → null/resource → concurrency → logic → spec → design →
+    directional/intent-misalignment).
+  - reproducibility class — Bohrbug | Mandelbug | Heisenbug (Grottke-Trivedi); the
+    single most decision-relevant axis for evaluation cost; feeds priority's LOE term.
+  - triage-state — needs-triage → accepted → needs-information.
+  - severity (impact) and priority (urgency + level-of-effort) kept distinct.
+
+  beadle-original axes (ahead of / beside the literature):
+  - leverage (systemic↔minutiae), alignment (advances↔drifts, B4 — the
+    "directional/intent" class research logs as an unsolved open question),
+    provenance (pilot↑/speculative↓), blast-radius visibility × compounding
+    (finding-004; FMEA-detectability analog), recoverability tier (finding-004),
+    integrity-gates-functional precedence (finding-004 — a rule, not an axis).
+
+  ## Open questions
+
+  1. **Calibration (research openQuestion 1).** No empirical data correlates
+     reproducibility class with actual maintainer fix-time. "Bohrbug = cheap" is a
+     heuristic, not calibrated. Could beadle's own store accumulate this over runs?
+  2. **Canonical ODC value-set (research openQuestion 2).** The fixed-7-types claim
+     was REFUTED. beadle adopts the mechanical→conceptual *spectrum*, not a bounded
+     enum, until a version/value-set is chosen. Which ODC version, if any?
+  3. **How many axes earn their keep on the dashboard?** Ten axes is the model; the
+     RENDER must not overwhelm (cf. the legibility lesson, finding-005). Which axes
+     are primary facets (report-type, defect-nature), which are badges
+     (reproducibility), which are drill-in only (trigger, triage-state)?
+  4. **Operationalizing the directional/intent class.** Research could not name a
+     detectable signal distinguishing intent-misalignment from a feature-request or a
+     design defect. beadle's alignment axis (B4) is the bet — what evidence makes the
+     class detectable rather than a judgment call?
+  5. **FMEA as the citable anchor for blast-radius visibility.** The research never
+     surfaced FMEA (RPN = severity × occurrence × detectability). Adopt it as the
+     reference for finding-004's visibility×compounding axis, or keep that axis
+     beadle-original?
+edges:
+  - target: question-intent-manifest-schema
+    type: relates
+  - target: elem-intent-alignment-whitespace
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"
