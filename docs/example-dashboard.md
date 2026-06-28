@@ -74,6 +74,15 @@ pass reads 6 threads, not 40:
 - [ ] <!-- verb=group-cluster;id=observability --> Create tracking issue for the observability cluster
 - [ ] <!-- verb=route-decision;id=#300,#305,#297 --> Route first-pass items to a maintainer decision
 - [ ] <!-- verb=mark-process-turned;id=baseline --> Mark the first maintainer pass complete (ends cold-start; enables trend reporting)
+
+<details><summary>Legend & references</summary>
+
+**Verdict:** 🟢 advances · 🟡 neutral · 🔴 drifts · 🛑 integrity (source-of-truth gate, ranks first).
+**Chips:** `verified` = checked against the code/spec · `systemic` = high-leverage · `hard-block` = blocks a dependent.
+
+Classification rests on: defect-nature — [IEEE 1044](https://standards.ieee.org/ieee/1044/4128/) / [ODC](https://www.chillarege.com/odc/); reproducibility — [Grottke–Trivedi (Bohr/Mandel/Heisenbug)](https://doi.org/10.1109/MC.2007.55); [severity vs priority](https://www.centizen.com/severity-vs-priority-a-crucial-distinction-in-software-testing/). Cold-start gating: ADR-005.
+
+</details>
 ```
 
 ---
