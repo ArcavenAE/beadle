@@ -59,6 +59,19 @@ For a self-referential factory, code is the cheapest thing it produces; the lear
 and spec are the expensive, irreplaceable output — and are exactly what
 "produced-but-not-committed" / silent-overwrite bugs destroy.
 
+**Integrity gates functional — a precedence rule, not just an ordering
+(finding-004).** Integrity is *foundational*; convergence, gate-correctness, feature
+behavior are *functional*. Functional properties are **computed over** the substrate
+(ratchet state, spec, hash, learning store). If the substrate can't be trusted, a
+functional verdict — including a "converged / PASS" — is **unfalsifiable**: correct
+code on a false substrate still yields a false result, and a green check certifies
+nothing. So a source-of-truth integrity defect does not merely *outrank* a
+convergence-soundness defect on impact — it **gates the validity of every functional
+verdict, convergence included.** In the action plan, the **Source-of-truth
+integrity** group is always P0 and sits **above** convergence-soundness; never let a
+functional item (however important) be ranked above an open integrity defect on the
+same substrate it depends on.
+
 ### 4. score-intent  (read-only) — MANDATORY PER ARTIFACT, never skipped
 This is beadle's differentiator (B4). You MUST read each enumerated issue's BODY
 and grade it — title-level slotting is a defect, not a shortcut. For every issue:

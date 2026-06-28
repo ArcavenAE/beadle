@@ -72,6 +72,32 @@ Recoverability is a severity input: a fault that risks the irreplaceable tier
 (learning/spec/process) outranks one that risks only regenerable output, even at equal
 "size."
 
+## Integrity gates functional (the precedence principle)
+
+The user sharpened this past "higher severity" into a precedence rule:
+
+> "convergence while important is lower in priority than integrity. it's a functional
+> requirement, but if we cannot trust the underlying substrate, then there is no
+> trustworthy functional feature even if it's written correctly."
+
+Integrity is **foundational**; convergence / gate-correctness / feature behavior are
+**functional**. Functional properties are *computed over* the substrate (ratchet
+state, spec, hash, learning store). If the substrate can't be trusted, a functional
+verdict — including a "converged / PASS" — is **unfalsifiable**: correct code on a
+false substrate still yields a false result; a green check certifies nothing.
+
+So a source-of-truth integrity defect does not merely *outrank* a convergence defect
+on impact — it **gates the validity of every functional verdict, convergence
+included.** This is why #313/#314 (integrity) sit ABOVE #314/#305/#309
+(convergence-soundness) in the action plan: not because they hurt more, but because an
+open integrity defect on the substrate makes the convergence verdict computed over
+that substrate untrustworthy regardless of how correctly convergence itself is
+implemented.
+
+**Classify rule:** never rank a functional item (however important) above an open
+integrity defect on the same substrate it depends on. The **Source-of-truth
+integrity** group is always P0, above convergence-soundness.
+
 ## Fix applied (skill — classify engine)
 
 `skills/beadle-triage/SKILL.md` step 3 (classify) gains:
@@ -86,9 +112,13 @@ Recoverability is a severity input: a fault that risks the irreplaceable tier
 The classify model (currently severity/priority/leverage) should record a fourth
 consideration: **blast-radius visibility × compounding**, with **silent integrity /
 source-of-truth corruption** as its top class and **recoverability tier** as a
-severity input. This is the first concrete severity-axis requirement and should be
+severity input. It should also record the **integrity-gates-functional precedence
+rule**: integrity is foundational and gates the validity of every functional verdict
+(convergence included), so an open integrity defect is always ranked above a
+functional one on the same substrate — this is a precedence relationship, not just a
+severity ordering. This is the first concrete severity-axis requirement and should be
 reconciled with the issue/defect taxonomy research (workflow we6yrrcba) when it lands —
-this axis is adjacent to ODC data/timing defect types and the severity-vs-priority
+the axis is adjacent to ODC data/timing defect types and the severity-vs-priority
 literature, but the user surfaced it ahead of the research, so it is baked in now.
 
 ## Re-scored verdict for the live board (apply on next refresh)
