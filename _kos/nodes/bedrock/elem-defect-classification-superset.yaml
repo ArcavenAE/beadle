@@ -1,0 +1,94 @@
+id: elem-defect-classification-superset
+type: element
+confidence: bedrock
+title: "beadle's classify model — research-grounded defect axes + beadle-original axes"
+tags: [beadle, classify, defect, taxonomy, ieee-1044, odc, dual-audience, finding-005, finding-006]
+content: |
+  beadle re-classifies every artifact on a SUPERSET of research-grounded axes plus
+  beadle-original axes — never trusting the body's self-label. "Defect" is the canonical
+  industry term (IEEE 1044 / ODC) for the nature axis.
+
+  Research-grounded axes (deep-research workflow we6yrrcba):
+  - report-type — the surface form. Primary carrier: GitHub Issue Types (Task / Bug /
+    Feature, org-level, distinct from labels). Long tail: a kind/* family (regression,
+    security, dependency/CVE, ci/build, flaky-test, tech-debt, perf, docs, question, RFC).
+    Submitter-assertable, cheap to auto-classify.
+  - defect-nature — what is actually wrong, on the mechanical->conceptual spectrum
+    (IEEE 1044 anomaly classes / ODC Defect Type): syntax/typo/wrong-variable ->
+    off-by-one/boundary -> null/resource/lifecycle -> concurrency/race -> logic ->
+    algorithmic -> spec/requirements -> design/architectural -> directional/
+    intent-misalignment (code correct, wrong thing built). Mechanical end is
+    auto-classifiable, decide-in-seconds. Conceptual end needs a human architectural
+    decision — escalate, never auto-resolve.
+  - reproducibility class — Bohrbug (consistent, isolatable -> cheap) | Mandelbug
+    (complex activation, not systematically reproducible -> investigate) | Heisenbug
+    (changes under observation -> investigate). The single most decision-relevant axis
+    for evaluation cost — it FEEDS priority's level-of-effort term (don't gut-estimate
+    effort) and routes escalation.
+  - triage-state — needs-triage -> accepted -> needs-information. Lifecycle lane,
+    distinct from the validate-verdict.
+  - severity and priority kept DISTINCT — severity = impact, priority = urgency + effort.
+
+  beadle-original axes (ahead of / beside the literature):
+  - leverage (systemic <-> minutiae)
+  - alignment (advances <-> drifts — B4, the "directional/intent" class the research
+    logs as an unsolved open question)
+  - provenance (pilot-derived ^ vs speculative v)
+  - blast-radius visibility x compounding — the silent-integrity cluster
+    (elem-silent-integrity-severity); FMEA-detectability is its citable analog. This
+    cluster GATES the validity of every functional verdict (finding-004 precedence).
+
+  Render: surface report-type and defect-nature as the two primary facets; render
+  reproducibility as a badge; keep severity and priority distinct. The integrity blocks
+  gate all of these — an open source-of-truth integrity defect outranks any functional
+  defect on the same substrate regardless of report-type or defect-nature.
+
+  --- Dashboard render model (the dashboard is an output artifact, not state — B1) ---
+
+  Row legibility — title leads, verdict trails. Every Action-plan and Classification-index
+  row leads with a SHORT human title (what the issue IS), then #NN (the agent's fetch
+  reference), then chips. The alignment verdict is STATUS (drill-in detail), a trailing
+  chip — never the headline. A human scans for what an issue is and will not hover.
+
+  Dual-audience — LLM-first, human-supported. The dashboard is MAINLY read by LLM/agent
+  sessions; humans are secondary. The two have inverted visibility, so one body serves
+  both via three channels:
+  - human channel (visible render): short title + minimal chips.
+  - agent channel (folded/embedded, free to the LLM): the beadle-computed judgments that
+    exist nowhere else — the full axis vector, cited verdict rationale, integrity flags —
+    in a per-row <details> or the beadle-state payload. Folding is NOT hiding for an agent.
+  - reference channel (links the agent fetches): #NN, PR refs, commit shas. The dashboard
+    NEVER replicates the issue body — an agent follows the reference. Carry only what
+    differentiates; link everything fetchable. This also protects the 65k body budget.
+
+  Quick-wins / safe-action lane (finding-006) — a grouping ORTHOGONAL to the P0/P1/P2
+  impact ordering, NOT a fourth priority tier. Its job: give maintainers the
+  obviously-broken, easy-fix, low-blast-radius issues they can use to EXERCISE their
+  process without the caution high-impact items demand — reward the safe + obvious, not
+  only the critical. Eligibility is DERIVED from the axes above (never a hand-curated
+  "easy" tag): mechanical defect-nature + Bohrbug (or pure docs) + bounded blast radius +
+  high fix-confidence + alignment != drifts. It is the inverse selection of the P0
+  integrity cluster (same axes, opposite ends). Two guards:
+  - HARD EXCLUSION (finding-004): an issue touching a system-of-record integrity_anchor
+    is NEVER a quick win, no matter how small the trigger — the easy lane is precisely
+    the trap a one-line diff with invisible blast radius would hide in. Integrity items
+    stay in P0.
+  - NO-GOODHART: a surfacing device, not a metric. Never count "quick wins closed" as
+    success (rewards trivial churn). Maintainer-progress moves only on verified
+    fix-outcomes.
+  Cold-start (elem-cold-start-warmup): the lane is the cheapest first maintainer pass —
+  resolving one is the lowest-risk way to turn the process and begin the baseline.
+edges:
+  - target: elem-intent-alignment-whitespace
+    type: refines
+  - target: elem-silent-integrity-severity
+    type: relates
+  - target: elem-state-out-of-band
+    type: relates
+  - target: question-defect-classification-axes
+    type: relates
+  - target: question-maintainer-progress-gamification
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"

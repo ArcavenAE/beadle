@@ -1,0 +1,59 @@
+id: elem-silent-integrity-severity
+type: element
+confidence: bedrock
+title: "Silent integrity / source-of-truth corruption is top severity; integrity gates functional"
+tags: [beadle, classify, severity, integrity, source-of-truth, precedence, finding-004]
+content: |
+  A fault that makes a SYSTEM OF RECORD (ratchet, spec, hash, index, decision log,
+  learning store) disagree with reality WITHOUT raising a signal, and propagates to
+  dependent cycles/artifacts, is the highest severity class — regardless of how small
+  the triggering bug looks. The severity comes from invisibility + compounding, not
+  from the size of the immediate loss. A green check or a one-line diff must never
+  mask it.
+
+  Three load-bearing parts:
+
+  1. Blast-radius visibility x compounding is a classify consideration alongside
+     severity/priority/leverage. The FMEA "detectability" term is its citable analog:
+     an undetectable high-severity fault is worse than a detectable one.
+
+  2. Recoverability tier is a severity input. Rank what is at risk by recoverability,
+     not byte count:
+       regenerable output (re-run the generator — cheapest)
+         < spec / process (only a human amends the authority code is judged against)
+         < learning (adversarial findings, decision log, convergence history, what was
+           ruled out — irreplaceable; cannot be cheaply re-derived).
+     A fault threatening the irreplaceable tier outranks one risking only regenerable
+     output, even at equal size. For a self-referential factory, code is the cheapest
+     thing it produces; learning + spec are the expensive, irreplaceable output — and
+     are exactly what "produced-but-not-committed" / silent-overwrite bugs destroy.
+
+  3. Integrity gates functional — a PRECEDENCE rule, not just an ordering. Integrity
+     is foundational; convergence, gate-correctness, feature behavior are functional.
+     Functional properties are COMPUTED OVER the substrate. If the substrate can't be
+     trusted, a functional verdict — including "converged / PASS" — is unfalsifiable:
+     correct code on a false substrate still yields a false result, and a green check
+     certifies nothing. So an open source-of-truth integrity defect does not merely
+     outrank a convergence-soundness defect on impact — it gates the validity of every
+     functional verdict, convergence included. In the action plan, the Source-of-truth
+     integrity group is always P0 and sits ABOVE convergence-soundness.
+
+  Grounding: vsdd-factory #313/#314 — the ratchet certifies PASS against artifacts not
+  on disk; the input-hash includes frontmatter so "changed" is fiction. These are
+  source-of-truth corruption, not a "CI cluster." Re-scored to a P0 integrity group
+  above convergence-soundness; #313 threatens the irreplaceable tier. Surfaced by the
+  user ahead of the defect-taxonomy research (workflow we6yrrcba); baked in now,
+  reconcile the ODC data/timing adjacency when that research lands.
+
+  Manifests ground the classifier via integrity_anchors (systems-of-record by
+  recoverability tier) — see elem-defect-classification-superset and the F1 schema node.
+edges:
+  - target: elem-defect-classification-superset
+    type: refines
+  - target: elem-propose-not-act
+    type: relates
+  - target: question-intent-manifest-schema
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"

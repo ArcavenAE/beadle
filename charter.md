@@ -9,7 +9,10 @@ Follows the kos process: Orient → Ideate → Question → Probe → Harvest �
 Authoritative graph: `_kos/nodes/`. Cross-repo questions belong in the
 orchestrator's charter.
 
-Last updated: 2026-06-27 (session: beadle charter created at repo bootstrap).
+Last updated: 2026-06-28 (harvest: findings 001–006 — silent-integrity severity,
+defect-classification superset + dual-audience render, two-tier controls, quick-wins
+lane, dashboard-discovery robustness, maintainer-progress. Detail in the nodes; the
+charter carries the load-bearing decisions only).
 
 ---
 
@@ -104,6 +107,34 @@ steady-state drift (B3), which is a sustained divergence *after* the process has
 demonstrably turned. ADR-005.
 `_kos/nodes/bedrock/elem-cold-start-warmup.yaml`.
 
+### B9: Silent integrity / source-of-truth corruption is top severity; integrity gates functional
+
+A fault that makes a *system of record* (ratchet, spec, hash, index, decision log,
+learning store) disagree with reality **without raising a signal**, and propagates,
+is the **highest** severity class — *regardless of how small the triggering bug
+looks*. Severity comes from invisibility + compounding, not immediate loss.
+Recoverability tier is a severity input (regenerable output < spec/process <
+irreplaceable learning). And integrity **gates** functional: a functional verdict —
+including "converged / PASS" — is unfalsifiable on a substrate that can't be trusted,
+so an open integrity defect doesn't merely outrank a functional one, it gates the
+validity of every functional verdict. P0 "Source-of-truth integrity" always sits
+above convergence-soundness. finding-004.
+`_kos/nodes/bedrock/elem-silent-integrity-severity.yaml`.
+
+### B10: The classify model is a research-grounded superset + beadle-original axes
+
+beadle re-classifies every artifact (never trusting its self-label) on research-grounded
+axes — report-type, defect-nature (mechanical→conceptual, IEEE 1044 / ODC),
+reproducibility (Bohr/Mandel/Heisen, feeding priority's effort term), triage-state,
+severity-vs-priority — plus beadle-original axes (leverage, alignment B4, provenance,
+the B9 integrity cluster). The dashboard renders this **title-leads / verdict-trails**
+and **dual-audience** (LLM-first, human-supported): short titles for humans, the axis
+vector + cited rationale folded/embedded for agents, references linked never replicated
+(B1). A **quick-wins / safe-action lane** — derived from the axes, orthogonal to the
+impact ordering, integrity-excluded (B9), never a scored metric (no-Goodhart) — surfaces
+low-caution work to exercise the maintainers' process. finding-005, finding-006.
+`_kos/nodes/bedrock/elem-defect-classification-superset.yaml`.
+
 ---
 
 ## Frontier
@@ -117,7 +148,10 @@ minimal, versioned, machine-readable schema? For vsdd-factory the anchor is a
 *composite* — `CLAUDE.md` canonical principle + `STATE.md` cycle goals + `docs/` +
 git history + maintainer (DrBothen/Zious11) comments + a future `SOUL.md`. The
 generic form must express goals, non-goals, scope boundaries, and an alignment
-rubric without becoming a doc nobody maintains (the GORE failure mode).
+rubric without becoming a doc nobody maintains (the GORE failure mode). First
+concrete requirements answered (live at v0.3): `self_referential`,
+`provenance_signal`, corpus-vs-per-issue minutiae scope (finding-002), and
+`integrity_anchors` by recoverability tier (finding-004/005).
 `_kos/nodes/frontier/question-intent-manifest-schema.yaml`.
 
 ### F2: State engine — Dolt vs DoltLab/DoltHub
@@ -148,7 +182,11 @@ Renovate's `- [ ] <!-- verb=target -->` checkbox-as-control pattern, but with
 state out-of-band: derive the checkboxes from authoritative state, parse `[x]` on
 the next scheduled run, act, reset. Which beadle actions are safe to expose as
 maintainer-triggered checkboxes (approve-fast-track, request-investigation,
-accept-deferral)?
+accept-deferral)? **Two tiers** (finding-003): Tier 1 per-issue verbs (`id=#NN`) +
+Tier 2 board-level maintenance requests (`id=board`: reprioritize / full-refresh /
+revalidate / rescore-intent) with a cheap-poll-then-act discipline; Tier 2 is
+read/analyze/regenerate only — irreversible public actions still escalate per B2.
+`_kos/nodes/frontier/question-maintenance-request-controls.yaml`.
 
 ### F6: Intent-alignment as a held-out evaluation
 
@@ -156,6 +194,23 @@ Borrow StrongDM's holdout discipline: keep some alignment scenarios *out of the
 scoring agent's view* so the verdict can't be taught-to-the-test, and score
 satisfaction probabilistically rather than binary. Is this tractable for issue
 triage, or only for the larger factory loop?
+
+### F7: Dashboard discovery robustness
+
+Discovery keys on the `<!-- beadle-state -->` sentinel first, exact title second;
+union of both, filtered to the beadle identity; >1 candidate → STOP and request
+consolidation; re-check before create. Open: the concurrency guarantee — creation
+needs a serialized chokepoint (INC-003 class) once Phase 1 (scheduled gh-aw) or
+Phase 2 (marvel) can run concurrent passes against one target. finding-001.
+`_kos/nodes/frontier/question-dashboard-discovery-robustness.yaml`.
+
+### F8: Maintainer-progress without a leaderboard
+
+Make resolution against beadle-discovered defects visible and rewarding without
+becoming a gameable metric. Reward the **verified fix-outcome** (flagged → fixed →
+validates), never close-rate / time-to-triage / volume (B3 + no-Goodhart). Open: the
+full reward design; Phase 0 renders a minimal honest version. finding-005.
+`_kos/nodes/frontier/question-maintainer-progress-gamification.yaml`.
 
 ---
 

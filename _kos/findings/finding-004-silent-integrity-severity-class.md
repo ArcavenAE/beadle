@@ -107,7 +107,7 @@ integrity** group is always P0, above convergence-soundness.
   apparent size; never let a green check or small diff mask it.
 - recoverability as a severity input (regenerable output < spec/process < learning).
 
-## Charter delta (human applies — root docs are human-edit-only)
+## Charter delta (kos harvest — update the nodes, then the charter projection)
 
 The classify model (currently severity/priority/leverage) should record a fourth
 consideration: **blast-radius visibility × compounding**, with **silent integrity /

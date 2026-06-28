@@ -58,7 +58,7 @@ The cheap-poll *cadence* itself (a separate frequent poll schedule) is Phase-1 g
 cron work, resolved alongside the discovery chokepoint and the gh-aw schedule design.
 Phase 0 is single-session, so rendering the Tier-2 boxes is enough today.
 
-## Charter delta (human applies — root docs are human-edit-only)
+## Charter delta (kos harvest — update the nodes, then the charter projection)
 
 F5 (checkbox control surface) should record the **two-tier** model: per-issue verbs
 (existing) + board-level maintenance-request controls with a cheap-poll-then-act

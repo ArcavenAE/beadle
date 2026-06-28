@@ -75,7 +75,7 @@ Manifest `vsdd-factory.intent.yaml` → **v0.2**:
 `targets/_template.intent.yaml`: carries `self_referential` (default false),
 `provenance_signal`, and the corpus-level minutiae note so future targets inherit it.
 
-## Charter delta (human applies — root docs are human-edit-only)
+## Charter delta (kos harvest — update the nodes, then the charter projection)
 
 F1 (intent-manifest schema) should record that the schema now needs: a
 `self_referential` flag, a `provenance_signal` ranking axis, and explicit
