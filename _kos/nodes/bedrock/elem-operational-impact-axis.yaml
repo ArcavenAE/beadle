@@ -1,0 +1,78 @@
+id: elem-operational-impact-axis
+type: element
+confidence: bedrock
+title: "Operational-impact axis — does the defect stop the autonomous process? (panic > halt > degraded)"
+tags: [beadle, classify, impact, liveness, autonomy, odc-impact, ieee-1044, finding-009]
+content: |
+  A defect's effect on the CONTINUITY of an autonomous/agentic process (the dark
+  factory) is a classification axis in its own right, ORTHOGONAL to defect-nature,
+  severity, and reproducibility. A defect that stops the factory carries this tag
+  NO MATTER how trivial or complex its trigger — a one-character typo that crashes
+  the Claude Code session is maximum operational impact at minimum nature-complexity.
+  This is exactly why it cannot be folded into the nature spectrum or inferred from
+  priority: those measure different things. beadle assigns it; the factory should
+  emit it (see the upstream emit contract, finding-009).
+
+  Standards grounding (do NOT invent vocabulary — adopt the standard):
+  - The axis is ODC's "Impact" attribute (IBM ODC v5.x). ODC's "Reliability" value
+    is verbatim-defined to cover "unplanned interruption ... ABEND and WAIT" — i.e.
+    BOTH crash (ABEND) and hang (WAIT), with the canonical example "system crashed
+    and had to be rebooted." ODC collapses the two into one value; we need them
+    SEPARATED and ORDERED, so we decompose Reliability along the failure-model spine.
+  - IEEE 1044-2009 has NO crash/halt Effect value (confirmed negative result): its
+    Effect attribute is Functionality/Usability/Security/Performance/Serviceability/
+    Other, and a crash classifies as Effect=Functionality. The work-stoppage concept
+    lives in IEEE 1044 SEVERITY (Blocking = "operations suspended pending correction";
+    Critical = "essential operations unavoidably disrupted"). So neither IEEE Effect
+    nor ODC Impact alone is sufficient — we take ODC's attribute NAME and the
+    failure-model literature's CRASH-vs-LIVENESS distinction.
+  - Failure-model frame: a CRASH is a crash/fail-stop failure (Schlichting &
+    Schneider 1983 — halts; context lost; but DETECTABLE → recoverable). A HALT is
+    an omission / LIVENESS-violation failure (Cristian 1991; Alpern & Schneider 1985
+    — alive, state preserved, NOT progressing). No standard term names "alive-but-
+    stuck-needs-a-human"; formally it is a liveness violation, and operationally the
+    dangerous "gray failure" (Huang 2017): it looks healthy (heartbeat fine) while
+    no work advances.
+
+  The values (the canonical label scope is impact.* in ../labels/schema.yaml):
+  - impact.panic   — agent session terminates abnormally; context LOST; recovery
+                     required. The most expensive to recover (lost context), BUT
+                     self-announcing/detectable.
+  - impact.halt    — process pauses/blocks awaiting MANUAL human intervention;
+                     state PRESERVED. Less severe than panic on recovery cost, but
+                     HARDER to detect (still alive) — the gray-failure trap. This is
+                     the case the user flagged as under-tracked.
+  - impact.data-loss — destroys/corrupts irreplaceable state. The ODC-Impact analog
+                     of the silent-integrity recoverability tier. Can co-occur with
+                     panic/halt (worst combined case: a panic that corrupts on the
+                     way down = liveness + safety failure together).
+  - impact.degraded — fail-slow / fail-stutter (Arpaci-Dusseau 2001; Gunawi 2018):
+                     still running and progressing but impaired. Not a stoppage.
+
+  Ordering twist (encode this, don't flatten it): panic > halt on RECOVERY COST
+  (context loss), but halt > panic on DETECTION DIFFICULTY (a crash announces
+  itself; a halt masquerades as healthy). Both are major; degraded is below both.
+
+  Relationship to the rest of the classifier:
+  - This axis is the LIVENESS half; elem-silent-integrity-severity is the SAFETY
+    half (the substrate silently goes false). They are the two top-level failure
+    dimensions and are independent: a defect can be silent-integrity WITHOUT
+    stopping the factory (worst — invisible AND running), or impact.panic WITHOUT
+    corrupting anything (loud but clean). Score both; never let one mask the other.
+  - Priority interaction: impact.panic and impact.halt are P0/P1 candidates by
+    default (they stop autonomous operation), but priority remains a distinct
+    judgment (urgency + effort) per elem-defect-classification-superset. Do not
+    auto-collapse impact into priority.
+  - This axis is what status.blocked / status.needs-human are NOT: those are
+    triage-workflow states of the ISSUE (waiting on a human decision); impact.* is
+    the runtime LIVENESS effect on the FACTORY. Different objects.
+edges:
+  - target: elem-silent-integrity-severity
+    type: relates
+  - target: elem-defect-classification-superset
+    type: refines
+  - target: question-defect-classification-axes
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"

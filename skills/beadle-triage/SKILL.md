@@ -85,6 +85,36 @@ or a one-line diff must never mask it. (vsdd-factory #313/#314 are this class �
 ratchet certifies PASS against state that doesn't exist on disk; the hash disagrees
 with reality. They are source-of-truth corruption, not a "CI cluster.")
 
+**Operational impact — does the defect stop the factory? Its own axis, set
+autonomously (finding-009).** ORTHOGONAL to defect-nature: a one-character typo that
+crashes the session is maximum operational impact at minimum nature-complexity, so it
+**cannot** be inferred from nature or priority. Grounded in ODC's *Impact* attribute
+(its `Reliability` value verbatim covers "ABEND and WAIT" = crash and hang); we split
+ODC-Reliability along the failure-model spine. Set the `impact.*` label autonomously
+(it is a classification, like `type.*`):
+- **`impact.panic`** — the agent (Claude Code) session terminates abnormally; context
+  is **lost**, recovery required. Crash / fail-stop. Worst recovery cost, but
+  self-announcing.
+- **`impact.halt`** — the run **pauses/blocks awaiting manual human intervention**;
+  state is **preserved** (no crash). Liveness violation / ODC-WAIT. *Less* severe than
+  panic on recovery cost, but **harder to detect** — the process looks healthy while
+  making no progress (the gray-failure trap). This is the case the user flagged as
+  under-tracked.
+- **`impact.data-loss`** — destroys/corrupts irreplaceable state; the ODC-Impact analog
+  of the silent-integrity recoverability tier. May co-occur with panic/halt.
+- **`impact.degraded`** — runs but impaired (fail-slow/fail-stutter); not a stoppage.
+
+This is the **liveness** top-axis; silent-integrity (above) is the **safety** top-axis.
+They are independent — score BOTH, never let one mask the other. A defect can be
+silent-integrity without stopping the factory (worst: invisible AND running), or
+`impact.panic` without corrupting anything (loud but clean). `impact.panic`/`impact.halt`
+are P0/P1 candidates by default (they stop autonomous operation) but priority stays a
+distinct judgment. Distinct from `status.blocked`/`status.needs-human`, which are
+triage-workflow states of the *issue*, not the runtime liveness of the *factory*. When
+the factory itself reports a defect it should emit this signal (it has ground truth
+beadle can only infer — finding-009 upstream contract); until it does, beadle infers
+`impact.*` from the issue body + dispatcher/run telemetry.
+
 **Recoverability is a severity input.** Rank what is at risk by recoverability, not
 byte count: regenerable **output** (re-run the generator — cheapest) < **spec /
 process** (the authority code is judged against; only a human amends it) <
