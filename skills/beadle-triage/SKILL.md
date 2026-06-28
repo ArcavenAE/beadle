@@ -35,9 +35,29 @@ load-bearing test, or is it a paper-fix)? do the cited symbols/files actually
 exist (catch hallucinated citations)? reproducible? → a verdict.
 
 ### 3. classify  (read-only)
-Two axes — severity (impact) and priority (urgency); a leverage axis
-(systemic ↔ minutiae); default priority low, escalate on evidence. Re-classify
-type; don't trust the body's self-label.
+Axes — severity (impact), priority (urgency), leverage (systemic ↔ minutiae), and
+**blast-radius visibility × compounding**; default priority low, escalate on
+evidence. Re-classify type; don't trust the body's self-label.
+
+**Silent integrity / source-of-truth corruption — top severity, always escalate
+(finding-004).** A fault that makes a *system of record* (ratchet, spec, hash,
+index, decision log, learning store) disagree with reality **without raising a
+signal**, and propagates to dependent cycles/artifacts, is the **highest** severity
+class **regardless of how small the triggering bug looks**. The severity comes from
+invisibility + compounding, not from the size of the immediate loss. A green check
+or a one-line diff must never mask it. (vsdd-factory #313/#314 are this class — the
+ratchet certifies PASS against state that doesn't exist on disk; the hash disagrees
+with reality. They are source-of-truth corruption, not a "CI cluster.")
+
+**Recoverability is a severity input.** Rank what is at risk by recoverability, not
+byte count: regenerable **output** (re-run the generator — cheapest) < **spec /
+process** (the authority code is judged against; only a human amends it) <
+**learning** (adversarial findings, decision log, convergence history, what was
+ruled out — *irreplaceable*; cannot be cheaply re-derived). A fault threatening the
+irreplaceable tier outranks one risking only regenerable output, even at equal size.
+For a self-referential factory, code is the cheapest thing it produces; the learning
+and spec are the expensive, irreplaceable output — and are exactly what
+"produced-but-not-committed" / silent-overwrite bugs destroy.
 
 ### 4. score-intent  (read-only) — MANDATORY PER ARTIFACT, never skipped
 This is beadle's differentiator (B4). You MUST read each enumerated issue's BODY
