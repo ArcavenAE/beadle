@@ -1,11 +1,22 @@
 # beadle intent manifest — drbothen/vsdd-factory
 # Schema is frontier (charter F1); this is the working v0 shape.
-schema_version: 0.1
+# v0.2: added self_referential flag, provenance_signal axis, corpus-level minutiae
+#       semantics, and self-referential rubric inversion (see finding-002).
+schema_version: 0.2
 
 target:
   repo: drbothen/vsdd-factory
   default_branch: develop
   local_checkout: ~/work/vsdd-factory   # for the already-fixed / citation-exists checks
+
+# vsdd-factory is a SELF-REFERENTIAL factory: the engine and the product are one
+# repo (goal 2). This INVERTS the generic "process-gap = drift" default. An issue
+# about the engine's own process (orchestrator, adversary, gates, convergence) is
+# NOT off-mission self-reference — for this target it directly changes product
+# outcomes, because the engine IS the product. beadle MUST read this flag before
+# applying the alignment_rubric: here `process-gap(...)` and `meta(...)` issues are
+# on-mission by default and judged on leverage, not dismissed as self-reference.
+self_referential: true
 
 # The compass. Work is weighted by what these humans actually act on
 # (respond / label / close / reference / merge) — not by volume or reactions.
@@ -53,27 +64,62 @@ scope_boundaries:
   - Code-vs-spec conflicts: the SPEC wins; only a human authorizes spec amendment
   - .factory/ mutations via Edit/Write only; no bypass (POL-3)
 
+# Provenance is a first-class ranking signal (NOT just classification). The
+# measured filer (arcavenai) produces two very different kinds of issue:
+#   - pilot-derived: a real finding from running vsdd-factory on an external pilot
+#     (e.g. ftc-blue), with cited commits/files/reproduction. Highest value for a
+#     self-referential factory — this is dogfooding the engine. Rank ABOVE.
+#   - speculative: invented machinery / "might need" with no observed failure.
+#     This is the over-engineering the project's own non_goals warn against.
+# beadle infers provenance from the body (cited real commit/file/run vs none) and
+# weights pilot-derived findings up, speculative proposals down.
+provenance_signal:
+  pilot_derived_markers:
+    - cites a real commit sha / PR / run with a reproduction
+    - "'observed in a real greenfield run' / 'external pilot' framing"
+    - concrete metrics or git evidence (git log, file paths, hashes)
+  speculative_markers:
+    - proposes a mechanism with no observed failure
+    - "'we might' / 'in the future' / 'to be safe' without a triggering incident"
+
 # How an issue/PR is scored. Graded, cited — never a bare label.
+# NOTE the self_referential inversion above: engine process/meta issues are
+# on-mission here; judge them on leverage + provenance, not as self-reference.
 alignment_rubric:
   advances:
     - closes a real defect class with a load-bearing test
     - tightens an existing gate / removes a drift surface
     - improves traceability or convergence soundness
+    - "(self-referential) a pilot-derived engine process-gap or meta finding that
+       hardens the factory's own gates/convergence — on-mission, not self-reference"
   neutral:
     - documentation/cosmetic with bounded blast radius
+    - "a study/observation request with no fix yet (e.g. a cost-arc to characterize)
+       — neutral-to-advances depending on whether it surfaces a real drift surface"
   drifts:
     - proposes machinery before a concrete need (gradual-elaboration violation)
     - couples otherwise-independent components
     - re-files an already-decided question; contradicts a maintainer decision
-    - a self-referential process-gap that doesn't change product outcomes
+    - "a SPECULATIVE self-referential process-gap with no observed failure and no
+       product-outcome path (NB: pilot-derived engine gaps are advances, not this)"
     - hallucinated citation / fix-not-fixed / surface-plausible but fabricated
 
 # Drift / minutiae detectors surfaced on the dashboard's Direction Health panel.
+# CRITICAL: these run at the CORPUS level against the measured filer (arcavenai),
+# not only per-issue. The "led-by-the-backlog" signal is a property of the whole
+# filing pattern (N granular engine process-gaps, M<<N maintainer actions), not of
+# any single issue. beadle must compute and surface these even when each individual
+# issue scores "advances" — a backlog of individually-sound minutiae is exactly the
+# drift this target fears. (Cold-start caveat ADR-005 still applies to RATE claims;
+# the structural ratio is reportable as baseline, the trend is not yet.)
 minutiae_signals:
   - low_leverage_ratio_rising
   - filed_vs_acted_gap_widening      # arcavenai files N, maintainers act on M<<N
   - cluster_same_lever_filed_n_times # candidate meta/tracking issue, not N issues
   - over_engineering_fingerprints    # premature abstraction, speculative config
+  - convert_finding_to_guard_unbounded  # every adversarial finding → a new permanent
+                                         # CI lint with no decay term (see issue #308);
+                                         # the factory's own minutiae-generation reflex
 
 # Compose the existing per-issue discipline rather than reinventing it.
 composes_skill: arcavenai-issue-review
