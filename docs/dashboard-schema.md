@@ -17,9 +17,34 @@ Every bot-maintained dashboard studied shares this failure mode. **beadle's rule
 
 ## Discovery & idempotency
 
-- **Find "its" issue by exact title**, not a stored number (Renovate's pattern):
-  `📋 beadle — Triage Dashboard`. If none, create + pin it (`pinIssue`, ≤3/repo).
-  Treat the title as a primary key.
+Discovery is **sentinel-first, title-second** — keep both, but the machine-stable
+key wins. The goal is one dashboard per target repo, never a duplicate:
+
+- **Primary key — the `<!-- beadle-state -->` sentinel.** Search open issues by the
+  beadle identity for a body containing the `beadle-state` sentinel block (and,
+  inside its JSON, a matching target). This survives a hand-edited title, which the
+  bare title does not.
+- **Secondary key — exact title.** `📋 beadle — Triage Dashboard` (the bare string;
+  the `· owner/name` suffix lives only in the body H1, never the issue title).
+  Used to find a dashboard whose body sentinel was wiped, and as the create-time
+  title.
+- **Candidate set = union of both, filtered to the beadle identity.** Then:
+  - **exactly one** authored by the beadle identity → rewrite it in place;
+  - **>1** → **STOP, report all candidates, request human consolidation.** Never
+    pick one silently; never create another. (Drift has already happened — a
+    second dashboard exists — and only a human should collapse them.)
+  - **one, wrong author** → STOP (do not edit another author's issue, do not fork);
+  - **none** → **re-check immediately before** `gh issue create` (narrows the
+    create race), then create + pin it (`pinIssue`, ≤3/repo).
+- **Closed dashboards are intentionally out of scope** (`--state open`). A closed
+  same-title issue frees the title for a fresh dashboard (this is how
+  vsdd-factory#311, mis-authored by `arcaven`, was retired). This is by design, not
+  a miss.
+- **Concurrency caveat:** re-check-before-create narrows but does not close the
+  TOCTOU window. Two concurrent runs against one target can still both create. A
+  real guarantee needs a serialized chokepoint (INC-003 class) — frontier
+  (`question-dashboard-discovery-robustness`), relevant at Phase 1 (scheduled
+  gh-aw) and Phase 2 (marvel single-writer orchestrator), not Phase 0.
 - **Rewrite the whole body each run**; never append comments. History is the
   issue's edit history.
 - Stay under the **65,536-char body limit**; offload detail to linked sub-issues

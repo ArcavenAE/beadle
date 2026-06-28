@@ -51,20 +51,33 @@ STEP 1 — Load target + invariants:
     docs/dashboard-schema.md. Honor every bedrock invariant (state out-of-band;
     propose-not-act; never auto-close; no Goodhart; cold-start gating ADR-005).
 
-STEP 2 — Discover the dashboard issue by EXACT title (the discovery key):
+STEP 2 — Discover the dashboard issue (sentinel-first, title-second). The body
+  `<!-- beadle-state -->` sentinel is the machine-stable primary key; the exact
+  title is the secondary/fallback key (it can be hand-edited; the sentinel can't):
     TITLE='📋 beadle — Triage Dashboard'
+    # candidate set = union of both, by arcavenai, open:
+    gh issue list --repo drbothen/vsdd-factory --state open --author arcavenai \
+      --search "beadle-state in:body" --json number,author,title,body
     gh issue list --repo drbothen/vsdd-factory --state open \
       --search "\"$TITLE\" in:title" --json number,author,title
-  - If an OPEN issue with that exact title exists AND its author is arcavenai:
+    # merge by issue number; filter to author arcavenai.
+  - EXACTLY ONE candidate authored by arcavenai:
       → rewrite its body in place: gh issue edit <n> --repo drbothen/vsdd-factory
         --body-file <generated>. Never open a second. Preserve any human-toggled
         checkbox selections you act on, then reset them.
-  - If it exists but is authored by someone else:
+  - MORE THAN ONE candidate authored by arcavenai:
+      → STOP and report ALL of them (numbers + titles). A duplicate dashboard
+        already exists. Do NOT pick one silently and do NOT create another — ask a
+        human to consolidate (close the extras) first.
+  - One candidate authored by someone else:
       → STOP and report. Do NOT edit another author's issue and do NOT create a
         duplicate title. Ask a human to close/hand it off first.
-  - If none exists:
-      → create it: gh issue create --repo drbothen/vsdd-factory --title "$TITLE"
-        --body-file <generated>
+  - NONE:
+      → re-run the discovery query one more time IMMEDIATELY before creating (a
+        concurrent run may have just created it — this narrows, but does not fully
+        close, the create race). If it now exists, branch above.
+      → otherwise create it: gh issue create --repo drbothen/vsdd-factory
+        --title "$TITLE" --body-file <generated>
       → pin it: get the node id (gh issue view <n> --json id) and call the GraphQL
         pinIssue mutation. If it returns FORBIDDEN, note that arcavenai lacks
         triage permission and a maintainer must pin — then continue (non-fatal).

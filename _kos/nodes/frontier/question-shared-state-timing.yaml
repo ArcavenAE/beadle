@@ -1,0 +1,49 @@
+id: question-shared-state-timing
+type: question
+confidence: frontier
+title: "When does beadle move from no/local bd to a shared bd/Dolt instance?"
+tags: [beadle, bd, dolt, state, infrastructure, timing, frontier]
+content: |
+  beadle today has no bd wiring (no `.beads` symlink) and tracks KNOWLEDGE in this
+  `_kos/` graph. WORK it produces (e.g. the doctor/concurrency follow-ons from
+  finding-001) has nowhere durable to live yet. Separately, a shared bd/Dolt
+  instance across machines does not exist for beadle: arcaven's machine has a local
+  bd; this machine does not. The question is TIMING, not architecture — the
+  architecture and phasing already exist at orc level.
+
+  Two distinct decisions, smaller first:
+
+  1. WIRE beadle into bd at all. Near-term, cheap. Gives beadle-produced work a
+     home. Could be a `.beads` symlink to the orc canonical db (the subrepo
+     pattern) — but note beadle is published at `ArcavenAE/beadle` and is generic
+     over targets, so "orc-canonical bd" may be the wrong home; beadle's work may
+     belong with whatever target/fleet it serves. Resolve before symlinking.
+
+  2. SHARED bd/Dolt instance across machines. This is the orc-level F26 arc, not a
+     beadle-local decision. Per orc charter F26: Phase 0 (localhost dolt sql-server)
+     shipped session-042; Phase 1 is "network-reachable single server, team gets
+     read-only" — exactly the cross-machine gap here. So the move is already
+     designed; only the trigger is open.
+
+  PROPOSED TRIGGER (the forcing function):
+    beadle Phase 1 — the scheduled gh-aw workflow running AS arcavenai — is the
+    first time state must be (a) written by a non-interactive agent and (b)
+    possibly on a different machine, AND the first time concurrent runs make the
+    dashboard creation race (question-dashboard-discovery-robustness) load-bearing.
+    Until then everything is single-session, single-machine, manually launched, and
+    a shared instance is cost without need (SOUL §7 gradual elaboration).
+    => Do NOT move yet. Move when beadle Phase 1 is committed.
+
+  Open sub-questions:
+  - Is beadle's work-tracking home the orc bd, a target-specific bd, or its own?
+  - Does the shared-state move and the discovery-race serialized chokepoint resolve
+    together (both want a single coordination point)?
+edges:
+  - target: question-dashboard-discovery-robustness
+    type: relates
+  - target: question-dolt-state-engine
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"
+  note: "points at orc charter F26 (bd on Dolt server, Phase 0 shipped / Phase 1 = network-reachable single server). Trigger bound to beadle Phase 1 (scheduled gh-aw)."

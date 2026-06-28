@@ -1,0 +1,43 @@
+id: question-dashboard-discovery-robustness
+type: question
+confidence: frontier
+title: "How robust is dashboard discovery against title drift, duplicates, and concurrent runs?"
+tags: [beadle, dashboard, idempotency, discovery, frontier]
+content: |
+  beadle finds "its" dashboard by exact title and rewrites in place, to avoid the
+  Renovate duplicate-dashboard failure. A design review (finding-001) surfaced four
+  edges in that mechanism. Three are obvious hardening (done in finding-001); one
+  needs design.
+
+  RESOLVED in finding-001 (operational docs updated — skill, launcher, schema):
+  - Title-as-only-key fragility: discovery now keys PRIMARILY on the
+    `<!-- beadle-state -->` body sentinel (machine-stable, survives title edits),
+    with exact title as a secondary signal. The union of both is the candidate set.
+  - Multi-match / drift-already-happened: >1 candidate authored by the beadle
+    identity → STOP, report all, request human consolidation. Never auto-create a
+    third, never silently pick one.
+  - Title vs H1 ambiguity: the GitHub issue TITLE is exactly the bare string; the
+    per-target `· owner/name` suffix lives only in the body H1. One dashboard per
+    target repo. Closed-issue scope (`--state open`) documented as intentional, not
+    a bug (a closed dashboard frees the title — see vsdd-factory#311).
+
+  STILL OPEN (this question):
+  - Concurrency guarantee. Re-check-before-create narrows the TOCTOU window but
+    does not close it. Two scheduled/concurrent runs against one target could each
+    see "no open dashboard" and both create. A true guarantee requires treating
+    dashboard creation as a SERIALIZED CHOKEPOINT — the INC-003 lesson
+    (cross-artifact identity allocation must be serialized; advisory checks don't
+    prevent races). Phase 0 is single-session so the risk is low today; the gap
+    becomes real at Phase 1 (scheduled gh-aw) and Phase 2 (marvel team).
+  - What is the chokepoint? Candidates: an advisory lock issue/label, a marvel
+    single-writer reconciliation (the orchestrator already serializes all writes —
+    dashboard creation should route through it), or a GitHub-side idempotency key.
+    Resolve alongside F3 (marvel team shape) and the Phase-1 gh-aw cron design.
+edges:
+  - target: elem-state-out-of-band
+    type: relates
+  - target: question-marvel-team-shape
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"
