@@ -118,6 +118,27 @@ frontier F2).
    (cited reason the action is recommended, integrity flags) rides in a folded
    `<details>` under the row — instantly visible to an LLM, out of the human's way —
    and never restates the issue body, which the agent fetches via `#NN`.
+3b. **Quick wins — safe to act on** (the low-caution lane). A grouping
+    **orthogonal to the impact ordering**, not a fourth priority tier: the
+    *obviously-broken, easy-fix, low-blast-radius* issues a maintainer can use to
+    **exercise their process** without the caution the P0/P1 items demand. Reward the
+    safe + obvious, not only the critical. Eligibility is **derived from the existing
+    axes**, never a hand-curated "easy" label:
+    - mechanical end of **defect-nature** (typo / wrong-variable / docs / one-line
+      config / a bounded agent-prompt warning) — *not* design/spec/directional;
+    - **Bohrbug reproducibility** (consistent, isolatable) or a pure docs/wording change;
+    - **bounded blast radius** + **high fix-confidence** (the fix is cited and obvious);
+    - **alignment ≠ drifts** (don't fast-track something that shouldn't be built).
+    **Hard exclusion (finding-004):** an issue touching a system-of-record
+    `integrity_anchor` is **never** eligible, *no matter how small the trigger looks* —
+    "a one-line diff must never mask a silent-integrity defect." The easy lane is
+    exactly the trap finding-004 warns about; integrity-gated items stay in P0.
+    **No-Goodhart:** this is a *surfacing* device, not a scored metric — never count
+    "quick wins closed" as success (that rewards trivial churn). Same row format as the
+    action plan (title leads, `#NN`, trailing chips); a folded agent-channel
+    `<details>` may carry the one-line fix sketch. Cold-start note (ADR-005): this lane
+    is the **cheapest first maintainer pass** — resolving one here is a low-risk way to
+    turn the process and begin the baseline.
 4. **Direction health** (the differentiator) — minutiae ratio, scope-drift
    candidates, issues contradicting declared intent, over-engineering smells
    (premature abstraction, speculative config, build-what-you-might-need),

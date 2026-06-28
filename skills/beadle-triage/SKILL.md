@@ -152,7 +152,8 @@ the union. Exactly one (your authorship) → rewrite in place. **>1 → STOP and
 human consolidation** (a duplicate already exists; never pick one silently, never
 create a third). Wrong author → STOP, don't fork. None → re-check immediately, then
 create+pin. Then rewrite the whole body from the store — Header (direction verdict), Progress (stats + trend deltas, every count
-paired with an outcome), Action plan, **Direction Health** (minutiae ratio,
+paired with an outcome), Action plan, **Quick wins — safe to act on** (see step 7a),
+**Direction Health** (minutiae ratio,
 filed-vs-acted gap, scope-drift candidates), Classification index, **Maintainer
 progress** (outcome-paired, not a leaderboard — see step 7b), Controls
 (derived checkboxes). Embed only a digest in `<!-- beadle-state -->`. Never parse
@@ -179,6 +180,35 @@ The two see *inverted visibility*, so render three channels in one body:
   dashboard **never replicates the issue body** — an agent follows the reference (B1: the
   board is a projection/index, not a replica). Carry only what differentiates; link
   everything an agent can fetch. This also protects the 65 k body budget.
+
+### 7a. Quick wins — safe to act on  (the low-caution lane)
+Render a group **orthogonal to the P0/P1/P2 impact ordering** — *not* a fourth
+priority tier. Its job: give maintainers the **obviously-broken, easy-fix,
+low-blast-radius** issues they can use to **exercise their process** without the
+caution the high-impact items demand. Reward the safe + obvious, not only the
+critical. **Eligibility is DERIVED from the axes you already scored** (never a
+hand-curated "easy" tag):
+- **defect-nature** at the mechanical end (typo / wrong-variable / docs / one-line
+  config / a bounded agent-prompt warning) — exclude design / spec / directional;
+- **reproducibility** Bohrbug (consistent, isolatable) or a pure docs/wording change;
+- **bounded blast radius** + **high fix-confidence** (the fix is cited + obvious);
+- **alignment ≠ drifts** (never fast-track something that shouldn't be built).
+
+**HARD EXCLUSION (finding-004) — non-negotiable.** An issue touching a
+system-of-record `integrity_anchor` is **never** a quick win, *no matter how small
+the triggering bug looks*. finding-004 is explicit: "a green check or a one-line diff
+must never mask" a silent-integrity defect. The easy lane is precisely that trap;
+integrity-gated items stay in the P0 source-of-truth cluster. Before placing any
+issue here, check it against the manifest's `integrity_anchors` and the integrity
+flag from step 3 — if either fires, it is disqualified.
+
+**NO-GOODHART.** This is a *surfacing* device, not a metric. Never count "quick wins
+closed" as success — that rewards trivial churn over real fixes. Maintainer progress
+(7b) still moves only on verified fix-outcomes. Row format matches the action plan
+(title leads, `#NN`, trailing chips); a folded agent-channel `<details>` may carry
+the one-line fix sketch. **Cold-start (ADR-005):** this lane is the **cheapest first
+maintainer pass** — resolving one is the lowest-risk way to turn the process and
+start the baseline. Surface a handful (not the whole tail); link, never replicate.
 
 ### 7b. Maintainer progress  (outcome-paired — NOT a leaderboard)
 Surface what maintainers have *resolved against beadle-discovered defects* to make
