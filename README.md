@@ -77,6 +77,18 @@ beadle elaborates gradually. It is useful at every phase and over-built at none.
 DrBothen's [Prism](./targets/prism.intent.yaml). Generic for any repo — each
 target declares its own intent anchor; nothing is hardcoded.
 
+## Running it (as arcavenai)
+
+beadle rewrites **its own** dashboard issue each run, so the issue must be
+created and maintained by the managing bot identity — **`arcavenai`**, not a human
+account (an issue's author can't be reassigned). To create/refresh a target's
+dashboard, run [`prompts/create-dashboard.md`](./prompts/create-dashboard.md) from
+the beadle repo root **on a system whose active GitHub identity is `arcavenai`**.
+It carries a hard identity guard (`gh api user` must be `arcavenai`/`arcavenai[bot]`,
+abort otherwise) so the post can never be made under the wrong identity. Phase 1
+replaces the manual launcher with a scheduled `gh-aw` workflow running as the
+arcavenai GitHub App — same identity, same idempotent rewrite.
+
 ## Layout
 
 ```
@@ -94,6 +106,7 @@ beadle/
 ├── _kos/                knowledge graph (bedrock/frontier/graveyard nodes)
 ├── targets/             per-project intent anchors (vsdd-factory, prism, ...)
 ├── skills/beadle-triage/  the Phase-0 MVP skill
+├── prompts/             runnable launchers (create-dashboard.md — run as arcavenai)
 └── pack.yaml            the sideshow-pack manifest (Phase-1+ target shape)
 ```
 
