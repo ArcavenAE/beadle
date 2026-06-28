@@ -39,9 +39,32 @@ Two axes — severity (impact) and priority (urgency); a leverage axis
 (systemic ↔ minutiae); default priority low, escalate on evidence. Re-classify
 type; don't trust the body's self-label.
 
-### 4. score-intent  (read-only)
-Grade alignment against the manifest's `alignment_rubric` (advances / neutral /
-drifts) **with cited rationale**. Confidence as frequency, never fluent certainty.
+### 4. score-intent  (read-only) — MANDATORY PER ARTIFACT, never skipped
+This is beadle's differentiator (B4). You MUST read each enumerated issue's BODY
+and grade it — title-level slotting is a defect, not a shortcut. For every issue:
+
+1. **Read the manifest's target semantics FIRST**, before applying the rubric:
+   - `self_referential: true` → engine/process/meta issues are **on-mission**;
+     do NOT flag `process-gap(...)`/`meta(...)` as off-mission self-reference. Judge
+     on leverage + provenance. (For vsdd-factory the engine IS the product.)
+   - `provenance_signal` → infer **pilot-derived** (cites a real commit/file/run +
+     reproduction) vs **speculative** (invented machinery, no observed failure).
+     Pilot-derived ranks ABOVE; speculative ranks toward `drifts`.
+2. Grade alignment against `alignment_rubric` (advances / neutral / drifts) **with
+   cited rationale** — quote the rubric line and cite the issue's evidence.
+3. Confidence as frequency, never fluent certainty.
+
+Group by **intent semantics, not surface keywords**: a drift-soundness bug, a
+data-safety bug, and a framework-cost study are three different buckets even if all
+three say "CI" in the title.
+
+### 4b. corpus-level minutiae  (read-only) — run the detectors against the FILER
+Beyond per-issue scoring, compute the manifest's `minutiae_signals` across the
+whole measured-contributor corpus. The "led-by-the-backlog" pattern (N granular
+issues, M<<N maintainer actions) is a property of the *filing pattern*, not any one
+issue — and it holds **even when every individual issue scores "advances."** Surface
+it on Direction Health. (Cold-start ADR-005: report the structural ratio as
+baseline; withhold the rate/trend claim until the process has turned.)
 
 ### 5. investigate  (read-only, selective)
 Only for ambiguous / high-stakes / contested issues: a short memo (what's true,
@@ -93,3 +116,8 @@ top contributing signal.
 - Never auto-close on inactivity (G2). Information density is a protection signal.
 - No Goodhart — never chase close-rate; pair counts with outcomes.
 - Maintainer engagement is the compass (B3).
+- **Intent fidelity (B4).** score-intent is mandatory per artifact and reads the
+  manifest's target semantics (`self_referential`, `provenance_signal`) before the
+  rubric. Title-level slotting without grading the body is a defect. Group by intent
+  semantics, not surface keywords. Run the corpus-level minutiae detectors against
+  the measured filer, not only per-issue.
