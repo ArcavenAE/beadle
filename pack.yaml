@@ -1,0 +1,37 @@
+# beadle — sideshow-pack manifest  [Phase-1+ target shape; frontier F4]
+# Distributes beadle into a consumer repo via sideshow. The MVP runs from
+# skills/beadle-triage today; this manifest is the packaged form.
+schema_version: 1.0
+name: beadle
+version: 0.1.0
+description: |
+  Intent-aligned issue triage + living dashboard. The next-generation envoy:
+  screens/labels/cross-checks issues, scores each against the target's declared
+  intent (weighted by maintainer engagement), and maintains a pinned dashboard
+  issue whose state lives out-of-band. Runs as arcavenai. Composes
+  arcavenai-issue-review for per-issue discipline.
+
+distribute:
+  # The Phase-0 entry point — synced to the consumer's Claude skills.
+  skills:
+    - source: skills/beadle-triage
+      target: .claude/skills/beadle-triage
+  # Operating rules surfaced to any agent working the repo.
+  rules:
+    - source: distribute/rules/beadle-invariants.md
+      target: .claude/rules/beadle-invariants.md
+  claude_md:
+    - id: beadle-intro
+      source: distribute/claude-md/beadle-intro.md
+  # The per-target intent anchor lives in the consumer repo so maintainers own it.
+  files:
+    - source: targets/_template.intent.yaml
+      target: .beadle/intent.yaml
+  gitignore:
+    - .beadle/state/        # out-of-band JSONL store (Phase 0)
+    - .beadle/cache/
+
+# Phase-1+ : a scheduled gh-aw workflow runs the pass as arcavenai.
+# Phase-2  : the pack is consumed by marvel as a triage Team (multiclaude v2);
+#            durable state migrates to Dolt (frontier F2).
+# (hooks / cli bindings added when a concrete need demands them — gradual elaboration.)

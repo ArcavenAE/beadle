@@ -1,0 +1,22 @@
+id: question-dolt-state-engine
+type: question
+confidence: frontier
+title: "Phase-2 state engine: Dolt vs DoltLab/DoltHub?"
+tags: [beadle, state, dolt, persistence, frontier]
+content: |
+  Phase-2 durable state wants revision control: diffable, branchable, auditable
+  issue/classification/stat history. Dolt (Git-for-data SQL) is the leading
+  candidate for the engine; DoltLab (self-hosted server) / DoltHub (hosted remote)
+  is the open question for a shared remote. NOT in the MVP — Phase 0 uses
+  append-only JSONL. Open:
+  - Schema for issues, classifications, alignment verdicts, maintainer-event log,
+    historical stats.
+  - Branch-per-run vs single-branch-with-commits for audit.
+  - Where does the remote live, and does it stay sovereign (SOUL.md tenet 1)?
+  - Migration path JSONL -> Dolt without losing history.
+edges:
+  - target: elem-state-out-of-band
+    type: derives
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

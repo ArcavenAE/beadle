@@ -1,0 +1,20 @@
+id: elem-maintainer-compass
+type: element
+confidence: bedrock
+title: "Maintainer engagement is the compass; contribution volume is the cargo"
+tags: [beadle, intent, maintainer-signal, drift]
+content: |
+  beadle weights work by what maintainers actually act on (respond / label /
+  close / reference / merge), reconstructed from role-filtered behavioural events.
+  Reaction-popularity is demand to reconcile, never equate. Contribution volume —
+  especially from an automated filer (arcavenai) — is the thing being measured,
+  never the signal of value. The gap between what is filed and what maintainers
+  act on is the primary "led-by-the-backlog" drift signal. No shipping tool cleanly
+  separates reaction-popularity from maintainer-acted-upon signal; this separation
+  is a beadle differentiator.
+edges:
+  - target: elem-intent-alignment-whitespace
+    type: supports
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

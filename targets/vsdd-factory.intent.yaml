@@ -1,0 +1,79 @@
+# beadle intent manifest — drbothen/vsdd-factory
+# Schema is frontier (charter F1); this is the working v0 shape.
+schema_version: 0.1
+
+target:
+  repo: drbothen/vsdd-factory
+  default_branch: develop
+  local_checkout: ~/work/vsdd-factory   # for the already-fixed / citation-exists checks
+
+# The compass. Work is weighted by what these humans actually act on
+# (respond / label / close / reference / merge) — not by volume or reactions.
+maintainers:
+  - drbothen
+  - Zious11
+# The prolific filer being measured against the compass.
+measured_contributors:
+  - arcavenai   # Skippy — public, reflects on the user; weight concerns highest
+  - arcaven     # the human review identity
+
+# Composite, weighted intent anchor (no single source is authoritative).
+intent_sources:
+  static:
+    - path: CLAUDE.md
+      weight: high
+      note: canonical principle — production-grade default, no MVP-defer, no paper-fix
+    - path: .factory/STATE.md
+      weight: high
+      note: live cycle goals, mode, decision log (latest D-NNN wins)
+    - glob: docs/**
+      weight: medium
+    - path: SOUL.md
+      weight: high
+      optional: true
+      note: not present yet; honor if added
+  dynamic:
+    - source: git-history
+      weight: medium
+      note: what actually merges signals real direction
+    - source: maintainer-comments
+      weight: high
+      note: DrBothen/Zious11 comments/decisions are first-class intent signal
+
+# What the project is for.
+goals:
+  - Production-grade-default engine discipline (F5 asymptotic convergence)
+  - Self-referential factory: engine and product are one repo
+  - Spec-driven, adversarially-reviewed, traceable artifacts (.factory/)
+non_goals:
+  - MVP-driven deferrals, "good enough", "fix later" (explicit anti-pattern)
+  - Paper-fixes (rename/doc-comment/assert-only without load-bearing test)
+  - Scope expansion into new domains without surfaced architecture decisions
+scope_boundaries:
+  - Code-vs-spec conflicts: the SPEC wins; only a human authorizes spec amendment
+  - .factory/ mutations via Edit/Write only; no bypass (POL-3)
+
+# How an issue/PR is scored. Graded, cited — never a bare label.
+alignment_rubric:
+  advances:
+    - closes a real defect class with a load-bearing test
+    - tightens an existing gate / removes a drift surface
+    - improves traceability or convergence soundness
+  neutral:
+    - documentation/cosmetic with bounded blast radius
+  drifts:
+    - proposes machinery before a concrete need (gradual-elaboration violation)
+    - couples otherwise-independent components
+    - re-files an already-decided question; contradicts a maintainer decision
+    - a self-referential process-gap that doesn't change product outcomes
+    - hallucinated citation / fix-not-fixed / surface-plausible but fabricated
+
+# Drift / minutiae detectors surfaced on the dashboard's Direction Health panel.
+minutiae_signals:
+  - low_leverage_ratio_rising
+  - filed_vs_acted_gap_widening      # arcavenai files N, maintainers act on M<<N
+  - cluster_same_lever_filed_n_times # candidate meta/tracking issue, not N issues
+  - over_engineering_fingerprints    # premature abstraction, speculative config
+
+# Compose the existing per-issue discipline rather than reinventing it.
+composes_skill: arcavenai-issue-review

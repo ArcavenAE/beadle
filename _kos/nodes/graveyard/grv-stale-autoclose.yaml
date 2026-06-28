@@ -1,0 +1,19 @@
+id: grv-stale-autoclose
+type: option
+confidence: graveyard
+title: "Auto-close issues on inactivity (stale-bot)"
+tags: [beadle, autoclose, rejected]
+content: |
+  Rejected. The documented stale-bot backlash: inactivity != irrelevance !=
+  resolution; auto-close buries the highest-information reports (repros,
+  reductions), spawns duplicates, and games the open-issue metric. Information
+  density is a protection signal, not a deletion signal. beadle labels and
+  surfaces; closure is escalated to a human, never fired on a timer. The
+  defensible variant (probot/no-response: human-applied precondition + reopen on
+  reply) is the only auto-close shape considered, and even that is out of scope.
+edges:
+  - target: elem-propose-not-act
+    type: superseded-by
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

@@ -1,0 +1,24 @@
+id: elem-intent-alignment-whitespace
+type: element
+confidence: bedrock
+title: "Per-artifact intent-alignment scoring is the white space beadle owns"
+tags: [beadle, intent, differentiator, prior-art]
+content: |
+  A genuine prior-art survey found no shipping tool that semantically scores an
+  individual issue/PR/commit against a declared, versioned project intent and
+  emits a graded verdict with cited rationale, weighted by reconstructed
+  maintainer-action signal, with a bot-maintained dashboard whose state lives
+  out-of-band. The adjacent cells are occupied but answer the wrong question: PM
+  tools score at roadmap granularity with no published method; engineering-
+  intelligence measures time-allocation; spec-conformance checks code-vs-spec;
+  GORE has the graded-satisfaction formalism but dies on manual modelling.
+  beadle needs all three at once: per-artifact granularity + semantic scoring
+  against a machine-readable intent + continuous automation.
+edges:
+  - target: question-intent-manifest-schema
+    type: refines
+  - target: elem-maintainer-compass
+    type: depends-on
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

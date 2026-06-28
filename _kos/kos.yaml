@@ -1,0 +1,5 @@
+graph_id: beadle
+scope: repo
+description: Intent-aligned issue triage + dashboard — knowledge graph
+schema_version: '0.3'
+nodes_dir: nodes

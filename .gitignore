@@ -1,0 +1,13 @@
+# beadle out-of-band state store (Phase 0 JSONL) and caches — never committed
+.beadle/state/
+.beadle/cache/
+*.local
+
+# rendered docs
+/tmp/beadle-*
+
+# editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

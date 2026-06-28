@@ -1,0 +1,22 @@
+id: elem-state-out-of-band
+type: element
+confidence: bedrock
+title: "Durable state lives out-of-band; the dashboard issue is a projection"
+tags: [beadle, dashboard, state, renovate]
+content: |
+  The universal failure mode of bot-maintained dashboards is state-in-Markdown:
+  the bot parses its own rendered issue body as machine state and breaks when a
+  human edits it (renovatebot/renovate#19563). beadle's source of truth is an
+  out-of-band store (Phase 0: append-only JSONL; Phase 2: Dolt). The GitHub
+  dashboard issue is regenerated each run as a read-only projection. beadle never
+  trusts a hand-edit, embeds only a digest in a `<!-- beadle-state -->` sentinel,
+  and tolerates a wiped body by regenerating cleanly. Checkboxes are derived from
+  authoritative state, never authored by hand.
+edges:
+  - target: grv-state-in-markdown
+    type: supersedes
+  - target: question-dolt-state-engine
+    type: refines
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

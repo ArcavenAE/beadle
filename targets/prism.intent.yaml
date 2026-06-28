@@ -1,0 +1,47 @@
+# beadle intent manifest — DrBothen's Prism  [DRAFT — needs population]
+# Schema is frontier (charter F1); this is a stub to be filled once Prism's
+# canonical sources are read. Do NOT score against this until populated.
+schema_version: 0.1
+
+target:
+  repo: drbothen/prism          # TODO confirm exact owner/name
+  default_branch: main          # TODO confirm
+  local_checkout: null          # TODO clone to its canonical orchestrator path
+
+maintainers:
+  - drbothen
+measured_contributors:
+  - arcavenai
+  - arcaven
+
+# TODO: read Prism's own CLAUDE.md / README / SOUL / docs / roadmap and populate.
+intent_sources:
+  static:
+    - path: README.md
+      weight: medium
+    - path: CLAUDE.md
+      weight: high
+      optional: true
+  dynamic:
+    - source: maintainer-comments
+      weight: high
+    - source: git-history
+      weight: medium
+
+goals: []          # TODO
+non_goals: []      # TODO
+scope_boundaries: []  # TODO
+
+alignment_rubric:
+  advances: []     # TODO
+  neutral: []      # TODO
+  drifts: []       # TODO
+
+minutiae_signals:
+  - low_leverage_ratio_rising
+  - filed_vs_acted_gap_widening
+  - cluster_same_lever_filed_n_times
+
+composes_skill: arcavenai-issue-review
+
+status: draft-unpopulated

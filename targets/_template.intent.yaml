@@ -1,0 +1,47 @@
+# beadle intent manifest — TEMPLATE. Copy to <project>.intent.yaml and populate.
+# Distributed by pack.yaml to a consumer repo as .beadle/intent.yaml.
+schema_version: 0.1
+
+target:
+  repo: owner/name
+  default_branch: main
+  local_checkout: null
+
+# The compass — work is weighted by what these humans act on, not by volume.
+maintainers: []
+measured_contributors: []
+
+# Composite, weighted anchor — prefer existing repo docs over inventing new ones.
+intent_sources:
+  static:
+    - path: README.md
+      weight: medium
+    - path: CLAUDE.md
+      weight: high
+      optional: true
+    - path: SOUL.md
+      weight: high
+      optional: true
+  dynamic:
+    - source: maintainer-comments
+      weight: high
+    - source: git-history
+      weight: medium
+
+goals: []
+non_goals: []
+scope_boundaries: []
+
+alignment_rubric:
+  advances: []
+  neutral: []
+  drifts: []
+
+minutiae_signals:
+  - low_leverage_ratio_rising
+  - filed_vs_acted_gap_widening
+  - cluster_same_lever_filed_n_times
+  - over_engineering_fingerprints
+
+composes_skill: arcavenai-issue-review
+status: draft-unpopulated

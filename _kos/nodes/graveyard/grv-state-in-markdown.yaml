@@ -1,0 +1,17 @@
+id: grv-state-in-markdown
+type: option
+confidence: graveyard
+title: "Store dashboard state in the issue body (Markdown-as-truth)"
+tags: [beadle, dashboard, rejected]
+content: |
+  Rejected. Storing authoritative state in the rendered Markdown body is the
+  universal failure mode of bot-maintained dashboards: Renovate parses its own
+  body and is left "in a broken state" when a human edits it
+  (renovatebot/renovate#19563). State lives out-of-band; the body is a
+  regenerated projection. See elem-state-out-of-band.
+edges:
+  - target: elem-state-out-of-band
+    type: superseded-by
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

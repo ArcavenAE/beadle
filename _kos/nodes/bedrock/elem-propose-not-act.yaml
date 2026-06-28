@@ -1,0 +1,24 @@
+id: elem-propose-not-act
+type: element
+confidence: bedrock
+title: "Propose-not-act for anything consequential or public; per-stage autonomy"
+tags: [beadle, autonomy, guardrails, human-ai]
+content: |
+  Automation level is set per stage independently (acquire / analyze / decide /
+  act — Parasuraman-Sheridan-Wickens). beadle reads and analyzes with high
+  autonomy; it proposes for anything consequential or reader-facing. Bounded,
+  reversible, additive actions (allow-listed labels, the dashboard rewrite) may
+  run autonomously; free-text public comments default to a high-bar/review path
+  with volume caps; closing/resolution is never autonomous (no stale-bot —
+  information density is a protection signal). Every public output clears the same
+  bar a careful human meets, or it is not posted (the curl AI-slop rule).
+  Confidence is surfaced as frequency; evidence is cheap-to-verify links; every
+  action is reversible with an audit trail and named-supervisor attribution.
+edges:
+  - target: grv-stale-autoclose
+    type: supersedes
+  - target: elem-maintainer-compass
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

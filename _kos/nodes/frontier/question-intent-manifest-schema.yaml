@@ -1,0 +1,22 @@
+id: question-intent-manifest-schema
+type: question
+confidence: frontier
+title: "What is the minimal, versioned, machine-readable intent-manifest schema?"
+tags: [beadle, intent, schema, frontier]
+content: |
+  Each target declares its intent so beadle can score against it
+  (targets/<project>.intent.yaml). The v0 shape exists (goals, non_goals,
+  scope_boundaries, alignment_rubric, maintainers, weighted intent_sources). Open:
+  - How minimal can it be while still supporting a graded verdict? The GORE
+    failure mode is a rich model nobody maintains.
+  - For vsdd-factory the anchor is composite (CLAUDE.md + STATE.md + docs +
+    git-history + maintainer comments + a future SOUL.md). How are weights combined?
+  - How is the rubric kept honest as the project evolves — re-derive from sources
+    each run, or pin and diff?
+  - Held-out alignment scenarios (frontier F6 / StrongDM) — in-schema or separate?
+edges:
+  - target: elem-intent-alignment-whitespace
+    type: derives
+provenance:
+  created_by: agent
+  created_at: "2026-06-27"

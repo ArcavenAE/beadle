@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifests parse + declare schema_version
+        run: |
+          for f in pack.yaml targets/*.intent.yaml _kos/kos.yaml; do
+            python3 -c "import yaml; d=yaml.safe_load(open('$f')); assert 'schema_version' in d, 'missing schema_version in $f'; print('ok:', '$f')"
+          done
+      - name: markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: '**/*.md'
+        continue-on-error: true
