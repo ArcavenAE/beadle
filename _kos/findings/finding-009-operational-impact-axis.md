@@ -89,7 +89,12 @@ to propose, NOT posted. Recommended ask:
   a factory regression critic should flag — defect-class-weighted efficiency
   per finding-008 / boundary-beadle).
 
-**Not posted upstream.** Whether/when to raise it with drbothen is the user's call.
+**Posted upstream (session-051, user direction "post upstream and let arcaven sort it out"):**
+`drbothen/vsdd-factory#325` carries the emit-contract as a feature request,
+parallel to #324 (per-run OTEL attribution). Framed WHAT/WHY with mechanism left
+to the implementers (INC-002); standards basis cited. Arcaven owns the HOW from
+here. The B2 propose-not-act discipline held up to the post: the contract was a
+proposal, surfaced to the user, posted only on explicit direction.
 
 ## Consequence for the two siblings
 
