@@ -53,9 +53,13 @@ events) to the out-of-band store (Phase 0: JSONL). The store is the source of
 truth — never the dashboard body.
 
 ### 7. Regenerate the dashboard  (the primary goal)
-Per `../../docs/dashboard-schema.md`: find the pinned `📋 beadle — Triage
-Dashboard` issue by title (create+pin if absent), rewrite the whole body from the
-store — Header (direction verdict), Progress (stats + trend deltas, every count
+Per `../../docs/dashboard-schema.md`: discover the pinned dashboard **sentinel-first,
+title-second** — search the beadle identity's open issues for the `<!-- beadle-state -->`
+block (machine-stable key) and the exact title `📋 beadle — Triage Dashboard`; take
+the union. Exactly one (your authorship) → rewrite in place. **>1 → STOP and request
+human consolidation** (a duplicate already exists; never pick one silently, never
+create a third). Wrong author → STOP, don't fork. None → re-check immediately, then
+create+pin. Then rewrite the whole body from the store — Header (direction verdict), Progress (stats + trend deltas, every count
 paired with an outcome), Action plan, **Direction Health** (minutiae ratio,
 filed-vs-acted gap, scope-drift candidates), Classification index, Controls
 (derived checkboxes). Embed only a digest in `<!-- beadle-state -->`. Never parse
