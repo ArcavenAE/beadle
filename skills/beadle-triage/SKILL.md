@@ -156,7 +156,8 @@ paired with an outcome), Action plan, **Quick wins — safe to act on** (see ste
 **Direction Health** (minutiae ratio,
 filed-vs-acted gap, scope-drift candidates), Classification index, **Maintainer
 progress** (outcome-paired, not a leaderboard — see step 7b), Controls
-(derived checkboxes). Embed only a digest in `<!-- beadle-state -->`. Never parse
+(derived checkboxes), **Legend & references** (one collapsed footer — see step 7c).
+Embed only a digest in `<!-- beadle-state -->`. Never parse
 the body as state; tolerate a wiped body.
 
 **Row legibility — title leads, verdict trails (finding-005).** A human scanning the
@@ -222,6 +223,21 @@ gamed by closing-without-fixing; the metric must move only when real defects get
 real fixes. Cold-start (ADR-005): show structure now, withhold rate/streak claims
 until the process has turned. Frontier — render a minimal honest version; the full
 reward design is open.
+
+### 7c. Legend & references  (one collapsed footer — light touch)
+Decode the chip vocabulary **once**, at the foot, in a single collapsed
+`<details><summary>Legend & references</summary>` — this is *why* §3–§5 rows stay
+terse. **Do NOT** scatter footnote marks, superscripts, or `[1]`-style callouts
+through the rows; stray symbols make the board harder to read, not easier. The footer
+has two short parts:
+- **Legend** — map only the chips/glyphs that **actually appeared this run** to a
+  one-line meaning (verdict 🟢/🟡/🔴, the `Bohr/Mandel/Heisen` repro badge, `🛑 integrity`).
+  Omit any row whose chip wasn't used.
+- **References** — link only the **load-bearing industry standards** so a maintainer
+  *can* read more: defect-nature → IEEE 1044 / ODC; reproducibility → Grottke–Trivedi;
+  severity-vs-priority. Plain inline links in the footer, the citation given **once** —
+  never repeated on the rows that use the term. Keep it to a few; don't catalog every
+  source (`references.bib` is the full bibliography).
 
 ### 8. Read controls from the prior body — two tiers
 Parse `- [x] <!-- verb=...;id=... -->` lines, dispatch, then reset the box on

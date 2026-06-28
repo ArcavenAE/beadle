@@ -194,6 +194,25 @@ frontier F2).
    this body and parse Tier-2 boxes to decide whether any costly routine was requested,
    escalating to the expensive act pass only on a hit. Frontier F5 + the maintenance-
    request question.
+8. **Legend & references** (one collapsed `<details>` at the foot — *light touch*).
+   The chips in §3–§5 stay terse precisely because the vocabulary is decoded **once**
+   here, not per row. The goal is concision, not annotation: **do not** scatter
+   footnote marks, superscripts, or `[1]`-style callouts through the rows — that makes
+   the board harder to read, not easier. Instead:
+   - **A short legend** mapping the chip glyphs/words used *in this render* to a
+     one-line meaning (only the ones actually present — don't pad it): e.g.
+     `🟢 advances · 🟡 neutral · 🔴 drifts` for the alignment verdict; the repro badge
+     `Bohr` (consistent) / `Mandel` (intermittent) / `Heisen` (observation-sensitive);
+     `🛑 integrity` for the source-of-truth-integrity gate.
+   - **A references line** linking the **major industry standards** the model rests on
+     so a maintainer *can* read more if they want — kept to the few that are
+     load-bearing, as plain inline links, no inline citation marks in the rows:
+     defect-nature → IEEE 1044 [@ieee1044] / ODC [@odc]; reproducibility →
+     Grottke–Trivedi [@grottke]; severity-vs-priority [@severitypriority]. Link the
+     term once, in the footer — never repeat the citation on every row that uses it.
+   Render the whole section collapsed (`<details><summary>Legend & references</summary>`)
+   so it is out of the human's way but one click (and, for an agent reading raw markdown,
+   zero cost) away. Omit any legend row whose chip didn't appear this run.
 
 ## Identity, cadence, hardening
 
