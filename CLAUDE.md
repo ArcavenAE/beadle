@@ -46,11 +46,11 @@ These are bedrock (`charter.md`) and incident-hardened. Violating one is a bug.
 
 beadle uses the aae-orc label schema (`../labels/schema.yaml`): scoped, with
 **mutual exclusivity** enforced by convention (GitHub does not enforce it). Before
-applying a label in an exclusive scope (`type.*`, `priority.*`, `triage.*`,
-`scope.*`, `resolution.*`), query current labels, remove the existing one in that
-scope, then apply the new one. beadle sets `type.*`/`priority.*`/`triage.*`/
-`contrib.*`/`status.stale`/`agent.*` autonomously; **proposes** `scope.*` and
-`resolution.*` (a human/supervisor confirms).
+applying a label in an exclusive scope (`type.*`, `priority.*`, `impact.*`,
+`triage.*`, `scope.*`, `resolution.*`), query current labels, remove the existing
+one in that scope, then apply the new one. beadle sets `type.*`/`priority.*`/
+`impact.*`/`triage.*`/`contrib.*`/`status.stale`/`agent.*` autonomously;
+**proposes** `scope.*` and `resolution.*` (a human/supervisor confirms).
 
 ## Build / Run / Test (Phase 0)
 
