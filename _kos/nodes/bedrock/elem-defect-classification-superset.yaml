@@ -78,6 +78,20 @@ content: |
     fix-outcomes.
   Cold-start (elem-cold-start-warmup): the lane is the cheapest first maintainer pass —
   resolving one is the lowest-risk way to turn the process and begin the baseline.
+
+  --- Downstream consumer: critic (the coupling, documented — not a contract) ---
+
+  This taxonomy is the single genuine shared surface between beadle and critic
+  (ArcavenAE/critic, cloned at ~/work/aae-orc/critic). beadle CLASSIFIES into these
+  axes; critic CONSUMES the class to apply a class weight w(class) for class-weighted
+  defect-detection efficiency (per-token / per-$ / per-hour) across runs — never a raw
+  count (Goodhart). critic never re-classifies; beadle never computes cross-run efficiency.
+  This node is the canonical source critic points at (critic/docs/analysis/boundary-beadle.md).
+  Decided session-051: DOCUMENT the coupling, do NOT extract a shared schema/library yet —
+  the taxonomy stays prose here, owned by beadle; defer a machine-readable class-id
+  contract (which would be an orc-level artifact mirroring aae-orc/labels/schema.yaml,
+  not a copy in critic) until critic has running code and a second consumer is real
+  (SOUL.md §7 gradual elaboration). See finding-008.
 edges:
   - target: elem-intent-alignment-whitespace
     type: refines
