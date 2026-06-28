@@ -4,7 +4,7 @@ confidence: frontier
 title: "Maintainer-triggered maintenance-request controls (the cheap-poll-then-act tier)"
 tags: [beadle, dashboard, controls, polling, on-demand, frontier]
 content: |
-  Extends F5 (checkbox control surface). F5 and the dashboard schema (§6) already
+  Extends F5 (checkbox control surface). F5 and the dashboard schema (Controls §) already
   describe PER-ISSUE control verbs — `fast-track`/`investigate`/`accept-deferral`,
   keyed to a single `id=#NN`. This question opens a SECOND, dashboard-level tier the
   current design only gestures at: maintainer-triggered *maintenance requests* for

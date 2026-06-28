@@ -1,6 +1,10 @@
 # beadle intent manifest — TEMPLATE. Copy to <project>.intent.yaml and populate.
 # Distributed by pack.yaml to a consumer repo as .beadle/intent.yaml.
-schema_version: 0.1
+# v0.3: added integrity_anchors (systems-of-record by recoverability tier) so the
+#       silent-integrity classifier has grounding instead of inference (finding-004,
+#       finding-005). The defect-nature / reproducibility / report-type / triage-state
+#       axes are engine-level (target-agnostic) and live in the skill, NOT here.
+schema_version: 0.3
 
 target:
   repo: owner/name
@@ -38,6 +42,20 @@ intent_sources:
 goals: []
 non_goals: []
 scope_boundaries: []
+
+# Systems-of-record this target depends on, ranked by RECOVERABILITY (finding-004,
+# finding-005). The silent-integrity classifier (skill step 3) uses these to ground
+# its highest-severity class instead of guessing: a defect that makes any of these
+# disagree with reality without a signal, or threatens the irreplaceable tier, is
+# top severity and gates every functional verdict computed over it. List per target;
+# omit/empty for an ordinary product with no out-of-band source of truth.
+integrity_anchors:
+  # tier: regenerable — re-run the generator (cheapest); losing it costs tokens/time.
+  regenerable: []        # e.g. build output, generated code, compiled artifacts
+  # tier: spec_process — the AUTHORITY code is judged against; only a human amends it.
+  spec_process: []       # e.g. the spec, process/state file, ratchet definition
+  # tier: learning — IRREPLACEABLE; cannot be cheaply re-derived (the expensive output).
+  learning: []           # e.g. decision log, adversarial findings, convergence history
 
 # Provenance is a ranking signal, not just a label: a pilot-derived finding (cites
 # a real commit/file/run/reproduction) outranks a speculative proposal (invented

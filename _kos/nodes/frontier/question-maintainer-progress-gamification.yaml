@@ -1,0 +1,56 @@
+id: question-maintainer-progress-gamification
+type: question
+confidence: frontier
+title: "Rewarding maintainers with visible progress — without breaking the compass"
+tags: [beadle, dashboard, engagement, gamification, no-goodhart, frontier]
+content: |
+  The user wants the dashboard to reward maintainers — make progress and status
+  visible, "get them hooked in fixing the things we discover." Engagement is the goal:
+  a maintainer who sees their resolved-defect count climb is more likely to keep
+  fixing. This is aligned with beadle's purpose IF and ONLY IF it does not corrupt the
+  signal beadle exists to read.
+
+  ## The tension (why this is frontier, not a quick add)
+
+  beadle's no-Goodhart invariant and B3 (maintainer engagement is the compass) are in
+  direct tension with naive gamification:
+  - A leaderboard on close-rate rewards CLOSING, not FIXING. A maintainer optimizing
+    the number closes-without-fixing, marks duplicates, or closes the
+    highest-information reports (the exact G2 stale-bot failure).
+  - B3 says engagement is the *measurement instrument* — the thing beadle reads to
+    detect drift. If maintainers start acting to move a beadle score, the instrument
+    is now measuring itself. The compass spins.
+
+  ## The resolution: reward the verified fix-OUTCOME, never the activity
+
+  The metric must move ONLY when a real defect beadle flagged gets a real, validating
+  fix: flagged → fixed → the fix passes validate (load-bearing test, not paper-fix).
+  - Count "integrity defects closed with a load-bearing fix," "longest-standing P0
+    resolved," "cycles since last drift," "pilot-derived findings adopted."
+  - Every count paired with its outcome signal (no vanity counts).
+  - No gameable per-human ranking; prefer team/streak framings tied to outcomes over
+    individual leaderboards. The validate engine is the gate that makes the number
+    un-gameable — a close without a real fix does not increment it.
+  - Cold-start (ADR-005): show structure now; withhold streak/rate/trend claims until
+    the process has turned (a streak over a pre-engagement window is initialization
+    bias, same as the drift verdict).
+
+  ## Open design questions
+
+  1. What exact reward surfaces hook without distorting? Streaks, badges, a
+     "defects-retired" tally, a "factory health" gauge? Which are outcome-locked?
+  2. Individual vs team framing — does naming a maintainer help (recognition) or hurt
+     (gaming, cross-human dispute)? Cross-ref the atelier closure-verification work.
+  3. Does rewarding fix-outcomes bias maintainers toward beadle-discovered defects
+     over their own roadmap? (A reward that pulls attention to beadle's queue could
+     itself be a drift surface — measure it.)
+  4. How does this interact with the held-out evaluation (F6)? A reward visible to the
+     scorer could become a teach-to-the-test channel.
+edges:
+  - target: elem-maintainer-compass
+    type: relates
+  - target: elem-cold-start-warmup
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"

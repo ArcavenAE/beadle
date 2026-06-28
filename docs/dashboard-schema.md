@@ -15,6 +15,34 @@ Every bot-maintained dashboard studied shares this failure mode. **beadle's rule
 > beadle never trusts a hand-edit and tolerates a wiped body by regenerating
 > cleanly from the store.
 
+## Dual-audience rendering: LLM-first, human-supported
+
+The dashboard is **mainly consumed by LLM/agent sessions** (other Claude Code runs
+orienting on the target) and **secondarily by humans**. These two audiences have
+*inverted visibility*, so one document serves both via three channels:
+
+- **Human channel — the rendered surface.** Humans will not hover, will not expand
+  `<details>`, will not read HTML comments. So the visible render must be scannable:
+  **short human title first** (a few words — *what the issue is*), then minimal chips.
+- **Agent channel — folded / embedded, free to the LLM.** An agent reads the **raw
+  markdown source**, so collapsed `<details>`, link titles, and HTML-comment payloads
+  are *instantly visible at zero cost* — folding is not hiding for an agent. This
+  channel carries the **beadle-computed judgments that exist nowhere else**: the axis
+  vector (report-type, defect-nature, reproducibility, leverage, alignment, priority),
+  the verdict rationale with citations, and the integrity flags. Put it in a per-issue
+  `<details>` block or a structured comment payload so it's out of the human's way but
+  one parse away for the agent.
+- **Reference channel — links the LLM follows.** Issue numbers, PR refs, and commit
+  shas are **fetchable resources**: an agent can follow `#314` and read the full body
+  on demand. So the dashboard **never replicates issue detail** — that would violate
+  B1 (the body is a projection, not a replica) and waste the 65 k budget. Anything
+  recoverable by following a reference stays a reference; the dashboard carries only
+  the *differentiating* payload an agent needs to decide whether to follow it.
+
+The rule: **surface short titles for humans; embed/fold the axis vector + rationale
+for agents; link (never copy) anything an agent can fetch.** Each audience gets its
+ideal view from the same artifact — not a compromise between them.
+
 ## Discovery & idempotency
 
 Discovery is **sentinel-first, title-second** — keep both, but the machine-stable
@@ -81,8 +109,15 @@ frontier F2).
    type, by priority, by validation verdict; **trend deltas** since last run;
    net-flow (intake − close); filed-vs-acted ratio; backlog age distribution.
    Every count paired with an outcome signal (no vanity metrics).
-3. **Action plan** — P0/P1/P2 tables: each row = issue link + recommended action
-   + owner + alignment verdict chip. Top actionable items only.
+3. **Action plan** — P0/P1/P2 tables. **Each row leads with a short human title**
+   (a few words — *what the issue is*), then `#NN` (the agent's fetch reference), then
+   recommended action + owner, with type / reproducibility / **alignment-verdict as
+   trailing chips** (finding-005). The verdict is *status* (drill-in detail), never the
+   row headline — a human scans for what an issue is and will not hover over a bare
+   number. Top actionable items only. **Agent channel:** the per-row verdict *rationale*
+   (cited reason the action is recommended, integrity flags) rides in a folded
+   `<details>` under the row — instantly visible to an LLM, out of the human's way —
+   and never restates the issue body, which the agent fetches via `#NN`.
 4. **Direction health** (the differentiator) — minutiae ratio, scope-drift
    candidates, issues contradicting declared intent, over-engineering smells
    (premature abstraction, speculative config, build-what-you-might-need),
@@ -91,9 +126,26 @@ frontier F2).
    cheap (high-leverage items, cluster candidates) and explicitly marks
    rate/drift signals as "not yet measurable — process not turned," never as a
    drift indictment.** Rate-based drift appears only once a baseline exists.
-5. **Classification index** — human-readable table of all tracked issues with
-   classification chips (type / priority / leverage / alignment / verdict).
-6. **Controls** — checkbox lines the next run reads, acts on, and resets. **Two
+5. **Classification index** — human-readable table of all tracked issues. **Each
+   row leads with the short human title**, then `#NN`, then classification chips:
+   **report-type** (Issue Type / kind/*) · **defect-nature** (mechanical→conceptual,
+   IEEE 1044 / ODC) · **reproducibility** (Bohr/Mandel/Heisen badge) · priority ·
+   leverage · alignment · verdict (finding-005). Defect-nature and report-type are
+   the two primary facets; reproducibility is a badge feeding the effort estimate.
+   **Agent channel:** the full axis vector for each issue (every scored axis, not just
+   the charted facets) lives in the folded `beadle-state` digest / store reference, so
+   an agent reading raw body has the complete classification without fetching, while the
+   human table stays scannable. The index is an *index* (B1) — it points, it does not
+   replicate the issue.
+6. **Maintainer progress** — outcome-paired progress, **not a leaderboard**
+   (`question-maintainer-progress-gamification`). Make resolution against
+   beadle-discovered defects visible and rewarding, but reward the **verified
+   fix-outcome** (flagged → fixed → validates), never close-rate / time-to-triage /
+   volume (B3 + no-Goodhart). E.g. "N integrity defects closed with a load-bearing
+   fix," "longest-standing P0 resolved," "cycles since last drift" — each count
+   paired with its outcome. No gameable per-human ranking. Cold-start (ADR-005):
+   show structure, withhold streak/rate claims until the process has turned.
+7. **Controls** — checkbox lines the next run reads, acts on, and resets. **Two
    tiers** (F5 + `question-maintenance-request-controls`):
    ```
    # Tier 1 — per-issue verbs (bounded to one artifact)

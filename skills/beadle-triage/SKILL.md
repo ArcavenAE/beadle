@@ -35,9 +35,45 @@ load-bearing test, or is it a paper-fix)? do the cited symbols/files actually
 exist (catch hallucinated citations)? reproducible? → a verdict.
 
 ### 3. classify  (read-only)
-Axes — severity (impact), priority (urgency), leverage (systemic ↔ minutiae), and
-**blast-radius visibility × compounding**; default priority low, escalate on
-evidence. Re-classify type; don't trust the body's self-label.
+Re-classify on every axis; **don't trust the body's self-label.** The model is a
+superset of research-grounded axes (finding-005) + beadle-original axes. Default
+priority low, escalate on evidence.
+
+**Research-grounded axes** (deep-research `we6yrrcba`; "defect" is the industry
+term — IEEE 1044 / ODC):
+- **report-type** — the surface form. Primary carrier: GitHub **Issue Types**
+  (Task / Bug / Feature, org-level, distinct from labels). Long tail: a `kind/*`-style
+  family (regression, security, dependency/CVE, ci/build, flaky-test, tech-debt,
+  perf, docs, question, RFC). Submitter-assertable, cheap to auto-classify.
+- **defect-nature** — *what is actually wrong*, on the mechanical→conceptual spectrum
+  (IEEE 1044 anomaly classes / ODC Defect Type): syntax/typo/wrong-variable →
+  off-by-one/boundary → null/resource/lifecycle → concurrency/race → logic →
+  algorithmic → spec/requirements → design/architectural → **directional /
+  intent-misalignment** (code correct, wrong thing built). Mechanical end =
+  auto-classifiable, decide-in-seconds, demand a one-line repro + fix sketch.
+  Conceptual end (design/spec/directional) = needs a human architectural decision,
+  demand cited rationale against the intent anchor, **escalate — never auto-resolve.**
+- **reproducibility class** — Bohrbug (consistent, isolatable → cheap) | Mandelbug
+  (complex activation/propagation, not systematically reproducible → investigate) |
+  Heisenbug (changes under observation → investigate). *The single most
+  decision-relevant axis for evaluation cost* — it **feeds priority's
+  level-of-effort term** (don't estimate effort by gut) and routes escalation. Demand
+  a reliable repro + environment + trace for Mandelbug/Heisenbug; flag unknown-nature
+  reports for further triage (Rust `regression-untriaged` pattern).
+- **triage-state** — needs-triage → accepted → needs-information. The lifecycle lane,
+  distinct from the validate-verdict.
+
+**beadle-original axes** (ahead of / beside the literature, finding-005):
+- **leverage** (systemic ↔ minutiae), **alignment** (advances ↔ drifts — B4, the
+  "directional/intent" class the research logs as an unsolved open question),
+  **provenance** (pilot-derived ↑ vs speculative ↓), and **blast-radius visibility ×
+  compounding** (finding-004; FMEA-detectability is its citable analog).
+
+Surface report-type and defect-nature as the two primary facets; render
+reproducibility as a badge; keep severity (impact) and priority (urgency+effort)
+distinct. The finding-004 integrity blocks below **gate** all of these — an open
+source-of-truth integrity defect outranks any functional defect on the same substrate
+regardless of its report-type or defect-nature.
 
 **Silent integrity / source-of-truth corruption — top severity, always escalate
 (finding-004).** A fault that makes a *system of record* (ratchet, spec, hash,
@@ -117,9 +153,45 @@ human consolidation** (a duplicate already exists; never pick one silently, neve
 create a third). Wrong author → STOP, don't fork. None → re-check immediately, then
 create+pin. Then rewrite the whole body from the store — Header (direction verdict), Progress (stats + trend deltas, every count
 paired with an outcome), Action plan, **Direction Health** (minutiae ratio,
-filed-vs-acted gap, scope-drift candidates), Classification index, Controls
+filed-vs-acted gap, scope-drift candidates), Classification index, **Maintainer
+progress** (outcome-paired, not a leaderboard — see step 7b), Controls
 (derived checkboxes). Embed only a digest in `<!-- beadle-state -->`. Never parse
 the body as state; tolerate a wiped body.
+
+**Row legibility — title leads, verdict trails (finding-005).** A human scanning the
+board orients on *what an issue is*, not its number, and will not hover. Every
+Action-plan and Classification-index row MUST lead with a **short human title** (a
+few words — what the issue IS), then `#NN`, then chips. The alignment **verdict is
+status** (drill-in detail), rendered as a trailing chip — never the headline. Format:
+`<short title> (#NN) · <type> · <repro badge> · <verdict chip>`. Do not spend the
+row's first, most-scanned characters on a verdict.
+
+**Dual-audience — LLM-first, human-supported (per `../../docs/dashboard-schema.md`).**
+The dashboard is MAINLY read by LLM/agent sessions; humans are the secondary audience.
+The two see *inverted visibility*, so render three channels in one body:
+- **Human channel (visible render):** short title + minimal chips, as above.
+- **Agent channel (folded/embedded — free to the LLM):** the beadle-computed judgments
+  that exist nowhere else — the full axis vector, the cited verdict rationale, integrity
+  flags — go in a per-row `<details>` block or the `beadle-state` payload. An LLM reading
+  raw markdown sees them instantly; the human doesn't have to. Folding is NOT hiding for
+  an agent.
+- **Reference channel (links the agent fetches):** `#NN`, PR refs, commit shas. The
+  dashboard **never replicates the issue body** — an agent follows the reference (B1: the
+  board is a projection/index, not a replica). Carry only what differentiates; link
+  everything an agent can fetch. This also protects the 65 k body budget.
+
+### 7b. Maintainer progress  (outcome-paired — NOT a leaderboard)
+Surface what maintainers have *resolved against beadle-discovered defects* to make
+progress visible and rewarding (`question-maintainer-progress-gamification`). This
+is **constrained by B3 + no-Goodhart**: reward the **verified fix-outcome** (a
+defect beadle flagged → maintainer fixed → the fix validates), never raw close-rate,
+time-to-triage, or volume. Concretely: "N source-of-truth-integrity defects closed
+with a load-bearing fix," "longest-standing P0 resolved," cycles since last drift —
+each a count **paired with its outcome signal**. No per-human ranking that could be
+gamed by closing-without-fixing; the metric must move only when real defects get
+real fixes. Cold-start (ADR-005): show structure now, withhold rate/streak claims
+until the process has turned. Frontier — render a minimal honest version; the full
+reward design is open.
 
 ### 8. Read controls from the prior body — two tiers
 Parse `- [x] <!-- verb=...;id=... -->` lines, dispatch, then reset the box on

@@ -2,7 +2,9 @@
 # Schema is frontier (charter F1); this is the working v0 shape.
 # v0.2: added self_referential flag, provenance_signal axis, corpus-level minutiae
 #       semantics, and self-referential rubric inversion (see finding-002).
-schema_version: 0.2
+# v0.3: added integrity_anchors (systems-of-record by recoverability tier) so the
+#       silent-integrity classifier is grounded, not inferred (finding-004/005).
+schema_version: 0.3
 
 target:
   repo: drbothen/vsdd-factory
@@ -63,6 +65,24 @@ non_goals:
 scope_boundaries:
   - Code-vs-spec conflicts: the SPEC wins; only a human authorizes spec amendment
   - .factory/ mutations via Edit/Write only; no bypass (POL-3)
+
+# Systems-of-record ranked by recoverability (finding-004/005). The silent-integrity
+# classifier uses these to ground its top-severity class: a defect making any of these
+# disagree with reality without a signal (e.g. #313 ratchet certifies PASS against
+# artifacts not on disk; #314 input-hash includes frontmatter so "changed" is fiction)
+# is source-of-truth corruption — top severity, gates every functional verdict.
+# NB (2026-06-28): the develop checkout's .factory/ holds only logs/ — the spec_process
+# and learning tiers are the tiers most exposed to "produced-but-not-committed" loss.
+integrity_anchors:
+  regenerable:
+    - generated code / build output (re-run the engine — the cheapest thing it makes)
+  spec_process:
+    - .factory/STATE.md          # live cycle goals, mode — the ratchet's referent
+    - the ratchet / convergence gate definition (PASS must require committed artifacts)
+    - CLAUDE.md canonical principle (spec wins; the authority code is judged against)
+  learning:
+    - .factory/ decision log (D-NNN — why a path was chosen/abandoned)
+    - adversarial findings / convergence history (accumulated uncertainty-reduction)
 
 # Provenance is a first-class ranking signal (NOT just classification). The
 # measured filer (arcavenai) produces two very different kinds of issue:
