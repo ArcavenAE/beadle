@@ -88,10 +88,27 @@ filed-vs-acted gap, scope-drift candidates), Classification index, Controls
 (derived checkboxes). Embed only a digest in `<!-- beadle-state -->`. Never parse
 the body as state; tolerate a wiped body.
 
-### 8. Read controls from the prior body
-Parse `- [x] <!-- verb=...;id=... -->` lines, dispatch the verb (fast-track /
-investigate / accept-deferral), then reset the box on regeneration. Eventually
-consistent — never read-and-act in the same instant.
+### 8. Read controls from the prior body — two tiers
+Parse `- [x] <!-- verb=...;id=... -->` lines, dispatch, then reset the box on
+regeneration. Eventually consistent — never read-and-act in the same instant a
+human clicks; act on the NEXT pass. Two tiers exist
+(`question-maintenance-request-controls`):
+
+- **Tier 1 — per-issue verbs** (`id=#NN`): `fast-track` / `investigate` /
+  `accept-deferral`. Bounded to one artifact.
+- **Tier 2 — board-level maintenance requests** (no `id`, or `id=board`): the
+  maintainer is pulling an expensive whole-corpus routine forward on demand —
+  `reprioritize`, `full-refresh`, `revalidate`, `rescore-intent`. Dispatch the
+  requested routine over the whole target, then reset the box. **De-bounce: reset
+  the box on dispatch so a box left checked across passes does not re-run.** These
+  are read/analyze/regenerate only — never an irreversible public action (close /
+  resolve / free-text comment), which still escalate per B2.
+
+**Cheap-poll pattern (Phase 1, gh-aw cron — render now, schedule later):** a poll
+pass may fetch ONLY the dashboard body and parse Tier-2 boxes to detect whether any
+human has requested an expensive routine, escalating to the act pass only when one
+is checked. Phase 0 is single-session, so render the Tier-2 controls today; wiring
+the separate cheap poll cadence is frontier.
 
 ### 9. Comment  (propose-not-act; high bar)
 Post on an individual issue **only** where it clears the bar: fixed-pending-release

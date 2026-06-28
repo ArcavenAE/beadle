@@ -93,16 +93,34 @@ frontier F2).
    drift indictment.** Rate-based drift appears only once a baseline exists.
 5. **Classification index** — human-readable table of all tracked issues with
    classification chips (type / priority / leverage / alignment / verdict).
-6. **Controls** — checkbox lines the next run reads, acts on, and resets:
+6. **Controls** — checkbox lines the next run reads, acts on, and resets. **Two
+   tiers** (F5 + `question-maintenance-request-controls`):
    ```
+   # Tier 1 — per-issue verbs (bounded to one artifact)
    - [ ] <!-- verb=fast-track;id=#NN --> Fast-track #NN
    - [ ] <!-- verb=investigate;id=#NN --> Deep-investigate #NN
    - [ ] <!-- verb=accept-deferral;id=#NN --> Accept deferral of #NN
+
+   # Tier 2 — board-level maintenance requests (whole-corpus, expensive, on-demand)
+   - [ ] <!-- verb=reprioritize;id=board --> Re-rank the action plan
+   - [ ] <!-- verb=full-refresh;id=board --> Re-enumerate & re-triage every open issue
+   - [ ] <!-- verb=revalidate;id=board --> Re-run validate across the whole corpus
+   - [ ] <!-- verb=rescore-intent;id=board --> Re-run score-intent corpus-wide (after a manifest change)
    ```
    Checkboxes are **derived from authoritative state** each render, never authored
    by hand. On the next scheduled run, parse raw body for `- [x] <!-- verb=...;id=... -->`,
    dispatch the verb, then rewrite with the box cleared (eventually-consistent;
-   never read-and-act in the same instant a human clicks). Frontier F5.
+   never read-and-act in the same instant a human clicks).
+
+   Tier 2 is the **maintainer-triggered maintenance-request** surface: a human checks
+   a box to pull an expensive routine forward without waiting for the next full
+   scheduled run. Resetting the box on dispatch is the de-bounce (a box left checked
+   across passes must not re-run). Tier-2 routines are read/analyze/regenerate only —
+   an irreversible public action (close / resolve / free-text comment) still escalates
+   per B2, never a checkbox. A **cheap-poll pass** (Phase 1, gh-aw cron) can fetch only
+   this body and parse Tier-2 boxes to decide whether any costly routine was requested,
+   escalating to the expensive act pass only on a hit. Frontier F5 + the maintenance-
+   request question.
 
 ## Identity, cadence, hardening
 

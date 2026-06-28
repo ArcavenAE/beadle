@@ -1,0 +1,91 @@
+id: question-maintenance-request-controls
+type: question
+confidence: frontier
+title: "Maintainer-triggered maintenance-request controls (the cheap-poll-then-act tier)"
+tags: [beadle, dashboard, controls, polling, on-demand, frontier]
+content: |
+  Extends F5 (checkbox control surface). F5 and the dashboard schema (§6) already
+  describe PER-ISSUE control verbs — `fast-track`/`investigate`/`accept-deferral`,
+  keyed to a single `id=#NN`. This question opens a SECOND, dashboard-level tier the
+  current design only gestures at: maintainer-triggered *maintenance requests* for
+  whole-board routines.
+
+  The intent already lives in "Controls" — it is simply NOT WIRED UP. Today the
+  checkboxes are rendered (derived from state) but nothing polls them on a cheap
+  cadence and dispatches the expensive routine they request.
+
+  ## The two control tiers
+
+  - **Tier 1 — per-issue verbs (existing, F5).** "Do X to issue #NN." Bounded blast
+    radius, one artifact. `verb=fast-track;id=#314`.
+  - **Tier 2 — board-level maintenance requests (this question).** "Run an expensive
+    routine over the whole target." No `id` — or `id=board`. Examples the user named:
+    - `verb=reprioritize` — re-rank the action plan without a full re-enumerate.
+    - `verb=full-refresh` — re-enumerate every open issue from scratch.
+    - `verb=revalidate` — re-run the validate engine (already-fixed / fix-not-fixed /
+      hallucinated-citation) across the corpus, not just new-since-watermark.
+    - `verb=rescore-intent` — re-run score-intent corpus-wide after an intent-manifest
+      change (e.g. the v0.1→v0.2 bump would have wanted this).
+    - other maintenance tasks TBD — the set is deliberately open.
+
+  ## The cost asymmetry this solves (the "cheap poll" idea)
+
+  The motivating insight: the expensive routines (full-refresh, corpus revalidate)
+  are exactly the ones a maintainer occasionally WANTS on demand but that beadle must
+  NOT run every scheduled tick. So split the work:
+
+  - **Poll pass (cheap, frequent).** Fetch only the dashboard body, parse the Tier-2
+    `- [x]` boxes, decide whether ANY human has requested an expensive routine. Bounded
+    cost: one issue read, no enumeration, no scoring. Safe to run on a tight cadence.
+  - **Act pass (expensive, on-demand).** Only if the poll found a checked request: run
+    the requested routine, then rewrite the body with the box reset.
+
+  This is a request queue rendered as checkboxes: humans express demand cheaply; beadle
+  discovers demand cheaply; the costly work happens only when asked. It is the
+  on-demand complement to the scheduled cadence — heartbeat-via-cron stays cheap, but a
+  maintainer can pull a more expensive routine forward without waiting for the next full
+  scheduled run.
+
+  ## Open design questions
+
+  1. **Which routines are safe as board-level controls?** All Tier-2 examples above are
+     read-or-regenerate (no irreversible GitHub mutation), so they fit propose-not-act
+     (B2) cleanly. The line to hold: a maintenance request may trigger expensive READ /
+     ANALYSIS / dashboard-REGENERATION, never an irreversible public action (close,
+     resolve, free-text comment) — those still escalate per B2. Confirm no requested
+     routine smuggles a consequential side effect.
+  2. **Poll cadence vs act cadence.** Two schedules, or one schedule that conditionally
+     escalates? Phase 1 (gh-aw cron) likely wants a frequent cheap poll + the existing
+     less-frequent full run; the poll can short-circuit to an act pass when it finds a
+     checked request.
+  3. **Eventually-consistent semantics (carry F5's rule).** Never read-and-act in the
+     same instant a human clicks. Parse on the NEXT poll, dispatch, reset the box. A
+     human sees their request acknowledged by the box clearing + the routine's output in
+     the next render.
+  4. **De-bounce / idempotency.** A box left checked across two polls must not run the
+     routine twice. Resetting the box on dispatch is the de-bounce; confirm the reset
+     write commits before the act pass is considered done (and what happens if the act
+     pass dies mid-routine — re-check the box? leave a "in progress" marker?).
+  5. **Cost guard / abuse.** A maintainer (or a hand-edit) checking `full-refresh` every
+     poll could pin beadle to its most expensive routine. Rate-limit board-level
+     requests; log who requested what (the body edit history is the audit trail).
+  6. **Concurrency.** Same INC-003 chokepoint concern as discovery
+     (`question-dashboard-discovery-robustness`): if two runs both see a checked request,
+     both could run the routine. The act pass should route through the same serialized
+     writer the dashboard rewrite already needs.
+
+  ## Phase note
+
+  Phase 0 is single-session and human-invoked, so the poll/act split is not yet
+  load-bearing — but the CONTROLS RENDERING should already emit Tier-2 boxes (it nearly
+  does), and the skill's step 8 ("read controls from the prior body") should grow a
+  branch for board-level verbs. Wiring the cheap-poll pass is a Phase 1 (gh-aw cron)
+  concern, alongside the discovery chokepoint and the gh-aw schedule design.
+edges:
+  - target: question-dashboard-discovery-robustness
+    type: relates
+  - target: question-marvel-team-shape
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"
