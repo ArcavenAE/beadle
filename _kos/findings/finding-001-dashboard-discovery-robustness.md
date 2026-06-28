@@ -35,7 +35,7 @@ duplicate dashboard?
 
 ## Fixes applied (obvious hardening — no spike needed)
 
-Operational specialist docs only (root meta-docs are human-edit-only per CLAUDE.md):
+Specialist operational docs (CLAUDE.md/DESIGN.md/README are the human-edit-only meta-docs; charter.md is NOT — it is kos harvest output):
 
 - **`docs/dashboard-schema.md`** — discovery now keys PRIMARILY on the
   `<!-- beadle-state -->` sentinel (machine-stable, survives title edits); exact
@@ -56,7 +56,7 @@ Phase 0 (single session); becomes real at Phase 1 (scheduled gh-aw) and Phase 2
 (marvel single-writer orchestrator). Tracked in the frontier node; resolve with
 F3 (marvel team shape) and the Phase-1 cron design.
 
-## Charter delta (for the human to apply — root docs are human-edit-only)
+## Charter delta (kos harvest — update the nodes, then the charter projection)
 
 Add to `charter.md` Frontier:
 

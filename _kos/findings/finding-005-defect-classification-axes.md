@@ -145,7 +145,7 @@ link (never copy) anything an agent can fetch. Each audience gets its ideal view
 artifact — not a compromise. Baked into the schema (new "Dual-audience rendering" section)
 and skill step 7.
 
-## Charter delta (human applies — root docs are human-edit-only)
+## Charter delta (kos harvest — update the nodes, then the charter projection)
 
 - **F1 (intent-manifest schema)** now also requires `integrity_anchors` (systems-of-record
   by recoverability tier) — the second concrete schema requirement after finding-002's
