@@ -1,0 +1,91 @@
+id: question-dark-factory-metric-canon
+type: question
+confidence: frontier
+title: "The dark-factory metric canon — what critic measures across runs (beadle surfaces, critic owns)"
+tags: [critic, beadle, metrics, telemetry, cost, dark-factory, atelier, finding-010, frontier]
+content: |
+  What metrics should an AI team / a dark factory / an AI project be measured on
+  — across effectiveness, efficiency, functionality, performance, cost, CI,
+  project-planning/visualization, time-allocation, and per-platform telemetry?
+  finding-010 is the reference canon answering this from eight primary-sourced
+  research strands (session-051).
+
+  ## Scope ruling (finding-008): this is CRITIC's canon, not beadle's
+
+  Every metric in finding-010 needs more than one run or a trend across time —
+  the finding-008 tell. beadle does not compute these. beadle's only stake is the
+  two classification axes it owns (impact.* liveness / silent-integrity safety)
+  and SURFACING the telemetry gaps that block the canon (it already did:
+  finding-007 / #324, finding-009 / #325). This node lives in beadle's graph
+  because beadle surfaced the question; the build belongs to ArcavenAE/critic.
+
+  ## The one rule beneath the canon (no-Goodhart #5, re-derived everywhere)
+
+  Pair every count with an independent, agent-inaccessible outcome signal, and
+  never optimize a single metric as the target. Self-report / acceptance-rate /
+  "tests pass" are gamed or wrong (METR −19% with a +20% perception gap;
+  reward-hacking 30.4% of RE-Bench runs; SWE-Bench+ ~67.7% of public passes
+  didn't truly resolve). A gameable metric is a false report waiting to happen —
+  the same penalty the user's business case warns against.
+
+  ## The precedence stack (read in order or get false confidence)
+
+  SAFETY (silent-integrity) and LIVENESS (impact.*) must be clean BEFORE
+  convergence/efficiency means anything; cost/time divides by "outcome" so the
+  outcome must be sound first; delivery (DORA/flow) is honest only at the top.
+  Headline single signal: NET DEFECT FLOW (introduced − resolved per cycle) —
+  count-paired-with-outcome by construction.
+
+  ## Open sub-questions (the frontier inside the canon)
+
+  1. **Which AI-specific metrics graduate to bedrock once instrumented?**
+     Candidates: resolve-rate-with-regression-guard (on contamination-clean
+     tasks), reward-hack rate, pass^k reliability, cost-per-resolved-task,
+     package-hallucination rate. Gated on #324 (per-run attribution) + #325
+     (factory liveness emit).
+  2. **Does the time-budget OEE composite earn its complexity?** The 7-bucket
+     taxonomy's two load-bearing buckets (orchestration self-time,
+     blocked-on-human) are the two no off-the-shelf tool emits and must be
+     self-instrumented. Is Factory-OEE worth computing, or do the raw buckets
+     suffice?
+  3. **CI gate decay-term design (open design space).** Every adversarial
+     finding becomes a permanent lint with no decay; macOS bills ~10× on every
+     run forever. No tool ships a "this check never catches anything" metric.
+     Compose from: check-count trend + p95 minutes trend + per-check trailing
+     catch-rate + a value signal (mutation score) before culling. What's the
+     right shape?
+  4. **Unified usage schema + cost provenance.** Capture per-invocation `usage`
+     at the call site across the mixed fleet (Bedrock richest / Vertex strong /
+     Anthropic-admin-gated / Max poorest), derive cost downstream from a rate
+     card, carry a mandatory cost_source field (measured / derived / unavailable).
+     What normalization (Bedrock camelCase vs Anthropic snake_case) and what
+     rate-card maintenance cadence?
+  5. **Cache death-spiral detection.** A high cache_creation:cache_read ratio =
+     paying the write premium and never reading it; compaction/re-anchoring
+     invalidates the cached prefix and forces a premium re-write (the mechanism
+     finding-007 was chasing). What threshold flags it per-run?
+  6. **How does critic's per-run health detector consume #325 + the usage
+     schema?** The resolver-storm extractor already counts dispatcher errors; a
+     panic/halt is the same liveness class. Does the detector fold impact.* rate
+     + cost-per-outcome into one class-weighted efficiency signal (finding-008)?
+
+  ## Citation-hygiene flags (carried in finding-010 §"flags"; do not lose)
+
+  METR published no numeric CI on −19%; "SAI / System Autonomy Index" is a
+  fabricated attribution; GitClear churn cannot identify AI-authored lines and
+  the 5.7%→7.1% figure was an overshooting projection; "26–46% Copilot code" is
+  a share metric not acceptance; MAST has version drift (pin it); several
+  reliability/CFD verbatim quotes could not be primary-verified (archives
+  blocked; SPACE recovered via arquivo.pt); OTel GenAI conventions are
+  Development-stability (attribute names current-but-unfrozen); token-efficient-
+  tools beta unverifiable (likely no-op on Claude 4+).
+edges:
+  - target: elem-operational-impact-axis
+    type: relates
+  - target: elem-silent-integrity-severity
+    type: relates
+  - target: question-defect-classification-axes
+    type: relates
+provenance:
+  created_by: agent
+  created_at: "2026-06-28"
