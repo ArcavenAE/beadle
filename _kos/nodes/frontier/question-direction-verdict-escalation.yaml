@@ -1,0 +1,91 @@
+id: question-direction-verdict-escalation
+type: question
+confidence: frontier
+title: "What are the escalation thresholds for a run's direction verdict — on-course / watch / drifting?"
+tags: [beadle, dashboard, direction-verdict, escalation, compass, phase-4]
+content: |
+  The SKILL.md output already promises a direction verdict per run
+  (`on-course` / `watch` / `drifting`, with the top contributing signal).
+  Today the verdict is editorial — a human authors it in the direction slot
+  after reading the store. Item F from the Phase-4 retrospective asks:
+  what are the concrete thresholds that promote a verdict from `on-course`
+  to `watch`, and from `watch` to `drifting`?
+
+  Three candidate metrics were named:
+
+  A. **Filing-density derivative.** Rate of new issues per run. Rising rate
+     is signal that the target is under stress or that a contributor
+     (usually the measured filer) is diverging from the maintainer's
+     absorption rate. Computable today from `run.new_this_run.len()` and
+     the interarrival delta between adjacent `run` records.
+     Proposed thresholds (needs calibration once we have >3 runs of real
+     data across at least 2 targets):
+       - `on-course` : filing rate flat or declining vs prior 3 runs
+       - `watch`     : filing rate rising 25%+ vs prior 3 runs OR any
+                       single run > 2× the trailing-3 mean
+       - `drifting`  : filing rate rising 50%+ vs prior 3 runs
+
+  B. **Integrity-density derivative.** Share of new issues carrying an
+     integrity-class flag (`elem-silent-integrity-severity`,
+     `elem-operational-impact-axis`). Rising integrity share is a
+     stronger drift signal than filing rate alone. Requires the
+     classification record kind to carry an `integrity_flag` — deferred
+     until the classifier has a first pass through the store.
+     Proposed thresholds:
+       - `on-course` : integrity share ≤ 15% of new
+       - `watch`     : integrity share 15–30%
+       - `drifting`  : integrity share > 30% for any run
+
+  C. **Silent-data-loss share.** Count of finding-004-class silent-integrity
+     issues as a fraction of the open baseline. This is the alarm layer —
+     silent-data-loss is a *severity* class that is not just about volume,
+     it's about the *nature* of the risk. Requires classification data.
+     Proposed thresholds:
+       - `on-course` : silent-data-loss share < 5% of open
+       - `watch`     : 5–10%
+       - `drifting`  : > 10% OR any new silent-data-loss issue with
+                       zero maintainer engagement across 3+ runs
+
+  Sub-questions:
+
+  A1. **Calibration corpus.** The proposed thresholds are educated guesses
+      from the vsdd-factory drift. We need at least two more targets before
+      the numbers stop being "the ratio that fit vsdd-factory's run 9."
+  A2. **Signal composition.** Should the verdict be the *max* of the three
+      signals (any one drifting → drifting), or a weighted vote? Current
+      proposal is max — drift on any axis is drift.
+  A3. **Rate of change window.** "Prior 3 runs" is a placeholder. Should
+      the window be time-based (last 30 days), run-count-based (last 3),
+      or event-count-based (last N new issues)? Deferred to first
+      calibration pass.
+  A4. **Silent-data-loss zero-engagement alarm.** The "3+ runs with zero
+      maintainer engagement" clause is the harshest — it fires the
+      `drifting` verdict on the exact case beadle exists to catch. Needs
+      an escape hatch for when the maintainer's engagement is *pending
+      response* rather than *absent* (finding-004 already flagged this).
+  A5. **Verdict slot ownership.** Should `beadle direction <target>`
+      *write* the verdict to the store as a `note` record, or only
+      *print* it as a proposal for the editor slot? Current proposal:
+      print + append a `note` record with `kind=note, category=direction-verdict`
+      so the audit trail exists but the editor still owns the free-text
+      paragraph. Editorial boundary (question-renderer-editorial-boundary)
+      is the referee.
+
+  Phase-4 first cut: `beadle direction <target>` computes signal A
+  (filing-density derivative) and emits a proposed verdict; signals B
+  and C are marked "pending classification data" until the classifier
+  step produces classification records.
+edges:
+  - target: elem-maintainer-compass
+    type: composes
+  - target: elem-state-out-of-band
+    type: derives_from
+  - target: elem-propose-not-act
+    type: bounded_by
+  - target: question-renderer-editorial-boundary
+    type: relates
+  - target: elem-silent-integrity-severity
+    type: measures
+provenance:
+  created_by: agent
+  created_at: "2026-07-01"
