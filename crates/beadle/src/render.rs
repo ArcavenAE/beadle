@@ -9,7 +9,7 @@
 //! See `_kos/nodes/frontier/question-renderer-editorial-boundary.yaml`.
 
 use anyhow::Result;
-use beadle_store::{ClusterRecord, IssueRecord, Record, RunRecord, Store};
+use beadle_store::{ClassificationRecord, ClusterRecord, IssueRecord, Record, RunRecord, Store};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -47,6 +47,8 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
     let latest_issues = latest_issue_observations(&records);
     let latest_clusters = latest_cluster_observations(&records);
     let comment_stats = comment_stats(&records);
+    let latest_class = latest_classifications(&records);
+    let class_summary = classification_summary(&latest_class);
 
     let derived = render_derived(
         target,
@@ -55,6 +57,8 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
         &latest_issues,
         &latest_clusters,
         &comment_stats,
+        &latest_class,
+        &class_summary,
     );
     let derived_digest = sha256_hex(&derived);
     let body = compose(target, &intent.repo, &latest_run, &derived, &derived_digest);
@@ -163,6 +167,84 @@ fn comment_stats(records: &[Record]) -> CommentStats {
     stats
 }
 
+/// For each issue number, the most-recent `ClassificationRecord`. Later
+/// classifications supersede earlier ones for the same issue — the skill is
+/// allowed to reclassify as new evidence arrives.
+fn latest_classifications(records: &[Record]) -> HashMap<u32, ClassificationRecord> {
+    let mut by_number: HashMap<u32, ClassificationRecord> = HashMap::new();
+    for rec in records {
+        if let Record::Classification(c) = rec {
+            let keep = by_number
+                .get(&c.number)
+                .map(|prev| prev.run <= c.run || prev.ts <= c.ts)
+                .unwrap_or(true);
+            if keep {
+                by_number.insert(c.number, (**c).clone());
+            }
+        }
+    }
+    by_number
+}
+
+#[derive(Debug, Default, Clone)]
+struct ClassificationSummary {
+    total: u32,
+    by_report_type: BTreeMap<String, u32>,
+    integrity: u32,
+    silent_data_loss: u32,
+    quick_win_eligible: u32,
+    p0: u32,
+    p1: u32,
+}
+
+fn classification_summary(latest: &HashMap<u32, ClassificationRecord>) -> ClassificationSummary {
+    let mut s = ClassificationSummary::default();
+    for c in latest.values() {
+        s.total += 1;
+        *s.by_report_type.entry(c.report_type.clone()).or_insert(0) += 1;
+        if c.integrity {
+            s.integrity += 1;
+        }
+        if c.operational_impact.as_deref() == Some("silent-data-loss") {
+            s.silent_data_loss += 1;
+        }
+        if c.quick_win_eligible {
+            s.quick_win_eligible += 1;
+        }
+        match c.priority.as_str() {
+            "P0" => s.p0 += 1,
+            "P1" => s.p1 += 1,
+            _ => {}
+        }
+    }
+    s
+}
+
+/// Compact chip: `bug · logic · P1 ⚠★` — report_type · defect_nature ·
+/// priority + flag glyphs. Glyphs: `⚠` integrity, `▲` silent-data-loss,
+/// `★` quick-win-eligible.
+fn classification_chip(c: &ClassificationRecord) -> String {
+    let mut flags = String::new();
+    if c.integrity {
+        flags.push('⚠');
+    }
+    if c.operational_impact.as_deref() == Some("silent-data-loss") {
+        flags.push('▲');
+    }
+    if c.quick_win_eligible {
+        flags.push('★');
+    }
+    let flag_seg = if flags.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", flags)
+    };
+    format!(
+        "{} · {} · {}{}",
+        c.report_type, c.defect_nature, c.priority, flag_seg
+    )
+}
+
 /// Compute display decay for a cluster given the run it was last updated in
 /// and the current run number.
 fn decay_display(cluster: &ClusterRecord, current_run: u32) -> String {
@@ -187,6 +269,8 @@ fn render_derived(
     issues: &[IssueRecord],
     clusters: &[ClusterRecord],
     comments: &CommentStats,
+    classifications: &HashMap<u32, ClassificationRecord>,
+    class_summary: &ClassificationSummary,
 ) -> String {
     let mut out = String::new();
 
@@ -266,6 +350,37 @@ fn render_derived(
         out.push('\n');
     }
 
+    out.push_str("## Classification summary\n\n");
+    if class_summary.total == 0 {
+        out.push_str("_no classifications in store — signals B/C emit `pending` until the classifier skill produces records for this run_\n\n");
+    } else {
+        out.push_str(&format!(
+            "| Metric | Value | Notes |\n|---|---|---|\n\
+             | Classified issues | {} | of {} observed |\n\
+             | Integrity (⚠) | {} | HARD: requires `integrity_anchor` |\n\
+             | Silent-data-loss (▲) | {} | operational_impact axis |\n\
+             | Quick-win eligible (★) | {} | HARD: never on integrity=true |\n\
+             | P0 / P1 | {} / {} | priority axis |\n\n",
+            class_summary.total,
+            issues.len(),
+            class_summary.integrity,
+            class_summary.silent_data_loss,
+            class_summary.quick_win_eligible,
+            class_summary.p0,
+            class_summary.p1,
+        ));
+        if !class_summary.by_report_type.is_empty() {
+            out.push_str("| Report type | Count |\n|---|---|\n");
+            let mut pairs: Vec<(&String, &u32)> =
+                class_summary.by_report_type.iter().collect();
+            pairs.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+            for (rt, n) in pairs {
+                out.push_str(&format!("| `{}` | {} |\n", rt, n));
+            }
+            out.push('\n');
+        }
+    }
+
     out.push_str(&format!(
         "## Open issues — {} observations (most-recent first)\n\n",
         issues.len()
@@ -274,20 +389,25 @@ fn render_derived(
         out.push_str("_no issue observations in store_\n\n");
     } else {
         out.push_str("<details><summary>Expand full list</summary>\n\n");
-        out.push_str("| # | Title | Updated | Author | Labels |\n");
-        out.push_str("|---|---|---|---|---|\n");
+        out.push_str("| # | Title | Classification | Updated | Author | Labels |\n");
+        out.push_str("|---|---|---|---|---|---|\n");
         for i in issues {
             let labels = if i.labels.is_empty() {
                 "—".to_string()
             } else {
                 i.labels.join(", ")
             };
+            let chip = classifications
+                .get(&i.number)
+                .map(classification_chip)
+                .unwrap_or_else(|| "_unclassified_".to_string());
             out.push_str(&format!(
-                "| [#{}](https://github.com/{}/issues/{}) | {} | {} | @{} | {} |\n",
+                "| [#{}](https://github.com/{}/issues/{}) | {} | {} | {} | @{} | {} |\n",
                 i.number,
                 repo,
                 i.number,
                 md_escape(&i.title),
+                md_escape(&chip),
                 short_date(&i.updated_at),
                 i.author,
                 md_escape(&labels),
@@ -440,5 +560,183 @@ mod tests {
             latest_issue_observations(&[Record::Issue(a.clone()), Record::Issue(b.clone())]);
         assert_eq!(latest.len(), 1);
         assert_eq!(latest[0].title, "new");
+    }
+
+    fn mk_class(number: u32, run: u32, ts: &str) -> ClassificationRecord {
+        ClassificationRecord {
+            ts: ts.into(),
+            target: "t".into(),
+            number,
+            run,
+            report_type: "bug".into(),
+            defect_nature: "logic".into(),
+            reproducibility: "bohrbug".into(),
+            leverage: "minutiae".into(),
+            alignment: "advances".into(),
+            provenance: "pilot-derived".into(),
+            integrity: false,
+            integrity_anchor: None,
+            operational_impact: None,
+            priority: "P2".into(),
+            cluster: vec![],
+            quick_win_eligible: false,
+            rationale: "r".into(),
+            cited_evidence: None,
+            quick_win_disqualification: None,
+        }
+    }
+
+    #[test]
+    fn latest_classification_supersedes_earlier() {
+        let a = mk_class(42, 1, "2026-07-01T00:00:00Z");
+        let mut b = mk_class(42, 2, "2026-07-02T00:00:00Z");
+        b.priority = "P0".into();
+        b.integrity = true;
+        b.integrity_anchor = Some("spec_process".into());
+        let latest = latest_classifications(&[
+            Record::Classification(Box::new(a.clone())),
+            Record::Classification(Box::new(b.clone())),
+        ]);
+        assert_eq!(latest.len(), 1);
+        let got = latest.get(&42).unwrap();
+        assert_eq!(got.priority, "P0");
+        assert!(got.integrity);
+    }
+
+    #[test]
+    fn classification_summary_counts() {
+        let mut c1 = mk_class(1, 1, "2026-07-01T00:00:00Z");
+        c1.integrity = true;
+        c1.integrity_anchor = Some("spec_process".into());
+        c1.operational_impact = Some("silent-data-loss".into());
+        c1.priority = "P0".into();
+
+        let mut c2 = mk_class(2, 1, "2026-07-01T00:00:00Z");
+        c2.quick_win_eligible = true;
+        c2.priority = "P3".into();
+        c2.report_type = "docs".into();
+
+        let mut c3 = mk_class(3, 1, "2026-07-01T00:00:00Z");
+        c3.priority = "P1".into();
+
+        let latest = latest_classifications(&[
+            Record::Classification(Box::new(c1)),
+            Record::Classification(Box::new(c2)),
+            Record::Classification(Box::new(c3)),
+        ]);
+        let s = classification_summary(&latest);
+        assert_eq!(s.total, 3);
+        assert_eq!(s.integrity, 1);
+        assert_eq!(s.silent_data_loss, 1);
+        assert_eq!(s.quick_win_eligible, 1);
+        assert_eq!(s.p0, 1);
+        assert_eq!(s.p1, 1);
+        assert_eq!(s.by_report_type.get("bug").copied().unwrap_or(0), 2);
+        assert_eq!(s.by_report_type.get("docs").copied().unwrap_or(0), 1);
+    }
+
+    #[test]
+    fn chip_shows_flags_and_priority() {
+        let plain = mk_class(1, 1, "2026-07-01T00:00:00Z");
+        assert_eq!(classification_chip(&plain), "bug · logic · P2");
+
+        let mut integrity = plain.clone();
+        integrity.integrity = true;
+        integrity.integrity_anchor = Some("spec_process".into());
+        integrity.priority = "P0".into();
+        assert_eq!(classification_chip(&integrity), "bug · logic · P0 ⚠");
+
+        let mut sdl_qw = plain.clone();
+        sdl_qw.operational_impact = Some("silent-data-loss".into());
+        sdl_qw.quick_win_eligible = true;
+        assert_eq!(classification_chip(&sdl_qw), "bug · logic · P2 ▲★");
+    }
+
+    #[test]
+    fn render_includes_classification_zones() {
+        let issue = IssueRecord {
+            ts: "2026-07-01T00:00:00Z".into(),
+            target: "t".into(),
+            number: 42,
+            observed_in_run: 1,
+            title: "wobble".into(),
+            author: "alice".into(),
+            state: "open".into(),
+            created_at: "2026-07-01T00:00:00Z".into(),
+            updated_at: "2026-07-01T00:00:00Z".into(),
+            closed_at: None,
+            labels: vec![],
+            assignees: vec![],
+            body_len: 0,
+            body_sha256: "s".into(),
+        };
+        let mut c = mk_class(42, 1, "2026-07-01T00:00:00Z");
+        c.integrity = true;
+        c.integrity_anchor = Some("spec_process".into());
+        c.priority = "P0".into();
+
+        let run = RunRecord {
+            ts: "2026-07-01T00:00:00Z".into(),
+            target: "t".into(),
+            run: 1,
+            watermark_before: 0,
+            watermark_after: 42,
+            counts: Default::default(),
+            digest: "d".into(),
+            warmup: None,
+            intent_version: None,
+            new_this_run: vec![],
+            notes: None,
+        };
+        let mut latest_class = HashMap::new();
+        latest_class.insert(42, c);
+        let summary = classification_summary(&latest_class);
+        let body = render_derived(
+            "t",
+            "acme/widget",
+            &run,
+            &[issue],
+            &[],
+            &CommentStats::default(),
+            &latest_class,
+            &summary,
+        );
+        assert!(body.contains("## Classification summary"), "summary header");
+        assert!(body.contains("| Integrity"), "integrity row");
+        assert!(body.contains("bug · logic · P0 ⚠"), "chip in row");
+        assert!(body.contains("Classification"), "chip column header");
+    }
+
+    #[test]
+    fn render_pending_when_no_classifications() {
+        let run = RunRecord {
+            ts: "2026-07-01T00:00:00Z".into(),
+            target: "t".into(),
+            run: 1,
+            watermark_before: 0,
+            watermark_after: 0,
+            counts: Default::default(),
+            digest: "d".into(),
+            warmup: None,
+            intent_version: None,
+            new_this_run: vec![],
+            notes: None,
+        };
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        let summary = classification_summary(&empty);
+        let body = render_derived(
+            "t",
+            "acme/widget",
+            &run,
+            &[],
+            &[],
+            &CommentStats::default(),
+            &empty,
+            &summary,
+        );
+        assert!(
+            body.contains("no classifications in store"),
+            "pending disclosure must be surfaced"
+        );
     }
 }

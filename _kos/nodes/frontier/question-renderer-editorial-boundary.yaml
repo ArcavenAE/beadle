@@ -49,6 +49,19 @@ content: |
      (per-issue chip in a slot → row appended to store), the renderer needs
      to write both directions: read classifications from the store *and*
      surface unclassified issues as editor todos.
+
+  ---
+
+  **Phase-4 follow-on (finding-015):** chips are in the *derived zone*, not
+  editor slots. Sentinel `derived_digest` covers them. Rationale: the chip
+  is a deterministic projection of `ClassificationRecord`; ownership sits
+  with the classifier skill via `beadle classify ingest`, not with the
+  editor writing prose. Unclassified issues render `_unclassified_` — the
+  loudest possible "classifier hasn't run on this yet" signal. Empty
+  classification summary emits the propose-not-act pending disclosure
+  verbatim, matching the shape of `SignalOrPending::Pending` in direction.
+  E's "surface unclassified issues as editor todos" is now answered:
+  they're visible by absence in every row of the derived table.
 edges:
   - target: elem-state-out-of-band
     type: derives_from

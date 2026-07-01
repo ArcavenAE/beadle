@@ -186,6 +186,15 @@ Direction signals B (integrity-density) and C (silent-data-loss share) derive
 from these classifications for the current run — if you don't ingest, they emit
 `pending` with a `reason` naming the gap (finding-014).
 
+`beadle render <target>` also consumes ingested classifications (finding-015):
+each Open-issues row gains a chip column (`report_type · defect_nature ·
+priority` + `⚠` integrity / `▲` silent-data-loss / `★` quick-win-eligible
+flags), and a summary block above the table tallies integrity / SDL /
+quick-win / P0-P1 counts + a per-report-type breakdown. Unclassified issues
+render `_unclassified_` and the summary emits the propose-not-act pending
+disclosure verbatim. The chip is a deterministic projection covered by the
+sentinel's `derived_digest`; don't hand-edit it.
+
 ### 7. Regenerate the dashboard  (the primary goal)
 Per `../../docs/dashboard-schema.md`: discover the pinned dashboard **sentinel-first,
 title-second** — search the beadle identity's open issues for the `<!-- beadle-state -->`
