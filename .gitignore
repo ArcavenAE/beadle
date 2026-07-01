@@ -3,6 +3,12 @@
 .beadle/cache/
 *.local
 
+# Rust build output
+/target/
+
+# Local target-observation JSONL (live state, not source of truth)
+/store/
+
 # rendered docs
 /tmp/beadle-*
 

@@ -1,0 +1,21 @@
+[package]
+name = "beadle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "beadle — intent-aligned issue triage + dashboard for aae-orc targets"
+
+[[bin]]
+name = "beadle"
+path = "src/main.rs"
+
+[dependencies]
+beadle-store = { path = "../beadle-store" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+time = { workspace = true }
+sha2 = { workspace = true }
