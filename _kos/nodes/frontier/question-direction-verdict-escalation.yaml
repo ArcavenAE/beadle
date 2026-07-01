@@ -75,6 +75,24 @@ content: |
   (filing-density derivative) and emits a proposed verdict; signals B
   and C are marked "pending classification data" until the classifier
   step produces classification records.
+
+  Phase-4 follow-on (finding-014): signals B and C are now computed
+  from `ClassificationRecord` rows for the current run when the store
+  contains any; they emit `pending` with a specific `reason` only when
+  no classifications exist for `run == latest_run`. The ingest contract
+  ships as `beadle classify ingest <target>` — the Phase-0 Claude Code
+  skill produces validated JSON, this binary appends to the store, and
+  direction consumes downstream. `SignalOrPending` (a live schema
+  variant, not a placeholder string) preserves the propose-not-act
+  invariant: pending signals contribute nothing to the `max` verdict,
+  so an unclassified run cannot escalate on B or C by omission.
+
+  Still open (calibration): 15%/30% integrity thresholds and 5%/10%
+  silent-data-loss thresholds are named constants awaiting the
+  calibration corpus (A1) — ≥2 targets × ≥3 runs of real classifier
+  output. Also open: A4 zero-engagement alarm (needs comment_event
+  join, deferred), A3 window question (trailing-3-run integrity
+  share vs current-run-only, deferred to same calibration pass).
 edges:
   - target: elem-maintainer-compass
     type: composes
