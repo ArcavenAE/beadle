@@ -16,6 +16,7 @@ use std::path::Path;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
+use crate::direction::{self, DirectionReport};
 use crate::intent;
 
 /// Body-budget budget line. Exceeding it emits a warning and (future work)
@@ -49,6 +50,7 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
     let comment_stats = comment_stats(&records);
     let latest_class = latest_classifications(&records);
     let class_summary = classification_summary(&latest_class);
+    let direction_report = direction::compute(target, &records);
 
     let derived = render_derived(
         target,
@@ -59,6 +61,7 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
         &comment_stats,
         &latest_class,
         &class_summary,
+        &direction_report,
     );
     let derived_digest = sha256_hex(&derived);
     let body = compose(target, &intent.repo, &latest_run, &derived, &derived_digest);
@@ -262,6 +265,94 @@ fn decay_display(cluster: &ClusterRecord, current_run: u32) -> String {
 
 /// Render just the derived zone — the piece the sentinel digest is computed over.
 /// Editor slots are NOT part of this string.
+fn verdict_glyph(verdict: &str) -> &'static str {
+    match verdict {
+        "drifting" => "🔴",
+        "watch" => "🟡",
+        "on-course" => "🟢",
+        _ => "⚪",
+    }
+}
+
+/// Render the derived-zone Direction verdict block. Deterministic projection
+/// of `DirectionReport` — the free-text paragraph is still an editor slot
+/// below. See `question-renderer-editorial-boundary` sub-question A: this is
+/// a *whole section* the renderer owns (the numbers), sitting above the
+/// editor's *whole section* (the prose rationale).
+fn render_direction_block(d: &DirectionReport) -> String {
+    use crate::direction::{SignalOrPending, ZeroEngagementOrPending};
+    let mut out = String::new();
+
+    out.push_str(&format!(
+        "**{} {}** — run {} — top signal: {}\n\n",
+        verdict_glyph(d.verdict),
+        d.verdict,
+        d.run,
+        d.top_signal,
+    ));
+
+    out.push_str("| Signal | Verdict | Detail |\n|---|---|---|\n");
+
+    let f = &d.signals.filing_density;
+    out.push_str(&format!(
+        "| filing-density | {} {} | {} |\n",
+        verdict_glyph(f.verdict),
+        f.verdict,
+        md_escape(&f.rationale),
+    ));
+
+    let (iv, idetail) = match &d.signals.integrity_density {
+        SignalOrPending::Live(s) => (s.verdict, s.rationale.clone()),
+        SignalOrPending::Pending(p) => (p.verdict, format!("pending — {}", p.reason)),
+    };
+    out.push_str(&format!(
+        "| integrity-density (B) | {} {} | {} |\n",
+        verdict_glyph(iv),
+        iv,
+        md_escape(&idetail),
+    ));
+
+    let (sv, sdetail) = match &d.signals.silent_data_loss_share {
+        SignalOrPending::Live(s) => (s.verdict, s.rationale.clone()),
+        SignalOrPending::Pending(p) => (p.verdict, format!("pending — {}", p.reason)),
+    };
+    out.push_str(&format!(
+        "| silent-data-loss-share (C) | {} {} | {} |\n",
+        verdict_glyph(sv),
+        sv,
+        md_escape(&sdetail),
+    ));
+
+    let (zv, zdetail) = match &d.signals.silent_data_loss_zero_engagement {
+        ZeroEngagementOrPending::Live(s) => {
+            let mut detail = s.rationale.clone();
+            if !s.drifting_issues.is_empty() {
+                let names: Vec<String> =
+                    s.drifting_issues.iter().map(|n| format!("#{}", n)).collect();
+                detail.push_str(&format!(" · drifting: {}", names.join(", ")));
+            } else if !s.watch_only_issues.is_empty() {
+                let names: Vec<String> = s
+                    .watch_only_issues
+                    .iter()
+                    .map(|n| format!("#{}", n))
+                    .collect();
+                detail.push_str(&format!(" · watch: {}", names.join(", ")));
+            }
+            (s.verdict, detail)
+        }
+        ZeroEngagementOrPending::Pending(p) => (p.verdict, format!("pending — {}", p.reason)),
+    };
+    out.push_str(&format!(
+        "| silent-data-loss-zero-engagement (A4) | {} {} | {} |\n\n",
+        verdict_glyph(zv),
+        zv,
+        md_escape(&zdetail),
+    ));
+
+    out
+}
+
+#[allow(clippy::too_many_arguments)]
 fn render_derived(
     target: &str,
     repo: &str,
@@ -271,8 +362,13 @@ fn render_derived(
     comments: &CommentStats,
     classifications: &HashMap<u32, ClassificationRecord>,
     class_summary: &ClassificationSummary,
+    direction: &DirectionReport,
 ) -> String {
     let mut out = String::new();
+
+    out.push_str("## Direction verdict\n\n");
+    out.push_str(&render_direction_block(direction));
+    out.push('\n');
 
     out.push_str("## Baseline (derived from store)\n\n");
     out.push_str("| Metric | Value | Provenance |\n");
@@ -691,6 +787,7 @@ mod tests {
         let mut latest_class = HashMap::new();
         latest_class.insert(42, c);
         let summary = classification_summary(&latest_class);
+        let direction = mk_direction_pending();
         let body = render_derived(
             "t",
             "acme/widget",
@@ -700,6 +797,7 @@ mod tests {
             &CommentStats::default(),
             &latest_class,
             &summary,
+            &direction,
         );
         assert!(body.contains("## Classification summary"), "summary header");
         assert!(body.contains("| Integrity"), "integrity row");
@@ -724,6 +822,7 @@ mod tests {
         };
         let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
         let summary = classification_summary(&empty);
+        let direction = mk_direction_pending();
         let body = render_derived(
             "t",
             "acme/widget",
@@ -733,10 +832,155 @@ mod tests {
             &CommentStats::default(),
             &empty,
             &summary,
+            &direction,
         );
         assert!(
             body.contains("no classifications in store"),
             "pending disclosure must be surfaced"
+        );
+    }
+
+    fn mk_direction_pending() -> DirectionReport {
+        use crate::direction::{
+            FilingDensity, PendingSignal, ShareSignal, Signals, SignalOrPending,
+            ZeroEngagementOrPending,
+        };
+        let _ = ShareSignal {
+            classified_this_run: 0,
+            numerator: 0,
+            share_pct: 0.0,
+            verdict: "on-course",
+            rationale: String::new(),
+        };
+        DirectionReport {
+            target: "t".into(),
+            run: 1,
+            verdict: "on-course",
+            top_signal: "filing-density on-course: no history".into(),
+            signals: Signals {
+                filing_density: FilingDensity {
+                    current_run_new: 0,
+                    trailing_3_mean: 0.0,
+                    rise_pct_vs_trailing: None,
+                    verdict: "on-course",
+                    rationale: "no runs recorded".into(),
+                },
+                integrity_density: SignalOrPending::Pending(PendingSignal {
+                    verdict: "pending",
+                    reason: "no classification records".into(),
+                }),
+                silent_data_loss_share: SignalOrPending::Pending(PendingSignal {
+                    verdict: "pending",
+                    reason: "no classification records".into(),
+                }),
+                silent_data_loss_zero_engagement: ZeroEngagementOrPending::Pending(
+                    PendingSignal {
+                        verdict: "pending",
+                        reason: "no silent-data-loss classifications".into(),
+                    },
+                ),
+            },
+        }
+    }
+
+    #[test]
+    fn render_includes_direction_verdict_block() {
+        let run = RunRecord {
+            ts: "2026-07-01T00:00:00Z".into(),
+            target: "t".into(),
+            run: 1,
+            watermark_before: 0,
+            watermark_after: 0,
+            counts: Default::default(),
+            digest: "d".into(),
+            warmup: None,
+            intent_version: None,
+            new_this_run: vec![],
+            notes: None,
+        };
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        let summary = classification_summary(&empty);
+        let direction = mk_direction_pending();
+        let body = render_derived(
+            "t",
+            "acme/widget",
+            &run,
+            &[],
+            &[],
+            &CommentStats::default(),
+            &empty,
+            &summary,
+            &direction,
+        );
+        assert!(body.contains("## Direction verdict"), "verdict header");
+        assert!(body.contains("🟢 on-course"), "verdict glyph + label");
+        assert!(body.contains("| filing-density |"), "filing-density row");
+        assert!(
+            body.contains("| integrity-density (B) |"),
+            "integrity-density row"
+        );
+        assert!(
+            body.contains("| silent-data-loss-share (C) |"),
+            "SDL share row"
+        );
+        assert!(
+            body.contains("| silent-data-loss-zero-engagement (A4) |"),
+            "A4 row"
+        );
+        assert!(body.contains("pending — "), "pending signals render their reason");
+    }
+
+    #[test]
+    fn render_direction_drifting_names_issues() {
+        use crate::direction::{
+            FilingDensity, PendingSignal, Signals, SignalOrPending,
+            ZeroEngagementOrPending, ZeroEngagementSignal,
+        };
+        let direction = DirectionReport {
+            target: "t".into(),
+            run: 3,
+            verdict: "drifting",
+            top_signal:
+                "silent-data-loss-zero-engagement drifting: 1 SDL issue(s) with ≥ 3-run silence"
+                    .into(),
+            signals: Signals {
+                filing_density: FilingDensity {
+                    current_run_new: 0,
+                    trailing_3_mean: 0.0,
+                    rise_pct_vs_trailing: None,
+                    verdict: "on-course",
+                    rationale: "n/a".into(),
+                },
+                integrity_density: SignalOrPending::Pending(PendingSignal {
+                    verdict: "pending",
+                    reason: "none".into(),
+                }),
+                silent_data_loss_share: SignalOrPending::Pending(PendingSignal {
+                    verdict: "pending",
+                    reason: "none".into(),
+                }),
+                silent_data_loss_zero_engagement: ZeroEngagementOrPending::Live(
+                    ZeroEngagementSignal {
+                        sdl_issues: 1,
+                        watch_count: 1,
+                        drifting_count: 1,
+                        drifting_issues: vec![42],
+                        watch_only_issues: vec![],
+                        longest_streak: 3,
+                        verdict: "drifting",
+                        rationale:
+                            "1 SDL issue(s) with ≥ 3-run silence + zero maintainer engagement"
+                                .into(),
+                    },
+                ),
+            },
+        };
+        let block = render_direction_block(&direction);
+        assert!(block.contains("🔴 drifting"), "drifting glyph");
+        assert!(block.contains("drifting: #42"), "issue named in detail");
+        assert!(
+            block.contains("top signal: silent-data-loss-zero-engagement"),
+            "top signal surfaced"
         );
     }
 }

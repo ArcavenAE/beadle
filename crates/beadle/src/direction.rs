@@ -142,11 +142,11 @@ pub struct PendingSignal {
     pub reason: String,
 }
 
-pub fn run(root: &Path, target: &str, write_note: bool) -> Result<()> {
-    let _intent = intent::load(root, target)?;
-    let store = Store::open(root.join("store"), target)?;
-    let records = store.read_all()?;
-
+/// Compute the direction report from a set of store records. Pure —
+/// called by both `run()` (which prints + optionally writes a note) and
+/// `render::render_dashboard` (which surfaces the verdict in the derived
+/// zone). Extracting the computation is the render→direction bridge.
+pub fn compute(target: &str, records: &[Record]) -> DirectionReport {
     let runs: Vec<RunRecord> = records
         .iter()
         .filter_map(|r| {
@@ -197,18 +197,29 @@ pub fn run(root: &Path, target: &str, write_note: bool) -> Result<()> {
 
     let top = top_signal(&filing, &integrity, &sdl, &sdl_zero, overall);
 
-    let report = DirectionReport {
+    DirectionReport {
         target: target.to_string(),
         run: latest_run,
         verdict: overall.label(),
-        top_signal: top.clone(),
+        top_signal: top,
         signals: Signals {
             filing_density: filing,
             integrity_density: integrity,
             silent_data_loss_share: sdl,
             silent_data_loss_zero_engagement: sdl_zero,
         },
-    };
+    }
+}
+
+pub fn run(root: &Path, target: &str, write_note: bool) -> Result<()> {
+    let _intent = intent::load(root, target)?;
+    let store = Store::open(root.join("store"), target)?;
+    let records = store.read_all()?;
+
+    let report = compute(target, &records);
+    let overall_label = report.verdict;
+    let top = report.top_signal.clone();
+    let latest_run = report.run;
 
     let json = serde_json::to_string_pretty(&report)?;
     println!("{}", json);
@@ -222,12 +233,12 @@ pub fn run(root: &Path, target: &str, write_note: bool) -> Result<()> {
             target: target.to_string(),
             run: latest_run,
             topic: "direction-verdict".to_string(),
-            text: format!("verdict={} top_signal={}", overall.label(), top),
+            text: format!("verdict={} top_signal={}", overall_label, top),
         };
         store.append(&[Record::Note(note)])?;
         eprintln!(
             "beadle direction: appended note record (topic=direction-verdict, verdict={})",
-            overall.label()
+            overall_label
         );
     }
     Ok(())

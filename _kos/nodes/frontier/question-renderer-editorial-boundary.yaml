@@ -62,6 +62,32 @@ content: |
   verbatim, matching the shape of `SignalOrPending::Pending` in direction.
   E's "surface unclassified issues as editor todos" is now answered:
   they're visible by absence in every row of the derived table.
+
+  **Phase-4 follow-on (finding-017): sub-question A answered — option 2
+  (whole-section ownership).** The `beadle render` derived zone now leads
+  with a whole renderer-owned **Direction verdict** section (header line
+  with glyph, 4-row per-signal table, A4 detail names the drifting
+  issue numbers). It sits directly below the whole editor-owned
+  `<!-- editor:direction-verdict -->` slot, which carries the free-text
+  paragraph. The two do not interleave — the renderer never touches the
+  paragraph; the editor never edits inside the table. `derived_digest`
+  covers the whole verdict block, so hand-edits are first-class
+  detectable events (sub-question B answered by inheritance).
+  Sub-question C is answered for the direction context: the editor's
+  paragraph survives regen verbatim; drift between the paragraph and the
+  fresh numbers is a visible reading experience (glyph moved, top-signal
+  text changed) rather than a data conflict. Option 1 (marked slots inside
+  the derived zone) was rejected because it lets editor-authored numbers
+  sit indistinguishably next to renderer-authored numbers, inverting B1.
+  Option 3 (editor overlay file) was rejected as premature elaboration —
+  the inline slot already round-trips across regens (finding-011) and a
+  second file adds merge semantics we don't yet need.
+
+  A now stands answered for direction verdict; whether it holds as the
+  general rule for future sections (e.g. quick-win eligibility, per-issue
+  editorial notes) is open. Working assumption: option 2 remains the
+  default divider; revisit only when a section arises whose ownership is
+  genuinely mixed rather than whole-owned-per-side.
 edges:
   - target: elem-state-out-of-band
     type: derives_from
