@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod direction;
 mod enumerate;
 mod gh;
 mod intent;
@@ -53,6 +54,13 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Compute the run's direction verdict (item F).
+    Direction {
+        target: String,
+        /// Also append a `note` record to the store as an audit trail.
+        #[arg(long)]
+        write_note: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -68,6 +76,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Cmd::Push { target, dry_run } => push::run(&root, &target, dry_run),
+        Cmd::Direction { target, write_note } => direction::run(&root, &target, write_note),
     }
     .with_context(|| "beadle command failed")
 }
