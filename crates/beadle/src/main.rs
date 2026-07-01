@@ -5,9 +5,7 @@
 //!   beadle sync   <target>   → delta-sweep comments on open issues (item E)
 //!   beadle render <target>   → materialize dashboard body to stdout
 //!   beadle push   <target>   → write rendered body to the dashboard issue
-//!
-//! Only `enum` is wired in this cut. The others are stubs with the intended
-//! contract commented — we build them out as each phase demands them.
+//!                              (preserves editor slots, finalizes body_digest)
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -16,6 +14,8 @@ use std::path::PathBuf;
 mod enumerate;
 mod gh;
 mod intent;
+mod push;
+mod render;
 mod sync;
 
 #[derive(Parser)]
@@ -63,13 +63,11 @@ fn main() -> Result<()> {
         Cmd::Enum { target, full } => enumerate::run(&root, &target, full),
         Cmd::Sync { target } => sync::run(&root, &target),
         Cmd::Render { target } => {
-            anyhow::bail!("`render` (item B/C) not implemented yet — target={target}")
+            let body = render::run(&root, &target)?;
+            print!("{}", body);
+            Ok(())
         }
-        Cmd::Push { target, dry_run } => {
-            anyhow::bail!(
-                "`push` not implemented yet — target={target}, dry_run={dry_run}"
-            )
-        }
+        Cmd::Push { target, dry_run } => push::run(&root, &target, dry_run),
     }
     .with_context(|| "beadle command failed")
 }
