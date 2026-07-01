@@ -16,6 +16,7 @@ use std::path::PathBuf;
 mod enumerate;
 mod gh;
 mod intent;
+mod sync;
 
 #[derive(Parser)]
 #[command(name = "beadle", version, about)]
@@ -60,9 +61,7 @@ fn main() -> Result<()> {
 
     match cli.cmd {
         Cmd::Enum { target, full } => enumerate::run(&root, &target, full),
-        Cmd::Sync { target } => {
-            anyhow::bail!("`sync` (item E, delta-sweep) not implemented yet — target={target}")
-        }
+        Cmd::Sync { target } => sync::run(&root, &target),
         Cmd::Render { target } => {
             anyhow::bail!("`render` (item B/C) not implemented yet — target={target}")
         }
