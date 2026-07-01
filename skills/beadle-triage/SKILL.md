@@ -292,12 +292,59 @@ is checked. Phase 0 is single-session, so render the Tier-2 controls today; wiri
 the separate cheap poll cadence is frontier.
 
 ### 9. Comment  (propose-not-act; high bar)
-Post on an individual issue **only** where it clears the bar: fixed-pending-release
-(cite commit + tests), hallucinated-citation / fix-not-fixed, a scope-drift
-concern, or a clear sibling cross-ref. Compose `arcavenai-issue-review` for tone
-and the already-fixed discipline. Never agreement-only. Soft, never
-hard/critical. Disclose bot authorship. Anything irreversible (close / resolve) →
-escalate, never auto.
+Post on an individual issue **only** where it clears the bar. Compose
+`arcavenai-issue-review` for tone and the already-fixed discipline. Never
+agreement-only. Soft, never hard/critical. Disclose bot authorship. Anything
+irreversible (close / resolve) → escalate, never auto.
+
+**The four passing lenses** (any one is sufficient):
+
+1. **fixed-pending-release** — cite the merge commit + the tests that
+   demonstrate the fix. The claim is verifiable against the repo.
+2. **hallucinated-citation / fix-not-fixed** — the issue cites a file, line,
+   function, or spec section that does not exist, or was edited to something
+   that no longer supports the claim. Cite the exact drift.
+3. **scope-drift** — the issue proposes work outside the target's declared
+   intent (or duplicates existing scope). Cite the intent anchor.
+4. **clear sibling cross-ref** — a sibling issue is measurably about the
+   same defect or a strictly-adjacent one. Cite both numbers, name the
+   difference in one sentence. `arcavenai`'s own follow-up comments on
+   an issue it filed (self-annotations broadening scope) count as a
+   sibling signal, not a comment we should imitate.
+
+**The opinion / disambiguation distinction (item D).** A comment that
+*expresses a view on the issue's worth, priority, or design merit* is
+opinion — it does not clear the bar, no matter how correct it feels. A
+comment that *disambiguates against cited artifacts* or *points at a
+verifiable check the reader can run themselves* is disambiguation /
+verify-hint — it can clear the bar as an instance of lens 2 or lens 4.
+
+Sharpening test — apply to the draft before posting:
+
+- **Would a maintainer be able to verify the claim in under 60 seconds
+  against the code, spec, or issue graph?** If no, it is opinion. Do not
+  post.
+- **Does the comment name a specific artifact (file:line, commit sha,
+  issue number, intent anchor)?** If no, it is opinion. Do not post.
+- **Would the comment survive the fact that the maintainer likely already
+  saw the issue?** Agreement-only ("this is important") always fails this.
+  A verify-hint that adds one piece of *pointer* the maintainer did not
+  already have passes.
+
+Grounded examples on `drbothen/vsdd-factory` (finding-012):
+
+- `#370` (CI static PASS): *opinion* would be "well-scoped, ship it";
+  *verify-hint* would be pointing at the exact workflow file and line
+  where the static echo lives so the maintainer can eyeball the fix
+  shape in one click. Post the second, not the first.
+- `#350`/`#380` (harness classifier vs subagent-decision): a comment
+  that cross-refs the two with a one-sentence delta clears lens 4;
+  a comment repeating "these are real problems" is opinion.
+- `#381` (reference-oracle duplication): the author's own follow-up
+  comment (2026-07-01) broadening scope to "test doc-comment overclaim"
+  is exactly the *self-annotation* pattern — beadle notes it as a
+  sibling signal (`arcavenai` self-thread) but does not imitate the
+  broadening in beadle's voice.
 
 ## Output
 
