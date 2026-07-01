@@ -186,6 +186,16 @@ Direction signals B (integrity-density) and C (silent-data-loss share) derive
 from these classifications for the current run — if you don't ingest, they emit
 `pending` with a `reason` naming the gap (finding-014).
 
+Signal A4 (silent-data-loss zero-engagement, finding-016) joins classifications
+against comment events across **all** runs in the store. An issue classified
+SDL that persists across ≥ 2 consecutive runs with zero `actor_role="maintainer"`
+comments fires `watch`; ≥ 3 fires `drifting`. A single maintainer comment
+drops the issue from the alarm entirely — silence is only silent when the
+maintainer has not spoken. This is the signal that catches the exact case
+beadle exists for; when it fires drifting alongside SDL-share drifting, it
+takes precedence in `top_signal` because it names *which issues*, not just
+how many.
+
 `beadle render <target>` also consumes ingested classifications (finding-015):
 each Open-issues row gains a chip column (`report_type · defect_nature ·
 priority` + `⚠` integrity / `▲` silent-data-loss / `★` quick-win-eligible
