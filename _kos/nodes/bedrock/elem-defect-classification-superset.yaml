@@ -92,6 +92,20 @@ content: |
   contract (which would be an orc-level artifact mirroring aae-orc/labels/schema.yaml,
   not a copy in critic) until critic has running code and a second consumer is real
   (SOUL.md §7 gradual elaboration). See finding-008.
+
+  --- Ingest contract (finding-014) ---
+
+  `beadle classify ingest <target>` is the machine-checked bridge between
+  the Phase-0 Claude Code classifier skill and the store. The four bounded
+  enums (report_type, defect_nature, reproducibility, operational_impact)
+  are validated at ingest time — free-text on those axes is rejected, not
+  silently accepted. Two invariants from this node are enforced at the same
+  boundary: `integrity=true` requires `integrity_anchor` naming the
+  systems-of-record tier; `quick_win_eligible=true` is invalid on integrity
+  items (the HARD EXCLUSION on line 72). This is the surface downstream
+  signals (question-direction-verdict-escalation B/C, render's
+  classification-index) derive from — enforcement here means the taxonomy
+  holds by construction, not by discipline.
 edges:
   - target: elem-intent-alignment-whitespace
     type: refines
@@ -103,6 +117,9 @@ edges:
     type: relates
   - target: question-maintainer-progress-gamification
     type: relates
+  - target: question-direction-verdict-escalation
+    type: feeds
 provenance:
   created_by: agent
   created_at: "2026-06-28"
+  updated_at: "2026-07-01"

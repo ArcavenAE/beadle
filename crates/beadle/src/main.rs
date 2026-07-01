@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod classify;
 mod direction;
 mod enumerate;
 mod gh;
@@ -61,6 +62,20 @@ enum Cmd {
         #[arg(long)]
         write_note: bool,
     },
+    /// Ingest ClassificationRecord payload(s) produced by the classifier skill.
+    #[command(subcommand)]
+    Classify(ClassifyCmd),
+}
+
+#[derive(Subcommand)]
+enum ClassifyCmd {
+    /// Append a validated ClassificationRecord (or JSON array of them) to the store.
+    /// Reads from `--file` if given, else stdin.
+    Ingest {
+        target: String,
+        #[arg(long)]
+        file: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -77,6 +92,9 @@ fn main() -> Result<()> {
         }
         Cmd::Push { target, dry_run } => push::run(&root, &target, dry_run),
         Cmd::Direction { target, write_note } => direction::run(&root, &target, write_note),
+        Cmd::Classify(ClassifyCmd::Ingest { target, file }) => {
+            classify::ingest(&root, &target, file.as_deref())
+        }
     }
     .with_context(|| "beadle command failed")
 }

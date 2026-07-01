@@ -174,6 +174,18 @@ Append the run's records (issue, verdicts, classification, alignment, maintainer
 events) to the out-of-band store (Phase 0: JSONL). The store is the source of
 truth — never the dashboard body.
 
+For classification records specifically, use `beadle classify ingest <target>` —
+pipe a JSON array of ClassificationRecord objects on stdin (or `--file <path>`).
+The binary validates the four bounded enums (`report_type`, `defect_nature`,
+`reproducibility`, `operational_impact`), enforces the HARD invariants
+(`integrity=true` requires `integrity_anchor`; `quick_win_eligible=true` is
+invalid on integrity items), and appends. If validation fails, fix the payload
+and retry — the taxonomy holds by construction, not by discipline.
+
+Direction signals B (integrity-density) and C (silent-data-loss share) derive
+from these classifications for the current run — if you don't ingest, they emit
+`pending` with a `reason` naming the gap (finding-014).
+
 ### 7. Regenerate the dashboard  (the primary goal)
 Per `../../docs/dashboard-schema.md`: discover the pinned dashboard **sentinel-first,
 title-second** — search the beadle identity's open issues for the `<!-- beadle-state -->`
