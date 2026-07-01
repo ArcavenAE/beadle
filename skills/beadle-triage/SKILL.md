@@ -212,7 +212,22 @@ block (machine-stable key) and the exact title `📋 beadle — Triage Dashboard
 the union. Exactly one (your authorship) → rewrite in place. **>1 → STOP and request
 human consolidation** (a duplicate already exists; never pick one silently, never
 create a third). Wrong author → STOP, don't fork. None → re-check immediately, then
-create+pin. Then rewrite the whole body from the store — Header (direction verdict), Progress (stats + trend deltas, every count
+create+pin.
+
+`beadle render <target>` now emits a **Direction verdict** section as the first
+derived-zone block (finding-017). It contains a deterministic projection of the
+current run's `DirectionReport`: header line `<glyph> <verdict>` (🟢/🟡/🔴) +
+top signal, plus a 4-row table with per-signal verdicts + rationale for
+filing-density, integrity-density (B), silent-data-loss-share (C), and
+silent-data-loss-zero-engagement (A4). When A4 fires, the row's detail cell
+names the affected issues (`· drifting: #42, #87` or `· watch: #12`). The
+editor still owns the free-text paragraph above the table — it goes in the
+`<!-- editor:direction-verdict -->` slot and is preserved verbatim across
+regens. Whole-section ownership: renderer owns the numbers/table, editor owns
+the interpretation (`question-renderer-editorial-boundary` sub-question A).
+
+Then rewrite the whole body from the store — Header (direction verdict, per
+finding-017), Progress (stats + trend deltas, every count
 paired with an outcome), Action plan, **Quick wins — safe to act on** (see step 7a),
 **Direction Health** (minutiae ratio,
 filed-vs-acted gap, scope-drift candidates), Classification index, **Maintainer
