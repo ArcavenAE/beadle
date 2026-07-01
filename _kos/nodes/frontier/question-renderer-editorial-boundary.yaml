@@ -1,0 +1,61 @@
+id: question-renderer-editorial-boundary
+type: question
+confidence: frontier
+title: "Where does the renderer's derived output stop and the editor's authored content begin?"
+tags: [beadle, renderer, dashboard, editorial, propose-not-act, phase-2]
+content: |
+  finding-011 established that the JSONL store can materially derive parts of
+  the dashboard body — sentinel block, counts table, per-cluster member lists,
+  cluster decay state, freshness timestamps, comment-derived compass numbers.
+  It cannot materialize the direction-verdict paragraph, quick-win eligibility,
+  per-issue verdict chips, or the pilot-derived / speculative distinction —
+  those depend on classifications the store does not yet hold, and per
+  `elem-propose-not-act` beadle must not invent them.
+
+  So the rendered body will be a mix. Open sub-questions:
+
+  A. **What is the divider format?** Options:
+     - Marked slots (`<!-- editor: direction-verdict -->` … `<!-- /editor -->`)
+       that the renderer preserves verbatim across regenerations.
+     - Whole sections owned by the renderer vs whole sections owned by the
+       editor, with no interleaving inside a section.
+     - A separate "editor overlay" file (`store/<target>/editorial.md`) that
+       the renderer includes at fixed anchor points.
+
+  B. **How does the sentinel digest catch hand-edits to derived zones?**
+     A single digest over the whole body is too coarse (any editor slot
+     change re-fires it). A digest over just derived zones is honest but
+     needs a stable extraction. Candidate: sentinel carries two digests —
+     `derived_digest` (over renderer output pre-slot-merge) and
+     `body_digest` (over the final body). Mismatch on `derived_digest`
+     between run N-1 and the current live body ⇒ someone edited the
+     derived zone; beadle logs and regenerates cleanly (per
+     `elem-state-out-of-band`), but the event is now first-class.
+
+  C. **Does the editor's content survive a regen?** Two failure modes:
+     - Editor wrote a per-issue verdict in an editor slot; run N+1
+       reclassifies the issue (new pilot repro, moved cluster). Renderer
+       needs to notice the editor's text references stale state.
+     - Editor's direction verdict said "cold start"; store now shows one
+       maintainer comment. Renderer needs to *nudge* — highlight the
+       divergence — without overwriting.
+
+  D. **How does `push` handle the "editor slot is empty" case on run 1?**
+     Ship placeholder markers, or refuse to push until an editor has
+     written to each slot? First run of a new target is the boundary case.
+
+  E. **Where does classification authorship live?** finding-011 named this
+     as a separate probe. If classifications become editor-authored
+     (per-issue chip in a slot → row appended to store), the renderer needs
+     to write both directions: read classifications from the store *and*
+     surface unclassified issues as editor todos.
+edges:
+  - target: elem-state-out-of-band
+    type: derives_from
+  - target: elem-propose-not-act
+    type: bounded_by
+  - target: elem-maintainer-compass
+    type: composes
+provenance:
+  created_by: agent
+  created_at: "2026-07-01"

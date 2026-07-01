@@ -12,11 +12,26 @@ content: |
   trusts a hand-edit, embeds only a digest in a `<!-- beadle-state -->` sentinel,
   and tolerates a wiped body by regenerating cleanly. Checkboxes are derived from
   authoritative state, never authored by hand.
+
+  Phase-0 shape (finding-011): the store is a single append-only JSONL file per
+  target at `store/<target>/state.jsonl`, gitignored (live target observation,
+  not source). Six record kinds — `run`, `issue`, `classification`,
+  `comment_event`, `cluster`, `note` — each with `kind`/`ts`/`target` as the
+  common header. Unknown-kind rows are preserved verbatim by the reader
+  (`Record::Other`) so schema evolution never loses history. Canonical-JSON
+  serialization (sorted keys, no trailing newline) keeps diffs stable. Watermark
+  is derived (`max(issue.number)`), not stored. Idempotency is guaranteed by
+  content fingerprints — comment events by `(number, ts, actor)`, issue
+  observations by number-per-run. See `docs/store-schema.md` for the full
+  schema and `finding-011` for what the shape settled and what it did not.
 edges:
   - target: grv-state-in-markdown
     type: supersedes
   - target: question-dolt-state-engine
     type: refines
+  - target: question-renderer-editorial-boundary
+    type: opens
 provenance:
   created_by: agent
   created_at: "2026-06-27"
+  updated_at: "2026-07-01"

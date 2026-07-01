@@ -12,9 +12,23 @@ content: |
   act on is the primary "led-by-the-backlog" drift signal. No shipping tool cleanly
   separates reaction-popularity from maintainer-acted-upon signal; this separation
   is a beadle differentiator.
+
+  Phase-0 derivation (finding-011): every comment observed on an open issue in
+  the target repo is written to the out-of-band store as a `comment_event` row
+  with the actor's login classified against the intent manifest as `maintainer`,
+  `measured`, or `other`. The compass is then a filter — `count(role=maintainer)`
+  vs `count(role=measured)` — computed from data, not asserted from inspection.
+  A dashboard body claim of maintainer_engaged=N must match the store's row
+  count exactly; a mismatch is a bug in the classifier, not a difference of
+  opinion. First derivation against vsdd-factory (run 10): 157 events,
+  0 maintainer / 157 measured / 0 other — reproducing the run-9 hand-authored
+  gap of 161:0 within observation-frame drift.
 edges:
   - target: elem-intent-alignment-whitespace
     type: supports
+  - target: elem-state-out-of-band
+    type: derives_from
 provenance:
   created_by: agent
   created_at: "2026-06-27"
+  updated_at: "2026-07-01"
