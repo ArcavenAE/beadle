@@ -106,6 +106,21 @@ content: |
   signals (question-direction-verdict-escalation B/C, render's
   classification-index) derive from — enforcement here means the taxonomy
   holds by construction, not by discipline.
+
+  --- Render wiring (finding-015) ---
+
+  `beadle render` now surfaces classifications in two zones, both machine-
+  derived: a per-issue chip column (`<report_type> · <defect_nature> ·
+  <priority>` + `⚠` / `▲` / `★` flags for integrity / silent-data-loss /
+  quick-win-eligible) and a summary block above the Open-issues table.
+  The chip is a deterministic projection covered by the sentinel's
+  `derived_digest`, so hand-edits are first-class detectable events on the
+  next render (question-renderer-editorial-boundary E is now answered).
+  When no classifications exist, the summary emits the propose-not-act
+  pending disclosure verbatim — same shape as `SignalOrPending::Pending`
+  in direction. Unclassified issues render `_unclassified_` in the chip
+  column, making "classifier hasn't run on this target yet" a visible
+  gap rather than a silent absence.
 edges:
   - target: elem-intent-alignment-whitespace
     type: refines
