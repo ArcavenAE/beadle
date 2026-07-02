@@ -16,6 +16,7 @@ use std::path::Path;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
+use crate::controls;
 use crate::direction::{self, DirectionReport};
 use crate::intent;
 
@@ -477,6 +478,8 @@ fn render_derived(
         }
     }
 
+    out.push_str(&controls::render_board_controls_block());
+
     out.push_str(&format!(
         "## Open issues — {} observations (most-recent first)\n\n",
         issues.len()
@@ -928,6 +931,47 @@ mod tests {
             "A4 row"
         );
         assert!(body.contains("pending — "), "pending signals render their reason");
+    }
+
+    #[test]
+    fn render_includes_board_controls_unchecked() {
+        let run = RunRecord {
+            ts: "2026-07-01T00:00:00Z".into(),
+            target: "t".into(),
+            run: 1,
+            watermark_before: 0,
+            watermark_after: 0,
+            counts: Default::default(),
+            digest: "d".into(),
+            warmup: None,
+            intent_version: None,
+            new_this_run: vec![],
+            notes: None,
+        };
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        let summary = classification_summary(&empty);
+        let direction = mk_direction_pending();
+        let body = render_derived(
+            "t",
+            "acme/widget",
+            &run,
+            &[],
+            &[],
+            &CommentStats::default(),
+            &empty,
+            &summary,
+            &direction,
+        );
+        assert!(body.contains("## Board controls"), "board controls header");
+        assert!(body.contains("- [ ] `reprioritize`"));
+        assert!(body.contains("- [ ] `full-refresh`"));
+        assert!(body.contains("- [ ] `revalidate`"));
+        assert!(body.contains("- [ ] `rescore-intent`"));
+        assert!(
+            body.contains("verb=full-refresh;id=board"),
+            "full-refresh marker present"
+        );
+        assert!(!body.contains("- [x]"), "renderer never emits checked");
     }
 
     #[test]

@@ -7,13 +7,16 @@
 //! Dry-run mode prints what would change without touching GitHub.
 
 use anyhow::{anyhow, Context, Result};
+use beadle_store::{NoteRecord, Record, Store};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
 
-use crate::{gh, intent, render};
+use crate::{controls, gh, intent, render};
 
 const DIRECTION_OPEN: &str = "<!-- editor:direction-verdict -->";
 const DIRECTION_CLOSE: &str = "<!-- /editor:direction-verdict -->";
@@ -33,6 +36,13 @@ pub fn run(root: &Path, target: &str, dry_run: bool) -> Result<()> {
         "beadle push: target={target} repo={} dashboard=#{} dry_run={dry_run}",
         intent.repo, dashboard.number
     );
+
+    // Scan the LIVE body for checked board-control boxes (F5 Tier 2).
+    // Record one Note per verb before rendering; the fresh render always
+    // emits unchecked boxes, so the next push through the same body
+    // resets the box (natural de-bounce). Dispatch of the requested
+    // routines is deferred — Phase-1 gh-aw will drain the notes queue.
+    record_board_controls(root, target, &dashboard.body, dry_run)?;
 
     let rendered = render::run(root, target)?;
 
@@ -91,6 +101,57 @@ pub fn run(root: &Path, target: &str, dry_run: bool) -> Result<()> {
         final_body.len(),
         intent.repo,
         dashboard.number
+    );
+    Ok(())
+}
+
+/// Extract any checked board-verb boxes from the live dashboard body and
+/// append one `control-request` note per verb to the store.
+///
+/// - Renderer never emits checked boxes, so an unchanged live body yields
+///   zero notes (fast path).
+/// - Dry-run does not append; it only reports what it would have recorded.
+/// - `run` on the note references the store's latest run (0 if none).
+fn record_board_controls(root: &Path, target: &str, live_body: &str, dry_run: bool) -> Result<()> {
+    let verbs = controls::extract_checked_verbs(live_body);
+    if verbs.is_empty() {
+        return Ok(());
+    }
+    let store = Store::open(root.join("store"), target)?;
+    let run = store
+        .latest_run()
+        .ok()
+        .flatten()
+        .map(|r| r.run)
+        .unwrap_or(0);
+    let ts = OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .unwrap_or_default();
+    let recs: Vec<Record> = verbs
+        .iter()
+        .map(|v| {
+            Record::Note(NoteRecord {
+                ts: ts.clone(),
+                target: target.to_string(),
+                run,
+                topic: "control-request".to_string(),
+                text: format!("verb={};id=board", v),
+            })
+        })
+        .collect();
+    if dry_run {
+        eprintln!(
+            "beadle push: dry-run — {} board-control request(s) would be recorded ({})",
+            recs.len(),
+            verbs.join(", ")
+        );
+        return Ok(());
+    }
+    store.append(&recs).context("append control-request notes")?;
+    eprintln!(
+        "beadle push: recorded {} board-control request(s) ({})",
+        recs.len(),
+        verbs.join(", ")
     );
     Ok(())
 }
@@ -217,5 +278,57 @@ mod tests {
     fn finalize_is_idempotent_on_missing_placeholder() {
         let body = "no placeholder here";
         assert_eq!(finalize_sentinel(body), body);
+    }
+
+    #[test]
+    fn record_board_controls_appends_notes() {
+        let td = tempfile::TempDir::new().unwrap();
+        let body = "\
+- [x] `full-refresh` — foo <!-- verb=full-refresh;id=board -->
+- [x] `revalidate` <!-- verb=revalidate;id=board -->
+";
+        record_board_controls(td.path(), "vsdd-factory", body, false).unwrap();
+        let store = Store::open(td.path().join("store"), "vsdd-factory").unwrap();
+        let recs = store.read_all().unwrap();
+        let notes: Vec<_> = recs
+            .iter()
+            .filter_map(|r| match r {
+                Record::Note(n) if n.topic == "control-request" => Some(n),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(notes.len(), 2);
+        assert!(notes.iter().any(|n| n.text == "verb=full-refresh;id=board"));
+        assert!(notes.iter().any(|n| n.text == "verb=revalidate;id=board"));
+    }
+
+    #[test]
+    fn record_board_controls_no_op_on_unchecked() {
+        let td = tempfile::TempDir::new().unwrap();
+        let body = "\
+- [ ] `full-refresh` <!-- verb=full-refresh;id=board -->
+- [ ] `revalidate` <!-- verb=revalidate;id=board -->
+";
+        record_board_controls(td.path(), "vsdd-factory", body, false).unwrap();
+        // No store dir should have been created — extract_checked_verbs
+        // returned empty, so `record_board_controls` returned before touching
+        // the filesystem.
+        assert!(!td.path().join("store").exists());
+    }
+
+    #[test]
+    fn record_board_controls_dry_run_does_not_write() {
+        let td = tempfile::TempDir::new().unwrap();
+        let body = "- [x] `reprioritize` <!-- verb=reprioritize;id=board -->\n";
+        record_board_controls(td.path(), "vsdd-factory", body, true).unwrap();
+        // Dry-run may still open the store (which creates the dir) but must
+        // not append. Read back and confirm zero note records.
+        let store = Store::open(td.path().join("store"), "vsdd-factory").unwrap();
+        let recs = store.read_all().unwrap();
+        assert!(
+            recs.iter()
+                .all(|r| !matches!(r, Record::Note(n) if n.topic == "control-request")),
+            "dry-run must not append control-request notes"
+        );
     }
 }

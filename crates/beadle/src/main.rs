@@ -12,6 +12,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod classify;
+mod controls;
 mod direction;
 mod enumerate;
 mod gh;
