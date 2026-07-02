@@ -81,11 +81,30 @@ content: |
   does), and the skill's step 8 ("read controls from the prior body") should grow a
   branch for board-level verbs. Wiring the cheap-poll pass is a Phase 1 (gh-aw cron)
   concern, alongside the discovery chokepoint and the gh-aw schedule design.
+
+  ## Phase-0 status (finding-018)
+
+  Poll half shipped. `beadle render` emits the four-verb block inside the derived
+  zone (always unchecked). `beadle push` scans the LIVE body for checked boxes,
+  records one `NoteRecord{topic="control-request", text="verb=<v>;id=board"}` per
+  checked verb, then overwrites the body with the fresh unchecked render — that
+  reset IS the de-bounce (question #4). Answered by inheritance / by construction:
+  #1 safety scope (whitelist = `BOARD_VERBS`; unknown verbs produce zero notes),
+  #3 eventually-consistent (parse happens on next push, box clears on same push),
+  #4 de-bounce (reset-on-render, structural). Still open: #2 poll/act cadence
+  (Phase-1 gh-aw), #5 cost guard / rate-limit, #6 concurrency (INC-003 shape —
+  Phase-1 single-session invariant hides it today). Tier-1 per-issue verb rows
+  are still unrendered — separate cut.
+
+  Dispatch of the requested routines is DEFERRED. Notes accumulate as a request
+  queue; Phase-1 gh-aw drains it.
 edges:
   - target: question-dashboard-discovery-robustness
     type: relates
   - target: question-marvel-team-shape
     type: relates
+  - target: finding-018-board-control-checkboxes
+    type: partially_answered_by
 provenance:
   created_by: agent
   created_at: "2026-06-28"
