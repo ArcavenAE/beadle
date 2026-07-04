@@ -3,8 +3,10 @@
 # Dormant by default: triggers only on version tags (v*) or manual dispatch.
 # Signing gates on the SIGNING_ENABLED repo variable (currently false) and
 # runs inside the `release` GitHub environment (branch policy: main; tag
-# policy: v*, alpha-*). Org-level secrets are only exposed inside it.
-# With SIGNING_ENABLED=false, tag pushes still produce unsigned releases.
+# policy: v*, alpha-*), which gates when the sign job may run. A
+# has_signing_secrets probe skips signing cleanly if any secret is absent
+# (e.g. mid-rotation). With SIGNING_ENABLED=false, tag pushes still
+# produce unsigned releases.
 #
 # Pattern: org-standard certificate-based flow (kos ci.yml is the reference).
 
@@ -47,6 +49,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      has_signing_secrets: ${{ steps.probe-secrets.outputs.has_secrets }}
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -80,6 +83,30 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Probe signing secrets presence
+        id: probe-secrets
+        env:
+          CERT_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          INSTALLER_P12: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_P12 }}
+          INSTALLER_PASSWORD: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
+          INSTALLER_IDENTITY: ${{ secrets.APPLE_INSTALLER_IDENTITY }}
+          NOTARIZATION_APPLE_ID: ${{ secrets.APPLE_NOTARIZATION_APPLE_ID }}
+          NOTARIZATION_PASSWORD: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
+          NOTARIZATION_TEAM_ID: ${{ secrets.APPLE_NOTARIZATION_TEAM_ID }}
+        run: |
+          HAS_SECRETS="false"
+          if [[ -n "$CERT_P12" && -n "$CERT_PASSWORD" && -n "$SIGNING_IDENTITY" && \
+                -n "$INSTALLER_P12" && -n "$INSTALLER_PASSWORD" && -n "$INSTALLER_IDENTITY" && \
+                -n "$NOTARIZATION_APPLE_ID" && -n "$NOTARIZATION_PASSWORD" && -n "$NOTARIZATION_TEAM_ID" ]]; then
+            HAS_SECRETS="true"
+          fi
+          echo "has_secrets=$HAS_SECRETS" >> "$GITHUB_OUTPUT"
+          if [[ "${{ vars.SIGNING_ENABLED }}" == "true" && "$HAS_SECRETS" == "false" ]]; then
+            echo "::warning::SIGNING_ENABLED is true but one or more signing secrets are absent; sign job will skip and the release will be unsigned."
+          fi
+
       - name: Build release binary
         run: |
           cargo build --release -p beadle --target ${{ matrix.target }}
@@ -97,7 +124,7 @@ jobs:
   sign-and-notarize:
     name: Sign & Notarize
     needs: build-release
-    if: vars.SIGNING_ENABLED == 'true'
+    if: vars.SIGNING_ENABLED == 'true' && needs.build-release.outputs.has_signing_secrets == 'true'
     permissions:
       contents: write
     environment: release
