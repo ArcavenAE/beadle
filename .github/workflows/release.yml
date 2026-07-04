@@ -1,0 +1,363 @@
+# Release pipeline — build, sign, notarize, publish
+#
+# Dormant by default: triggers only on version tags (v*) or manual dispatch.
+# Signing gates on the SIGNING_ENABLED repo variable (currently false) and
+# runs inside the `release` GitHub environment (branch policy: main; tag
+# policy: v*, alpha-*), which gates when the sign job may run. A
+# has_signing_secrets probe skips signing cleanly if any secret is absent
+# (e.g. mid-rotation). With SIGNING_ENABLED=false, tag pushes still
+# produce unsigned releases.
+#
+# Pattern: org-standard certificate-based flow (kos ci.yml is the reference).
+
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v[0-9]*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-release:
+    name: Build (${{ matrix.target }})
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact_name: beadle-darwin-arm64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: beadle-linux-amd64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            artifact_name: beadle-linux-arm64
+    runs-on: ${{ matrix.os }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      has_signing_secrets: ${{ steps.probe-secrets.outputs.has_secrets }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: step-security/dtolnay-rust-toolchain@8dd607977d06adf4ed49b190381e74c17a9dd25f # v1.0.0
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - uses: step-security/rust-cache@851174d9a2fdc03e0896e02844dcc61d81dd7851 # v2.9.1
+        with:
+          cache-on-failure: true
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            TAG="${GITHUB_REF_NAME}"
+          else
+            VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            TAG="alpha-$(date -u +%Y%m%d-%H%M%S)-$(echo ${{ github.sha }} | head -c 7)"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Probe signing secrets presence
+        id: probe-secrets
+        env:
+          CERT_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          INSTALLER_P12: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_P12 }}
+          INSTALLER_PASSWORD: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
+          INSTALLER_IDENTITY: ${{ secrets.APPLE_INSTALLER_IDENTITY }}
+          NOTARIZATION_APPLE_ID: ${{ secrets.APPLE_NOTARIZATION_APPLE_ID }}
+          NOTARIZATION_PASSWORD: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
+          NOTARIZATION_TEAM_ID: ${{ secrets.APPLE_NOTARIZATION_TEAM_ID }}
+        run: |
+          HAS_SECRETS="false"
+          if [[ -n "$CERT_P12" && -n "$CERT_PASSWORD" && -n "$SIGNING_IDENTITY" && \
+                -n "$INSTALLER_P12" && -n "$INSTALLER_PASSWORD" && -n "$INSTALLER_IDENTITY" && \
+                -n "$NOTARIZATION_APPLE_ID" && -n "$NOTARIZATION_PASSWORD" && -n "$NOTARIZATION_TEAM_ID" ]]; then
+            HAS_SECRETS="true"
+          fi
+          echo "has_secrets=$HAS_SECRETS" >> "$GITHUB_OUTPUT"
+          if [[ "${{ vars.SIGNING_ENABLED }}" == "true" && "$HAS_SECRETS" == "false" ]]; then
+            echo "::warning::SIGNING_ENABLED is true but one or more signing secrets are absent; sign job will skip and the release will be unsigned."
+          fi
+
+      - name: Build release binary
+        run: |
+          cargo build --release -p beadle --target ${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/beadle ${{ matrix.artifact_name }}
+
+      - name: Verify binary
+        run: ./${{ matrix.artifact_name }} --version
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: binaries-${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+
+  sign-and-notarize:
+    name: Sign & Notarize
+    needs: build-release
+    if: vars.SIGNING_ENABLED == 'true' && needs.build-release.outputs.has_signing_secrets == 'true'
+    permissions:
+      contents: write
+    environment: release
+    runs-on: macos-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+
+      - name: Download binaries
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: binaries-beadle-darwin-arm64
+
+      - name: Import certificates
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_INSTALLER_CERTIFICATE_P12: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_P12 }}
+          APPLE_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_INSTALLER_CERTIFICATE_PASSWORD }}
+        run: |
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > cert.p12
+          security import cert.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm cert.p12
+
+          echo "$APPLE_INSTALLER_CERTIFICATE_P12" | base64 --decode > installer-cert.p12
+          security import installer-cert.p12 -k build.keychain -P "$APPLE_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/pkgbuild -T /usr/bin/productbuild -T /usr/bin/productsign
+          rm installer-cert.p12
+
+          curl -sfo /tmp/DeveloperIDG2CA.cer https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security add-certificates -k build.keychain /tmp/DeveloperIDG2CA.cer
+          rm /tmp/DeveloperIDG2CA.cer
+
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+      - name: Sign binary
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          codesign --force --options runtime \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            --timestamp \
+            beadle-darwin-arm64
+
+      - name: Verify signature
+        run: codesign --verify --deep --strict beadle-darwin-arm64
+
+      - name: Build app bundle
+        run: |
+          VERSION="${{ needs.build-release.outputs.version }}"
+          chmod +x scripts/create-app.sh
+          ./scripts/create-app.sh beadle-darwin-arm64 "$VERSION" .
+          mv Beadle.app Beadle-arm64.app
+
+      - name: Sign app bundle
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          codesign --force --deep --options runtime \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            --timestamp \
+            Beadle-arm64.app
+
+      - name: Build dmg
+        run: |
+          VERSION="${{ needs.build-release.outputs.version }}"
+          chmod +x scripts/create-dmg.sh
+          ./scripts/create-dmg.sh Beadle-arm64.app "$VERSION" beadle-arm64.dmg
+
+      - name: Build pkg
+        env:
+          APPLE_INSTALLER_IDENTITY: ${{ secrets.APPLE_INSTALLER_IDENTITY }}
+        run: |
+          if ! security find-identity -v build.keychain | grep -q "$APPLE_INSTALLER_IDENTITY"; then
+            echo "::error::APPLE_INSTALLER_IDENTITY not found in keychain"
+            security find-identity -v build.keychain
+            exit 1
+          fi
+          VERSION="${{ needs.build-release.outputs.version }}"
+          chmod +x scripts/create-pkg.sh
+          ./scripts/create-pkg.sh beadle-darwin-arm64 "$VERSION" "$APPLE_INSTALLER_IDENTITY" beadle-arm64.pkg
+
+      - name: Notarize and staple
+        env:
+          APPLE_NOTARIZATION_APPLE_ID: ${{ secrets.APPLE_NOTARIZATION_APPLE_ID }}
+          APPLE_NOTARIZATION_PASSWORD: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
+          APPLE_NOTARIZATION_TEAM_ID: ${{ secrets.APPLE_NOTARIZATION_TEAM_ID }}
+        run: |
+          for ARTIFACT in beadle-arm64.pkg beadle-arm64.dmg; do
+            echo "Notarizing $ARTIFACT..."
+            xcrun notarytool submit "$ARTIFACT" \
+              --apple-id "$APPLE_NOTARIZATION_APPLE_ID" \
+              --password "$APPLE_NOTARIZATION_PASSWORD" \
+              --team-id "$APPLE_NOTARIZATION_TEAM_ID" \
+              --wait --timeout 14400
+            xcrun stapler staple "$ARTIFACT"
+          done
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: signed-binaries-darwin-arm64
+          path: |
+            beadle-darwin-arm64
+            beadle-arm64.pkg
+            beadle-arm64.dmg
+          retention-days: 14
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain build.keychain || true
+
+  create-release:
+    name: Create Release
+    needs: [build-release, sign-and-notarize]
+    if: |
+      always() &&
+      needs.build-release.result == 'success' &&
+      (needs.sign-and-notarize.result == 'success' || needs.sign-and-notarize.result == 'skipped')
+    permissions:
+      contents: write
+    environment: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Download macOS arm64
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.sign-and-notarize.result == 'success' && 'signed-binaries-darwin-arm64' || 'binaries-beadle-darwin-arm64' }}
+          path: dist/
+
+      - name: Download Linux amd64
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: binaries-beadle-linux-amd64
+          path: dist/
+
+      - name: Download Linux arm64
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: binaries-beadle-linux-arm64
+          path: dist/
+
+      - name: List release files
+        run: ls -la dist/
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ needs.build-release.outputs.tag }}"
+          PRERELEASE=""
+          if [[ "$TAG" == alpha-* ]]; then
+            PRERELEASE="--prerelease"
+          fi
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            $PRERELEASE \
+            --title "$TAG" \
+            --notes "$(cat <<NOTES
+          Automated release.
+
+          **Version:** ${{ needs.build-release.outputs.version }}
+          **Commit:** ${{ github.sha }}
+          **Built with:** Rust (cargo)
+          **Signed:** ${{ needs.sign-and-notarize.result == 'success' && 'Yes (Apple Developer ID)' || 'No (unsigned)' }}
+
+          **Binaries:**
+          - \`beadle-darwin-arm64\` — macOS Apple Silicon
+          - \`beadle-linux-amd64\` — Linux x86_64
+          - \`beadle-linux-arm64\` — Linux ARM64
+          NOTES
+          )" \
+            dist/*
+
+  update-homebrew:
+    name: Update Homebrew Tap
+    needs: [build-release, sign-and-notarize, create-release]
+    if: needs.create-release.result == 'success' && needs.sign-and-notarize.result == 'success'
+    permissions:
+      contents: write
+    environment: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+
+      - name: Download signed darwin binaries
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: signed-binaries-darwin-arm64
+          path: dist/
+
+      - name: Update Homebrew formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          TAG="${{ needs.build-release.outputs.tag }}"
+          VERSION="${{ needs.build-release.outputs.version }}"
+
+          SHA256_ARM64=$(shasum -a 256 dist/beadle-darwin-arm64 | cut -d' ' -f1)
+
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/arcavenae/homebrew-tap.git" homebrew-tap-repo
+          cd homebrew-tap-repo
+
+          mkdir -p Formula
+          cp ../Formula/beadle.rb Formula/beadle.rb
+
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" Formula/beadle.rb
+          sed -i "s/TAG_PLACEHOLDER/$TAG/g" Formula/beadle.rb
+          sed -i "s/SHA256_ARM64_PLACEHOLDER/$SHA256_ARM64/g" Formula/beadle.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/beadle.rb
+          git diff --cached --quiet || git commit -m "Update beadle to $TAG"
+          git push
