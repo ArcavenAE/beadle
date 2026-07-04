@@ -1,0 +1,8 @@
+# rustfmt config — unstable features require nightly rustfmt.
+# Run: cargo +nightly fmt --all
+
+edition = "2024"
+unstable_features = true
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true
