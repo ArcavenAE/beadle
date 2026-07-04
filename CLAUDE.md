@@ -89,3 +89,15 @@ GitHub or repo state — they emit findings the orchestrator acts on.
 
 Only a human edits this file and the project-root meta-docs. Everything else is
 produced by the appropriate specialist.
+
+@.claude/rules/_index.md
+
+## Beads Issue Tracker
+
+This project uses **bd (beads)** for issue tracking, shared with the
+orchestrator via the `.beads -> ../.beads` symlink. Run `bd prime` for
+full workflow context.
+
+- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or
+  markdown TODO lists
+- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
