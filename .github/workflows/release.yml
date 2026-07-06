@@ -361,3 +361,43 @@ jobs:
           git add Formula/beadle.rb
           git diff --cached --quiet || git commit -m "Update beadle to $TAG"
           git push
+
+  attest:
+    name: Attest Release Provenance
+    needs: [build-release, sign-and-notarize, create-release]
+    # Run after create-release publishes the FINAL release assets (signed if
+    # sign-and-notarize succeeded, unsigned if it was skipped). Attesting here
+    # covers the bytes that actually ship, not intermediate build artifacts.
+    if: |
+      !cancelled() &&
+      needs.build-release.result == 'success' &&
+      (needs.sign-and-notarize.result == 'success' || needs.sign-and-notarize.result == 'skipped') &&
+      needs.create-release.result == 'success'
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Download final release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release-assets
+          # Pull everything currently attached to the release; create-release
+          # has finished publishing by the time this job runs.
+          gh release download "${GITHUB_REF_NAME}" \
+            --repo "${{ github.repository }}" \
+            --dir release-assets
+          echo "Assets to be attested:"
+          ls -la release-assets/
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: 'release-assets/*'

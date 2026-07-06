@@ -77,6 +77,64 @@ beadle elaborates gradually. It is useful at every phase and over-built at none.
 DrBothen's [Prism](./targets/prism.intent.yaml). Generic for any repo — each
 target declares its own intent anchor; nothing is hardcoded.
 
+## Installation
+
+beadle ships as a signed, notarized macOS binary (Apple Silicon) and Linux
+binaries (`amd64`, `arm64`) via GitHub Releases. **The first stable release is
+pending** — every release today is a prerelease from `main`. Everyday use is
+still primarily via the Phase-0 Claude Code skill at `skills/beadle-triage/`;
+the binary is here for automation and the Phase-1+ hooks.
+
+### Option 1: Homebrew (macOS arm64)
+
+```bash
+brew install arcavenae/tap/beadle
+```
+
+Until the first stable release is cut, the tap tracks the latest alpha.
+
+### Option 2: Install with mise
+
+[mise](https://mise.jdx.dev/) is a polyglot version manager. It reads a
+per-project `mise.toml`, pulls the exact signed binary from GitHub Releases,
+and verifies GitHub Artifact Attestations natively — no Homebrew tap required.
+
+**Stable** — no stable release exists yet; this block starts working once the
+first `v*` tag lands:
+
+```bash
+mise use github:ArcavenAE/beadle@latest
+beadle --version
+```
+
+**Alpha channel** (prereleases from `main`) — add `prerelease = true` to opt in
+per-tool. Alpha binaries are not `-a`-suffixed for beadle, so stable and alpha
+share the `beadle` shim (installing both concurrently is not supported until
+we split the release-asset naming):
+
+```toml
+# mise.toml
+[tools]
+"github:ArcavenAE/beadle" = { version = "latest", prerelease = true }
+```
+
+```bash
+mise install
+beadle --version
+```
+
+**macOS troubleshooting** — if a quarantine-aware host propagates
+`com.apple.quarantine` into the mise install and Gatekeeper prompts, clear it
+once:
+
+```bash
+xattr -d com.apple.quarantine "$(mise which beadle)"
+```
+
+### Option 3: Download Pre-built Binary
+
+Download the latest release from [GitHub Releases](https://github.com/ArcavenAE/beadle/releases). Binaries are available for macOS (arm64) and Linux (amd64, arm64).
+
 ## Running it (as arcavenai)
 
 beadle rewrites **its own** dashboard issue each run, so the issue must be
