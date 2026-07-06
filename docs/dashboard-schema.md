@@ -109,16 +109,9 @@ frontier F2).
    type, by priority, by validation verdict; **trend deltas** since last run;
    net-flow (intake − close); filed-vs-acted ratio; backlog age distribution.
    Every count paired with an outcome signal (no vanity metrics).
-3. **Action plan** — P0/P1/P2 tables. **Each row leads with a short human title**
-   (a few words — *what the issue is*), then `#NN` (the agent's fetch reference), then
-   recommended action + owner, with type / reproducibility / **alignment-verdict as
-   trailing chips** (finding-005). The verdict is *status* (drill-in detail), never the
-   row headline — a human scans for what an issue is and will not hover over a bare
-   number. Top actionable items only. **Agent channel:** the per-row verdict *rationale*
-   (cited reason the action is recommended, integrity flags) rides in a folded
-   `<details>` under the row — instantly visible to an LLM, out of the human's way —
-   and never restates the issue body, which the agent fetches via `#NN`.
-3a. **Needs human reading** (the direct-attention lane). A small group —
+2a. **Needs human reading** (the direct-attention lane) — **the first group after
+    Progress, before the Action plan.** The human's entry point: the few items to
+    read in full come before the many items to scan. A small group —
     single digits by construction — of issues whose **special nature benefits
     from the human maintainer reading them directly and in full**: their value
     is in the prose and cannot survive summarization into chips. The facet is
@@ -141,6 +134,15 @@ frontier F2).
     Hard rules: never quick-win-eligible; never folded into a cluster
     rollup; may cross-reference a P0/P1/P2 row (`also P1`) but never
     substitutes for it. If the section exceeds ~7 rows, the bar is too low.
+3. **Action plan** — P0/P1/P2 tables. **Each row leads with a short human title**
+   (a few words — *what the issue is*), then `#NN` (the agent's fetch reference), then
+   recommended action + owner, with type / reproducibility / **alignment-verdict as
+   trailing chips** (finding-005). The verdict is *status* (drill-in detail), never the
+   row headline — a human scans for what an issue is and will not hover over a bare
+   number. Top actionable items only. **Agent channel:** the per-row verdict *rationale*
+   (cited reason the action is recommended, integrity flags) rides in a folded
+   `<details>` under the row — instantly visible to an LLM, out of the human's way —
+   and never restates the issue body, which the agent fetches via `#NN`.
 3b. **Quick wins — safe to act on** (the low-caution lane). A grouping
     **orthogonal to the impact ordering**, not a fourth priority tier: the
     *obviously-broken, easy-fix, low-blast-radius* issues a maintainer can use to

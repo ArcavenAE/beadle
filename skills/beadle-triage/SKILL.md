@@ -283,8 +283,9 @@ the interpretation (`question-renderer-editorial-boundary` sub-question A).
 
 Then rewrite the whole body from the store — Header (direction verdict, per
 finding-017), Progress (stats + trend deltas, every count
-paired with an outcome), Action plan, **Needs human reading** (the `attn.*`
-lane — see step 7d), **Quick wins — safe to act on** (see step 7a),
+paired with an outcome), **Needs human reading** (the `attn.*` lane, first
+group after Progress/Baseline — see step 7d), Action plan,
+**Quick wins — safe to act on** (see step 7a),
 **Direction Health** (minutiae ratio,
 filed-vs-acted gap, scope-drift candidates), Classification index, **Maintainer
 progress** (outcome-paired, not a leaderboard — see step 7b), Controls
@@ -316,9 +317,10 @@ The two see *inverted visibility*, so render three channels in one body:
 
 ### 7d. Needs human reading — the direct-attention lane
 Render the `attn.*` group (step 3b) as its own top-level section, placed
-**between the Action plan and Quick wins**. Small by construction (single
-digits); if it grows past ~7 rows, tighten the bar — the facet only works
-while it stays rare. Row format: `<short title> (#NN) · <attn.subtype chip> ·
+**first after the Baseline section, before the Action plan** — it is the
+human's entry point to the board: the few items to read in full come before
+the many items to scan. Small by construction (single digits); if it grows
+past ~7 rows, tighten the bar — the facet only works while it stays rare. Row format: `<short title> (#NN) · <attn.subtype chip> ·
 <reading-order reason chip (reply-needed / gates-work / standing)> · <one-line
 "why direct reading">`. Never replicate the issue body (B1); the row's job is
 to earn the click. Items here may ALSO appear in P0/P1/P2 groupings (the
