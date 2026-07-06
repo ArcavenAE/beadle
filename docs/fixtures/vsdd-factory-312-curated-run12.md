@@ -61,6 +61,34 @@ finding-005/009 axes + **NEW: human-attention facet (attn.\*)**_
 | filed-vs-acted gap | 277 open : 0 acted | widened +13 — structure, not yet a rate (cold-start) |
 | Δ since last run (#502→#515) | +13 open | integrity-light: 0 of 13 touch a source-of-truth anchor (vs 35% run-11) — methodology-refinement intake |
 
+## 👤 Needs human reading — direct attention (NEW lane · orthogonal to priority)
+
+> A small group whose **special nature benefits from the maintainer reading them directly and
+> in full** — the value is in the prose and cannot survive summarization into chips. Orthogonal
+> to priority: an item here can be P2 on impact yet first in your reading queue. Ordered by
+> reading priority: **reply-needed** (a counterparty is blocked on your answer) →
+> **gates-work** (the decision unblocks other open work) → **standing** (context that improves
+> everything downstream). Never quick-win-eligible; never folded into cluster rollups.
+
+| What it is | # | attn · order · why direct reading |
+|---|---|---|
+| **External contribution flow proposal (ArcavenAE)** — first external contributor asks how to route artifact-bearing changes; proposes artifact-content-via-issue backed by a 2000-trial simulation (tables + charts in comments) | **#510** | `attn.governance` · **reply-needed** · consent/relationship decision only maintainers can make; ArcavenAE holds artifact-bearing PRs until your ruling (also P2 · you both subscribed 2026-07-05) |
+| **Platform-envelope mismatch (tracking)** — the dark-factory requirements profile vs the Claude Code plugin envelope; seven named limits (#411–#417), now generating live gate failures (#458 #461 #473 #474) | **#410** | `attn.direction` · **gates-work** · re-platform / amend-constitution / risk-accept is an architectural fork only you can take; 11 open issues wait on it (also P1-KEYSTONE) |
+| **Fleet-mining evidence brief** — 4,602 dispatches across 3 factories, 169 bad-outcome chains hand-classified: 84% of real bad outcomes are NOT model capability; four engine asks derived | **#463** | `attn.evidence-brief` · **standing** · external empirical corpus you cannot re-derive from this repo; weighing adoption of the four asks is a judgment over the full method + numbers (also P1-KEYSTONE) |
+
+<details><summary>🤖 agent channel — attn.* facet notes (debut run)</summary>
+
+```
+Facet defined in beadle SKILL.md step 3b (2026-07-06). Initial subtypes grown from these
+three exemplars; growth rule = codify a new subtype on its SECOND instance, generic
+attn.other until then. Candidates screened this run and NOT tagged: #508 (worktree config
+poisoning — serious but a defect, chips carry it), #507 (consolidation terminus — engineering
+judgment, not relationship/direction), #464 (evidence volume but derivable from this repo's
+own telemetry). The bar: would the maintainer LOSE something decision-relevant if they only
+read the chip row? Keep the lane in single digits or the facet stops meaning anything.
+```
+</details>
+
 ## Action plan — grouped by INTENT, integrity-first (finding-004 precedence)
 
 Rows lead with **what the issue is**; `#NN` is the agent's fetch reference; trailing chips are
@@ -282,34 +310,6 @@ body budget: dispatch/test/spec tail (#368 #369 #371 #375 #376 #377 #378 #328 #3
 #387 #388 #392 #393 #394 #395 #398 #400 #405 #407 #417 #420 #422 #423 #424), observability
 thread (#317–#325, root cause #415), CI-cost cluster (#308, read WITH #336), trust-scope
 reminder (#316).
-
-## 👤 Needs human reading — direct attention (NEW lane · orthogonal to priority)
-
-> A small group whose **special nature benefits from the maintainer reading them directly and
-> in full** — the value is in the prose and cannot survive summarization into chips. Orthogonal
-> to priority: an item here can be P2 on impact yet first in your reading queue. Ordered by
-> reading priority: **reply-needed** (a counterparty is blocked on your answer) →
-> **gates-work** (the decision unblocks other open work) → **standing** (context that improves
-> everything downstream). Never quick-win-eligible; never folded into cluster rollups.
-
-| What it is | # | attn · order · why direct reading |
-|---|---|---|
-| **External contribution flow proposal (ArcavenAE)** — first external contributor asks how to route artifact-bearing changes; proposes artifact-content-via-issue backed by a 2000-trial simulation (tables + charts in comments) | **#510** | `attn.governance` · **reply-needed** · consent/relationship decision only maintainers can make; ArcavenAE holds artifact-bearing PRs until your ruling (also P2 · you both subscribed 2026-07-05) |
-| **Platform-envelope mismatch (tracking)** — the dark-factory requirements profile vs the Claude Code plugin envelope; seven named limits (#411–#417), now generating live gate failures (#458 #461 #473 #474) | **#410** | `attn.direction` · **gates-work** · re-platform / amend-constitution / risk-accept is an architectural fork only you can take; 11 open issues wait on it (also P1-KEYSTONE) |
-| **Fleet-mining evidence brief** — 4,602 dispatches across 3 factories, 169 bad-outcome chains hand-classified: 84% of real bad outcomes are NOT model capability; four engine asks derived | **#463** | `attn.evidence-brief` · **standing** · external empirical corpus you cannot re-derive from this repo; weighing adoption of the four asks is a judgment over the full method + numbers (also P1-KEYSTONE) |
-
-<details><summary>🤖 agent channel — attn.* facet notes (debut run)</summary>
-
-```
-Facet defined in beadle SKILL.md step 3b (2026-07-06). Initial subtypes grown from these
-three exemplars; growth rule = codify a new subtype on its SECOND instance, generic
-attn.other until then. Candidates screened this run and NOT tagged: #508 (worktree config
-poisoning — serious but a defect, chips carry it), #507 (consolidation terminus — engineering
-judgment, not relationship/direction), #464 (evidence volume but derivable from this repo's
-own telemetry). The bar: would the maintainer LOSE something decision-relevant if they only
-read the chip row? Keep the lane in single digits or the facet stops meaning anything.
-```
-</details>
 
 ## 🟦 Quick wins — safe to act on (low-caution lane · orthogonal to impact)
 
