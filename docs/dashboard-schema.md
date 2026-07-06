@@ -118,6 +118,29 @@ frontier F2).
    (cited reason the action is recommended, integrity flags) rides in a folded
    `<details>` under the row — instantly visible to an LLM, out of the human's way —
    and never restates the issue body, which the agent fetches via `#NN`.
+3a. **Needs human reading** (the direct-attention lane). A small group —
+    single digits by construction — of issues whose **special nature benefits
+    from the human maintainer reading them directly and in full**: their value
+    is in the prose and cannot survive summarization into chips. The facet is
+    `attn.*` (SKILL.md step 3b), **orthogonal to priority** — an item can be
+    P2 on impact yet first in the reading queue. Initial subtypes, grown from
+    observed instances (codify a new one only on its second instance):
+    - `attn.governance` — relationship/consent/policy between parties
+      (contribution flows, disclosure, provenance commitments); often a
+      counterparty is waiting on the answer. Exemplar: vsdd-factory#510.
+    - `attn.direction` — strategic/architectural direction at the conceptual
+      terminus of defect-nature; one reading re-frames dozens of downstream
+      issues. Exemplar: the #410–#417 platform-envelope family.
+    - `attn.evidence-brief` — external empirical evidence offered for
+      adoption that the maintainer cannot re-derive from this repo.
+      Exemplar: #463 (4,602-dispatch cross-corpus study).
+    Rows are ordered by the human's reading priority: **reply-needed**
+    (counterparty blocked) → **gates-work** (decision unblocks other issues)
+    → **standing** (context). Row format: short title, `#NN`,
+    `attn.*` chip, reading-order chip, one line of *why direct reading*.
+    Hard rules: never quick-win-eligible; never folded into a cluster
+    rollup; may cross-reference a P0/P1/P2 row (`also P1`) but never
+    substitutes for it. If the section exceeds ~7 rows, the bar is too low.
 3b. **Quick wins — safe to act on** (the low-caution lane). A grouping
     **orthogonal to the impact ordering**, not a fourth priority tier: the
     *obviously-broken, easy-fix, low-blast-radius* issues a maintainer can use to

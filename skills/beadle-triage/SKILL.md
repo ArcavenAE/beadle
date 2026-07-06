@@ -138,6 +138,61 @@ integrity** group is always P0 and sits **above** convergence-soundness; never l
 functional item (however important) be ranked above an open integrity defect on the
 same substrate it depends on.
 
+### 3b. human-attention  (read-only) — the direct-reading facet
+
+After classifying, ask one more question per issue: **"Does this issue, by its
+special nature, benefit from the human maintainer reading it directly and in
+full — rather than consuming it through the board's classification/priority
+machinery?"** This is a *rare* facet (single-digit share of a corpus). Most
+issues — even most P0s — are well-served by chips + a drill-in reference; a
+ratchet integrity bug needs the human to *act*, not to *read 3,000 words*. The
+`attn.*` facet marks the opposite case: issues whose **value is in the prose
+and cannot survive summarization** — where the chip row is a worse artifact
+than the issue itself.
+
+**Initial family** (grown from observed instances; see growth rule):
+
+- **`attn.governance`** — relationship, consent, or policy between parties:
+  contribution flows, external-party proposals about *how we interact*,
+  licensing, security disclosure, identity/provenance commitments. Only the
+  human can consent on behalf of the project, and often **a counterparty is
+  waiting on the answer**. (Exemplar: #510 — external contribution flow +
+  artifact-routing proposal; not a defect on any axis, invisible to the
+  defect taxonomy.)
+- **`attn.direction`** — strategic/architectural direction at the conceptual
+  terminus of defect-nature: platform-envelope, architecture-vs-requirements
+  mismatch, "should this exist" questions. One reading can re-frame dozens of
+  downstream issues; no agent may resolve them (classify step 3 already says
+  escalate — this facet adds *how*: direct reading, not summary). (Exemplar:
+  the #410–#417 family — tracking issue + seven named envelope limits.)
+- **`attn.evidence-brief`** — external empirical evidence offered for
+  adoption: cross-project studies, telemetry analyses, benchmark results the
+  maintainer **cannot re-derive from this repo** — the data lives elsewhere;
+  the brief is the only carrier. Weighing adoption is a human judgment over
+  the full method + numbers. (Exemplar: #463 — 4,602-dispatch three-corpus
+  study grounding four engine proposals.)
+
+**Growth rule.** When an issue clearly benefits from direct reading but fits
+none of the above: tag generic `attn.other`, name the candidate subtype in the
+run report, and codify a new `attn.*` subtype once a **second** instance
+appears (one instance is an anecdote, not a class). Expected candidates as the
+group grows: legal/licensing, community/conduct, upstream-coordination.
+
+**Hard rules:**
+- **Orthogonal to priority — never a priority inflater.** An `attn.*` issue
+  can be P2 on impact (#510 blocks nothing) yet first in the human's reading
+  queue. Render both; never let one substitute for the other.
+- **Never quick-win-eligible** — by definition these need judgment, not a
+  fast mechanical fix.
+- **Never buried in a cluster rollup.** Folding an `attn.*` issue into a
+  "prior clusters" line defeats the facet's entire purpose; each one renders
+  as its own row in the §7d section, whatever else it also appears under.
+- **Reading order within the group** (the human's prioritization aid):
+  (1) a counterparty is blocked waiting on an answer (reply-needed) →
+  (2) the decision gates other open work →
+  (3) standing reading (context that improves future triage but gates
+  nothing). Render the group in that order with the reason as a chip.
+
 ### 4. score-intent  (read-only) — MANDATORY PER ARTIFACT, never skipped
 This is beadle's differentiator (B4). You MUST read each enumerated issue's BODY
 and grade it — title-level slotting is a defect, not a shortcut. For every issue:
@@ -228,7 +283,8 @@ the interpretation (`question-renderer-editorial-boundary` sub-question A).
 
 Then rewrite the whole body from the store — Header (direction verdict, per
 finding-017), Progress (stats + trend deltas, every count
-paired with an outcome), Action plan, **Quick wins — safe to act on** (see step 7a),
+paired with an outcome), Action plan, **Needs human reading** (the `attn.*`
+lane — see step 7d), **Quick wins — safe to act on** (see step 7a),
 **Direction Health** (minutiae ratio,
 filed-vs-acted gap, scope-drift candidates), Classification index, **Maintainer
 progress** (outcome-paired, not a leaderboard — see step 7b), Controls
@@ -257,6 +313,17 @@ The two see *inverted visibility*, so render three channels in one body:
   dashboard **never replicates the issue body** — an agent follows the reference (B1: the
   board is a projection/index, not a replica). Carry only what differentiates; link
   everything an agent can fetch. This also protects the 65 k body budget.
+
+### 7d. Needs human reading — the direct-attention lane
+Render the `attn.*` group (step 3b) as its own top-level section, placed
+**between the Action plan and Quick wins**. Small by construction (single
+digits); if it grows past ~7 rows, tighten the bar — the facet only works
+while it stays rare. Row format: `<short title> (#NN) · <attn.subtype chip> ·
+<reading-order reason chip (reply-needed / gates-work / standing)> · <one-line
+"why direct reading">`. Never replicate the issue body (B1); the row's job is
+to earn the click. Items here may ALSO appear in P0/P1/P2 groupings (the
+facets are orthogonal) — a cross-ref chip (`also P1`) is enough. Never place
+an `attn.*` item in Quick wins; never fold one into a cluster rollup.
 
 ### 7a. Quick wins — safe to act on  (the low-caution lane)
 Render a group **orthogonal to the P0/P1/P2 impact ordering** — *not* a fourth
