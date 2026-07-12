@@ -28,9 +28,7 @@ edges:
   - target: grv-state-in-markdown
     type: supersedes
   - target: question-dolt-state-engine
-    type: refines
-  - target: question-renderer-editorial-boundary
-    type: opens
+    type: supports
 provenance:
   created_by: agent
   created_at: "2026-06-27"

@@ -20,7 +20,7 @@ content: |
     for context-exhaustion survival (multiclaude persistent-agent-ops).
 edges:
   - target: elem-propose-not-act
-    type: relates
+    type: supports
 provenance:
   created_by: agent
   created_at: "2026-06-27"

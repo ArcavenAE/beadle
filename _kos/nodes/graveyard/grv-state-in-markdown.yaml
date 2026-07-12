@@ -1,5 +1,5 @@
 id: grv-state-in-markdown
-type: option
+type: graveyard
 confidence: graveyard
 title: "Store dashboard state in the issue body (Markdown-as-truth)"
 tags: [beadle, dashboard, rejected]
@@ -9,9 +9,13 @@ content: |
   body and is left "in a broken state" when a human edits it
   (renovatebot/renovate#19563). State lives out-of-band; the body is a
   regenerated projection. See elem-state-out-of-band.
+graveyard:
+  approach: "Store authoritative dashboard state in the rendered issue body (Markdown-as-truth)"
+  ruling: "Universal bot-dashboard failure mode (renovatebot/renovate#19563): human edits corrupt machine state. State lives out-of-band; the body is a regenerated projection (B1)."
+  reopener: "If the dashboard host ships a structured-data channel on issues that human edits cannot corrupt."
 edges:
   - target: elem-state-out-of-band
-    type: superseded-by
+    type: contradicts
 provenance:
   created_by: agent
   created_at: "2026-06-27"

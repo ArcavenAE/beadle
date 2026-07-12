@@ -123,17 +123,17 @@ content: |
   gap rather than a silent absence.
 edges:
   - target: elem-intent-alignment-whitespace
-    type: refines
+    type: derives
   - target: elem-silent-integrity-severity
-    type: relates
+    type: derives
   - target: elem-state-out-of-band
-    type: relates
+    type: derives
   - target: question-defect-classification-axes
-    type: relates
+    type: partially_resolves
   - target: question-maintainer-progress-gamification
-    type: relates
+    type: supports
   - target: question-direction-verdict-escalation
-    type: feeds
+    type: supports
 provenance:
   created_by: agent
   created_at: "2026-06-28"

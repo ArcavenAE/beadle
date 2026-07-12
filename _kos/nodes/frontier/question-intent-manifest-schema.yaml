@@ -29,9 +29,9 @@ edges:
   - target: elem-intent-alignment-whitespace
     type: derives
   - target: elem-silent-integrity-severity
-    type: relates
+    type: derives
   - target: elem-defect-classification-superset
-    type: relates
+    type: supports
 provenance:
   created_by: agent
   created_at: "2026-06-27"

@@ -68,11 +68,11 @@ content: |
     the runtime LIVENESS effect on the FACTORY. Different objects.
 edges:
   - target: elem-silent-integrity-severity
-    type: relates
+    type: supports
   - target: elem-defect-classification-superset
-    type: refines
+    type: derives
   - target: question-defect-classification-axes
-    type: relates
+    type: partially_resolves
 provenance:
   created_by: agent
   created_at: "2026-06-28"

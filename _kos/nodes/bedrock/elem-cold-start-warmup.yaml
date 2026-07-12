@@ -28,9 +28,9 @@ content: |
   cold-start signature, not a drift signature.
 edges:
   - target: elem-maintainer-compass
-    type: refines
+    type: derives
   - target: grv-stale-autoclose
-    type: relates
+    type: contradicts
 provenance:
   created_by: agent
   created_at: "2026-06-27"

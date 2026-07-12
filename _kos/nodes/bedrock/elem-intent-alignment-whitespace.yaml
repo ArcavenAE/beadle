@@ -16,9 +16,9 @@ content: |
   against a machine-readable intent + continuous automation.
 edges:
   - target: question-intent-manifest-schema
-    type: refines
+    type: supports
   - target: elem-maintainer-compass
-    type: depends-on
+    type: derives
 provenance:
   created_by: agent
   created_at: "2026-06-27"

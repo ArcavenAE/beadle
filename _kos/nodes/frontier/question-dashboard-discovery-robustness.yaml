@@ -35,9 +35,9 @@ content: |
     Resolve alongside F3 (marvel team shape) and the Phase-1 gh-aw cron design.
 edges:
   - target: elem-state-out-of-band
-    type: relates
+    type: derives
   - target: question-marvel-team-shape
-    type: relates
+    type: supports
 provenance:
   created_by: agent
   created_at: "2026-06-28"

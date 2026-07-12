@@ -49,11 +49,11 @@ content: |
   recoverability tier) — see elem-defect-classification-superset and the F1 schema node.
 edges:
   - target: elem-defect-classification-superset
-    type: refines
+    type: supports
   - target: elem-propose-not-act
-    type: relates
+    type: supports
   - target: question-intent-manifest-schema
-    type: relates
+    type: supports
 provenance:
   created_by: agent
   created_at: "2026-06-28"
