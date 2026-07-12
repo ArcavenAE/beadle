@@ -1,5 +1,5 @@
 id: grv-stale-autoclose
-type: option
+type: graveyard
 confidence: graveyard
 title: "Auto-close issues on inactivity (stale-bot)"
 tags: [beadle, autoclose, rejected]
@@ -11,9 +11,13 @@ content: |
   surfaces; closure is escalated to a human, never fired on a timer. The
   defensible variant (probot/no-response: human-applied precondition + reopen on
   reply) is the only auto-close shape considered, and even that is out of scope.
+graveyard:
+  approach: "Auto-close issues on inactivity (stale-bot pattern)"
+  ruling: "Inactivity != irrelevance != resolution; auto-close buries the highest-information reports, spawns duplicates, and games the open-issue metric. beadle labels and surfaces; closure escalates to a human (B2)."
+  reopener: "If a target demands the one defensible variant (probot/no-response: human-applied precondition + reopen on reply), scope it explicitly as that shape."
 edges:
   - target: elem-propose-not-act
-    type: superseded-by
+    type: contradicts
 provenance:
   created_by: agent
   created_at: "2026-06-27"

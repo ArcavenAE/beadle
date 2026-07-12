@@ -81,11 +81,11 @@ content: |
   tools beta unverifiable (likely no-op on Claude 4+).
 edges:
   - target: elem-operational-impact-axis
-    type: relates
+    type: derives
   - target: elem-silent-integrity-severity
-    type: relates
+    type: derives
   - target: question-defect-classification-axes
-    type: relates
+    type: supports
 provenance:
   created_by: agent
   created_at: "2026-06-28"

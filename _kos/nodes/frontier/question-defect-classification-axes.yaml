@@ -51,9 +51,9 @@ content: |
      beadle-original?
 edges:
   - target: question-intent-manifest-schema
-    type: relates
+    type: supports
   - target: elem-intent-alignment-whitespace
-    type: relates
+    type: derives
 provenance:
   created_by: agent
   created_at: "2026-06-28"
