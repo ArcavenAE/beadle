@@ -121,6 +121,14 @@ content: |
   in direction. Unclassified issues render `_unclassified_` in the chip
   column, making "classifier hasn't run on this target yet" a visible
   gap rather than a silent absence.
+
+  Enum contract caveat (finding-020, run-13): the `classify ingest`
+  validator's operational_impact enum drifted from the finding-009
+  liveness axis this model specifies (panic/halt/data_loss/degraded) —
+  a self-referential attest-vs-verify instance inside beadle's own
+  binary. Store records for runs 10+13 carry a lossy mapping; ground
+  truth lives in the run-N rich fixtures. Defect: ArcavenAE/beadle#32;
+  the model's axis definitions in this node remain authoritative.
 edges:
   - target: elem-intent-alignment-whitespace
     type: derives
@@ -137,4 +145,4 @@ edges:
 provenance:
   created_by: agent
   created_at: "2026-06-28"
-  updated_at: "2026-07-01"
+  updated_at: "2026-07-13"
