@@ -348,6 +348,20 @@ integrity-gated items stay in the P0 source-of-truth cluster. Before placing any
 issue here, check it against the manifest's `integrity_anchors` and the integrity
 flag from step 3 — if either fires, it is disqualified.
 
+**LANE EXCLUSION BY RULE (finding-020 F3) — SDL and panic never ride this lane.**
+Two further classes are excluded **by rule, regardless of mechanical
+eligibility**: anything in the **silent-data-loss class** (`silent_data_loss` /
+the ▲ flag — the highest-severity class never rides the safe lane even when the
+fix is mechanically bounded), and **`impact.panic`** (recovery architecture —
+checkpoint/resume — is never a one-liner, however small the trigger looks).
+Run-13 instantiated both as curator judgment (#523 SDL; #541/#548 panic); this
+rule replaces that judgment so lane admission no longer depends on who is
+curating. **Curator-override audit is mandatory:** whenever the curator
+overrides grader eligibility in either direction (excluding a grader-eligible
+item, or admitting one the grader passed on), record the exclusion audit in the
+body's agent channel (the folded `<details>` block) naming the issue, the
+grader's verdict, and the rule or rationale that overrode it.
+
 **NO-GOODHART.** This is a *surfacing* device, not a metric. Never count "quick wins
 closed" as success — that rewards trivial churn over real fixes. Maintainer progress
 (7b) still moves only on verified fix-outcomes. Row format matches the action plan
