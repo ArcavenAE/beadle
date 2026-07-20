@@ -16,15 +16,17 @@
 //! trail exists — the editor slot still owns the free-text paragraph per
 //! `question-renderer-editorial-boundary`.
 
+use std::{
+    collections::{BTreeSet, HashMap},
+    path::Path,
+};
+
 use anyhow::Result;
 use beadle_store::{
     ClassificationRecord, CommentEventRecord, NoteRecord, Record, RunRecord, Store,
 };
-use std::collections::{BTreeSet, HashMap};
 use serde::Serialize;
-use std::path::Path;
-use time::format_description::well_known::Rfc3339;
-use time::OffsetDateTime;
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::intent;
 
@@ -315,10 +317,7 @@ fn filing_density_signal(runs: &[RunRecord]) -> FilingDensity {
     }
 }
 
-fn integrity_density_signal(
-    classifications: &[ClassificationRecord],
-    run: u32,
-) -> SignalOrPending {
+fn integrity_density_signal(classifications: &[ClassificationRecord], run: u32) -> SignalOrPending {
     if classifications.is_empty() {
         return SignalOrPending::Pending(PendingSignal {
             verdict: "pending",
@@ -351,10 +350,7 @@ fn integrity_density_signal(
     })
 }
 
-fn silent_data_loss_signal(
-    classifications: &[ClassificationRecord],
-    run: u32,
-) -> SignalOrPending {
+fn silent_data_loss_signal(classifications: &[ClassificationRecord], run: u32) -> SignalOrPending {
     if classifications.is_empty() {
         return SignalOrPending::Pending(PendingSignal {
             verdict: "pending",
@@ -364,12 +360,7 @@ fn silent_data_loss_signal(
     let denom = classifications.len() as u32;
     let num = classifications
         .iter()
-        .filter(|c| {
-            c.operational_impact
-                .as_deref()
-                .map(|s| s == "silent-data-loss")
-                .unwrap_or(false)
-        })
+        .filter(|c| c.is_silent_data_loss())
         .count() as u32;
     let share = if denom == 0 {
         0.0
@@ -425,10 +416,7 @@ fn sdl_zero_engagement_signal(
     all_comments: &[CommentEventRecord],
     latest_run: u32,
 ) -> ZeroEngagementOrPending {
-    if all_classifications
-        .iter()
-        .all(|c| c.operational_impact.as_deref() != Some("silent-data-loss"))
-    {
+    if !all_classifications.iter().any(|c| c.is_silent_data_loss()) {
         return ZeroEngagementOrPending::Pending(PendingSignal {
             verdict: "pending",
             reason: "no silent-data-loss classifications in store".to_string(),
@@ -453,10 +441,7 @@ fn sdl_zero_engagement_signal(
     // count r as an SDL-run for the issue.
     let mut per_issue_class: HashMap<u32, Vec<ClassificationRecord>> = HashMap::new();
     for c in all_classifications {
-        per_issue_class
-            .entry(c.number)
-            .or_default()
-            .push(c.clone());
+        per_issue_class.entry(c.number).or_default().push(c.clone());
     }
     for v in per_issue_class.values_mut() {
         v.sort_by(|a, b| a.run.cmp(&b.run).then_with(|| a.ts.cmp(&b.ts)));
@@ -479,9 +464,7 @@ fn sdl_zero_engagement_signal(
 
     for number in all_numbers {
         let class_history = &per_issue_class[&number];
-        let ever_sdl = class_history
-            .iter()
-            .any(|c| c.operational_impact.as_deref() == Some("silent-data-loss"));
+        let ever_sdl = class_history.iter().any(|c| c.is_silent_data_loss());
         if !ever_sdl {
             continue;
         }
@@ -496,13 +479,8 @@ fn sdl_zero_engagement_signal(
         let earliest_class_run = class_history.first().map(|c| c.run).unwrap_or(latest_run);
         let mut streak = 0u32;
         for r in (earliest_class_run..=latest_run).rev() {
-            let effective = class_history
-                .iter()
-                .rev()
-                .find(|c| c.run <= r);
-            let is_sdl_at_r = effective
-                .map(|c| c.operational_impact.as_deref() == Some("silent-data-loss"))
-                .unwrap_or(false);
+            let effective = class_history.iter().rev().find(|c| c.run <= r);
+            let is_sdl_at_r = effective.map(|c| c.is_silent_data_loss()).unwrap_or(false);
             if is_sdl_at_r {
                 streak += 1;
             } else {
@@ -619,7 +597,10 @@ fn top_signal(
     // signal that measures silence itself, exactly what beadle exists to catch.
     if sdl_zero_v == target {
         if let ZeroEngagementOrPending::Live(s) = sdl_zero {
-            return format!("silent-data-loss-zero-engagement {}: {}", s.verdict, s.rationale);
+            return format!(
+                "silent-data-loss-zero-engagement {}: {}",
+                s.verdict, s.rationale
+            );
         }
     }
     if integrity_v == target {
@@ -677,10 +658,13 @@ mod tests {
                 None
             },
             operational_impact: if sdl {
+                // Legacy pre-finding-009 encoding — deliberately kept so the
+                // is_silent_data_loss() compat arm stays covered.
                 Some("silent-data-loss".into())
             } else {
                 None
             },
+            silent_data_loss: false,
             priority: "P2".into(),
             cluster: vec![],
             quick_win_eligible: false,
@@ -808,10 +792,7 @@ mod tests {
 
     #[test]
     fn sdl_drifting_above_10_percent() {
-        let mut classes = vec![
-            mk_class(1, 1, false, true),
-            mk_class(2, 1, false, true),
-        ];
+        let mut classes = vec![mk_class(1, 1, false, true), mk_class(2, 1, false, true)];
         for i in 3..=10 {
             classes.push(mk_class(i, 1, false, false));
         }
@@ -922,10 +903,7 @@ mod tests {
             mk_class_at(1, 2, true),
             mk_class_at(1, 3, true),
         ];
-        let comments = vec![
-            mk_comment(1, 2, "user"),
-            mk_comment(1, 3, "arcavenai"),
-        ];
+        let comments = vec![mk_comment(1, 2, "user"), mk_comment(1, 3, "arcavenai")];
         let sig = sdl_zero_engagement_signal(&classes, &comments, 3);
         if let ZeroEngagementOrPending::Live(s) = sig {
             assert_eq!(s.verdict, "drifting", "{}", s.rationale);
