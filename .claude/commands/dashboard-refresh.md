@@ -35,13 +35,37 @@ with `docs/fixtures/<target>-312-curated-run12.md` (latest committed fixture)
 as the **shape canon**. Key operational notes from the sessions:
 
 - Enumerate open issues with number > W (the sentinel watermark).
-- Classify new issues in **batches of ~12–15 via parallel subagents**; each
-  grader gets the intent manifest (`targets/<target>.intent.yaml`) + the full
-  issue bodies, and returns per-issue axis records (report-type, defect-nature,
+- Classify new issues in **batches of ~10–12 via parallel subagents dispatched
+  SYNCHRONOUSLY — never background**; each grader gets the intent manifest
+  (`targets/<target>.intent.yaml`) + the full issue bodies (orchestrator
+  pre-builds the input file; graders Read input → Write output, no fetching),
+  and returns per-issue axis records (report-type, defect-nature,
   reproducibility, triage-state, leverage, alignment + cited rationale,
   provenance, integrity, operational-impact, attn facet, quick-win flag).
-  Subagent API failures (429/503/timeout) are retried/resumed, never silently
-  dropped — every issue number in the batch must appear in the returned records.
+  - **Dispatch policy (run-14 evidence, 2026-07-20 — MITIGATION with a sunset,
+    not permanent lore):** background-dispatched graders starved ~10–20×
+    slower than sync for identical work, then died to the session timeout
+    reaper (11/12 deaths in one cluster) — orc finding-083. Until that
+    harness fault is resolved (sunset anchor: bd `aae-orc-0nud` — when it
+    closes, re-test background dispatch and retire this rule), graders run
+    sync-only, and each dispatch is sized so its expected wall clock sits
+    well under the reaper: healthy grading measured ~26–50 s/issue, so a
+    10–12-issue batch ≈ 5–10 min. Stagger spawns by a few seconds (no
+    thundering herd).
+  - **Recovery = hedged gap-fill, not resume.** If a grader dies or exceeds
+    ~2× the median batch wall clock, dispatch fresh **sync** gap-filler
+    agents covering ONLY its missing issue numbers (run-14: 6/6 hedges
+    succeeded, zero redundant tokens because hedges never race live work).
+    Resume-from-transcript does NOT recover terminal API deaths (0/3,
+    run-14) — don't burn time on it. Every issue number in every batch must
+    appear in the returned records; merge keep-first.
+  - **Dispatch ledger (self-profiling — diagnostic, never a gate):** record
+    per dispatch: grader id, mode, batch size, issue numbers, spawn/end
+    timestamps, outcome (ok / timeout / hedged), tokens if the harness
+    reports them — plus per-phase orchestrator timings (enumerate, merge,
+    compose, gate, recompose count). Publish the ledger in the run report,
+    and append it to the store as `beadle note <target> --topic perf`
+    records (one per dispatch + one per phase summary).
 - score-intent is MANDATORY per artifact (SKILL §4); corpus-level minutiae
   detectors run against the filer (§4b).
 - Update the store (`store/<target>/state.jsonl`): append run record,
