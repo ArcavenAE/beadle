@@ -77,6 +77,11 @@ ArcavenAE/aae-orc#58 (bd-request work-queue anchor).
 
 - beadle#32 fix + store migration (runs 10+13 records) + SKILL↔binary enum
   contract test.
+  **[2026-07-20]** Fix + contract test SHIPPED (PR #35: vocabulary.json
+  manifest, finding-009 alignment, `silent_data_loss` field, contract
+  tests; PR #34: §7a lane-exclusion rule from F3). Store migration tooling
+  shipped (`beadle classify migrate-impact`); execution pending on the
+  machine holding the live store — anchor aae-orc-57g6.
 - Maintainer first actions landed this run (3 Zious11 comments + 9 filings) —
   next run tests whether engagement converts to a close/label (the ADR-005
   turn) and whether the A4 clock on #342/#365/#358 breaks.
