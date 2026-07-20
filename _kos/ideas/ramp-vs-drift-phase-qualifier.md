@@ -47,16 +47,52 @@ flat ≥ N runs with A4 firing → `drifting` earns its name. Run-14's board now
 carries this framing in the editor slot with a declared prediction: if the
 ceiling has not moved past P0b by run-16, ramping stops explaining the data.
 
+## Pre-registration (2026-07-20, aae-orc#65 — fixed BEFORE run-15, blind to its data)
+
+Per aae-orc#65 ask 2, the two definitions that decide the run-16 verdict are
+fixed now, while we cannot see run-15/16 engagement. Changing them after run-15
+posts voids the test.
+
+**(a) Severity ordering for the ceiling:** `P2 < P1 < P0b < P0a`. An item's
+rung is its **assigned priority at the time the action is observed** (re-grades
+get noted in the run summary, they don't retroactively move past ceilings).
+Liveness classes (`halt`/`panic`) carry **no separate rung** — they are loud,
+self-announcing failures and already land at the priority they were graded
+(typically P0b); the top rung stays reserved for silent integrity (SDL/P0a),
+which is the class A4 guards. Consequence: **"past P0b" ⇔ an acted-on P0a/SDL
+item ⇔ A4 discharge.** The prediction, the ordering, and A4 cohere by
+construction.
+
+**(b) "Acted-on" (two meters, no fractional credit):**
+
+- **Hard ceiling** — moved only by: maintainer merges a fix, closes with a
+  stated resolution, or lands a commit addressing the item. This is the meter
+  the run-16 prediction is evaluated against.
+- **Soft ceiling** — substantive maintainer comment (reproduction attempt,
+  explicit triage decision, fix direction, question-to-reporter). Reported
+  alongside every run; **never moves the hard ceiling**.
+- **Self-filed exclusion:** action on an item the maintainer filed themselves
+  moves neither meter — the ceiling measures engagement with the measured
+  backlog, not the maintainer's own filings (run-14 edge that forced this:
+  Zious11's own SDL filing #635 shows awareness, not backlog engagement).
+
+Baseline at declaration: hard ceiling = **P0b** (close of #465, run-14).
+Prediction: hard ceiling past P0b by run-16, else ramping stops explaining
+the data. Discharge mechanism (ask 1): store record `kind: note,
+topic: prediction` + `dashboard-refresh.md` step-4 checklist (run ≥ 16
+evaluation line + every-run meter line, ask 4).
+
 ## Sub-questions (for the eventual frontier node)
 
-1. Severity ordering for the ceiling: P2 < P1 < P0b < P0a(SDL)? Where do
-   halts/panic sit vs integrity?
-2. What counts as "acted-on" for the ceiling — close-with-fix only, or do
-   partial fixes and substantive comments raise it fractionally?
+1. ~~Severity ordering for the ceiling~~ — **pre-registered above** (a).
+2. ~~What counts as "acted-on"~~ — **pre-registered above** (b).
 3. N for "flat ceiling" before ramp → drift flips (relate to A4's own ≥3-run
    threshold; avoid double-counting the same silence).
-4. Should `ramping` be a verdict value or a phase *qualifier* on any verdict
-   (analogous to ADR-005 cold-start annotating rates)?
+4. ~~Verdict value or phase qualifier?~~ — **answered by aae-orc#65 ask 3:
+   qualifier**, the ADR-005 cold-start-annotation shape. Two reasons adopted:
+   no-Goodhart says annotate the alarm, never soften it (A4 stays loud with
+   the qualifier explaining it); and ramping and drifting can coexist on
+   orthogonal axes (e.g. scope), which a single enum value cannot express.
 5. Does the phase model generalize to other engagement-distribution claims
    (filed-vs-acted gap, quick-wins conversion rate)?
 
