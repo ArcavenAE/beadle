@@ -31,8 +31,9 @@ any point in this workflow.**
 ## 2. Refresh — run the SKILL, not the binary
 
 Follow `skills/beadle-triage/SKILL.md` (the load-bearing analysis discipline),
-with `docs/fixtures/<target>-312-curated-run12.md` (latest committed fixture)
-as the **shape canon**. Key operational notes from the sessions:
+with the **highest-numbered** committed fixture
+`docs/fixtures/<target>-312-curated-run<N>.md` as the **shape canon**
+(run-14 at time of writing). Key operational notes from the sessions:
 
 - Enumerate open issues with number > W (the sentinel watermark).
 - Classify new issues in **batches of ~12–15 via parallel subagents**; each
@@ -51,6 +52,10 @@ as the **shape canon**. Key operational notes from the sessions:
   history); merge the new run's analysis into every section; bump
   `"run"` and `"watermark"` in the sentinel state JSON; refresh the digest.
 - Read controls from the prior body before regenerating (SKILL §8).
+- Direction Health carries the **falsification meter every run** (aae-orc#65):
+  A4 SDL-engagement streak + the acted-on severity ceiling (hard/soft, per the
+  pre-registered criteria in `_kos/ideas/ramp-vs-drift-phase-qualifier.md`) —
+  reported whichever way it points, never only when it flatters a hypothesis.
 - Write the candidate body to
   `tmp/dashboard-snapshots/<target>-312-candidate-<UTC ts>.md`. **Do not post yet.**
 
@@ -94,7 +99,16 @@ if a bad body was ever posted, restore it with the before-snapshot via
    `docs/fixtures/<target>-312-curated-run<N+1>.md` (+ rich classification JSON)
    on a feature branch → PR (repo forbids direct pushes to main).
 5. Report: run number, watermark movement, issue deltas, verification results,
-   snapshot paths.
+   snapshot paths, and the falsification meter (A4 streak + hard/soft
+   acted-on severity ceiling).
+6. Append the run record (`kind: run`) to the store — the run-14 pass missed
+   this; it is part of SKILL §6, not optional.
+7. **If run ≥ 16:** evaluate the declared ramp prediction (store record
+   `kind: note, topic: prediction`, declared run-14, aae-orc#65): the hard
+   ceiling must have moved past P0b — i.e. the maintainer acted on a P0a/SDL
+   item they did not file, discharging A4. Report pass or fail in the run
+   summary and on the board; do not defer, soften, or re-derive the criteria
+   post-hoc.
 
 ## Guardrails (charter/incidents — non-negotiable)
 
