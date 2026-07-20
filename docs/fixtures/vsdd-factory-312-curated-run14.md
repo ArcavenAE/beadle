@@ -4,21 +4,29 @@
 {"schema":1,"last_run":"2026-07-20","watermark":713,"store":"jsonl","intent_version":"vsdd-factory@0.3","warmup":"cold-start","run":14,"digest":"run14-72-maintainer-turn-8-merges-3-closes-first-p0b-close-465-a4-drifting-5run-sdl-silence-zious-sdl-debut-635-2026-07-20","counts":{"open":477,"arcavenai_open":427,"maintainer_engaged":33,"arcavenai_closed_alltime":4},"attn":{"governance":[510],"direction":[410,671],"evidence_brief":[463,686,710]},"axis_model":"finding-005 superset + finding-009: report-type, defect-nature, reproducibility, triage-state, leverage, alignment, provenance, integrity(safety), operational-impact(liveness)","p0_data_loss":[342,358,365,523,588,635],"p0_integrity":[313,314,330,331,332,333,337,339,341,348,355,356,370,372,373,374,379,381,399,404,412,421,425,427,428,430,433,434,437,440,441,448,452,465,468,470,474,475,477,479,481,483,485,486,488,491,492,494,496,517,535,537,538,544,546,547,576,589,592,599,600,614,623,637,638,647,650,663,664,672,673,680,685,692,704,710],"new_this_run":[633,634,635,636,637,638,641,642,643,644,645,647,648,649,650,651,652,653,654,655,656,658,660,661,662,663,664,665,666,667,668,669,671,672,673,674,675,676,677,678,679,680,681,682,683,684,685,686,687,690,692,693,694,695,696,697,698,699,700,701,702,703,704,705,706,707,708,709,710,711,712,713],"prior_run_burst":[432,433,434,435,436,437,440,441,442,443,444,445,446,447,448,449,450,451,452,453,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499,500,501,502],"operational_impact":{"halt":[321,326,343,346,347,349,357,380,386,411,414,451,457,458,461,469,472,473,474,516,543,555,601,604,626,637,651,658,681,684,696,702],"panic":[541,548,569,647],"data_loss":[342,365,358,523],"degraded_new":[638,641,642,643,644,645,660,662,663,664,665,666,667,668,669,671,672,673,674,675,676,677,679,682,685,687,690,692,693,694,695,697,698,699,700,701,703,705,706,707,708,710,711,712,713]},"keystone":336,"keystone_new":[671],"keystone_prior":[406,410,413,415,416,419,426,432,462,463,470,487,488,507,513,576],"quick_wins_new":[633,636,641,643,645,653,654,655,656,660,661,666,667,677,678,682,684,690,703,705,707,709,712],"quick_wins_prior":[436,444,447,450,453,466,469,471,472,476,478,482,495,498,499,501],"clusters":{"silent-data-loss":[342,358,365,412,479,523,588,635,645],"source-of-truth-integrity":[399,404,412,421,425,427,428,430,433,434,437,440,441,448,452,465,468,470,474,475,477,479,481,483,485,486,488,491,492,494,496,517,535,537,538,544,546,547,589,600,614,623,637,638,647,650,663,664,672,673,680,685,692,704,709],"false-green-convergence":[305,309,310,322,327,330,331,332,333,337,339,348,353,355,356,360,364,370,373,381,390,391,393,397,398,399,421,425,429,433,434,440,441,442,448,452,462,465,467,468,470,474,475,477,479,480,481,484,485,486,488,490,492,494,496,497,500,513,533,535,543,553,563,576,591,592,599,614,618,620,627,634,643,664,672,673,674,675,676,677,685,686,687,690,694,698,699,700,704,705,710],"operational-halt":[321,326,343,346,347,349,357,380,386,411,414,451,457,458,461,469,472,473,474,503,539,541,548,555,569,604,626,637,642,681,696],"platform-envelope-mismatch":[410,411,412,413,414,415,416,417,458,461,473,474,516,601,614,625,649,651,656],"test-writer-gaps":[329,335,354,359,363,364,373,381,383,393,394,398,402,418,419,420,422,423,424,426,436,442,460,466,471,475,477,479,480,481,485,490,494,496,498,499,500,502,520,556,571,575,598,607,609,633,653,665,679,682,684,697,699,700,701,702,713],"spec-propagation-drift":[361,362,367,369,376,382,387,388,390,391,392,395,396,400,401,403,404,406,418,419,422,427,428,429,430,432,435,443,444,445,446,447,449,450,453,459,471,476,478,482,484,488,489,491,493,519,521,522,537,550,552,554,559,561,564,565,573,574,580,581,582,594,600,615,622,638,647,653,656,660,668,671,680,681,693,695,708,709,711],"adversary-sweep-enumeration":[504,505,506,507,511,519,520,534,548,563,564,573,574,606,615,633,652,686],"verification-methodology":[509,512,517,518,522,525,533,534,535,536,539,540,542,543,544,545,546,549,550,553,555,556,557,559,560,562,566,567,585,586,587,590,593,595,596,599,601,602,603,605,607,608,616,617,618,620,621,627,633,634,641,643,645,648,649,652,654,658,660,661,662,663,664,665,667,668,669,671,675,676,677,678,679,682,687,690,693,694,695,697,698,699,700,701,702,703,704,705,710,713],"artifact-containment":[263,341,515,589,597,630,636,650],"scratch-isolation":[508,624,701],"contribution-governance":[510,551,651,696],"dispatch-contract":[328,368,386,405,409,448,457,459,463,468,473,482,516,518,521,525,540,545,549,551,558,569,589,619,630,655,658,661,662,666,674,683,696,706,707],"authority-substrate":[372,374,379,426,483,508,605,644],"observability":[317,318,319,320,324,325,415,463,464,495,501,583,628,629,635,644,648,667],"plugin-pack-ci":[349,351,357,469,472,476,492,625,694,698],"orchestrator-continuation":[343,347,380,408,409,446,457,486,495,604,635,647,692,707],"branch-protection":[346,348,349,357,408,626],"dispatch-race":[345,350,355,368,451,547,570,592,594,619,703],"worktree-factory-split":[341,342,451,452,483,503,508,523,588,624,631,655],"state-manager-hygiene":[517,538,547,572,629,631,641,692,706,711,712],"variants-gallery-review":[568],"convergence-tuning":[577,578,579],"learning-loop":[584]},"maintainer_actions":{"comments_prior":{"298":"2026-07-08","428":"2026-07-08","507":"2026-07-08"},"comments":{"507":"2026-07-15","521":"2026-07-15","649":"2026-07-15","651":"2026-07-15","443":"2026-07-15","494":"2026-07-19","461":"2026-07-19","686":"2026-07-19","682":"2026-07-19","305":"2026-07-19","655":"2026-07-19","396":"2026-07-19","582":"2026-07-19","654":"2026-07-19","290":"2026-07-19","418":"2026-07-19","472":"2026-07-19","465":"2026-07-19","473":"2026-07-19","515":"2026-07-19","434":"2026-07-19","424":"2026-07-19","475":"2026-07-19"},"filings":[635,636,637,638,652,653,654,655,656,671,690,695],"merges":{"524":"2026-07-19","526":"2026-07-19","527":"2026-07-19","528":"2026-07-19","529":"2026-07-19","530":"2026-07-19","531":"2026-07-19","532":"2026-07-19"},"closes":{"418":"2026-07-19","465":"2026-07-19","472":"2026-07-19"},"corrections":{"691":"corrects #531 (merged PR) \u2014 Go/Node stdin diagnosis"}}}
 beadle-state -->
 
-**Direction verdict: 🔴 DRIFTING — the compass turned for real this window, and the alarm that fires is precisely the one built for this moment.**
+**Direction verdict: 🔴 DRIFTING (machine) — editor's read: RAMPING. The clock below is the meter that will tell us which is true.**
 The triage wheel completed its **first full turns**: Zious11 merged **all 8 arcavenai PRs**
 (#524 #526–#532, 2026-07-19), closed **3 tracked defects with validated fixes** — #472 (⏸
 quick-win, lock-helper paths), #418 (demo-tape relocation), and **#465, the first
-source-of-truth-integrity (P0b) close** (adversary ground-truth verification, PR #532) — left
-partial-fix engagement on 5 more (#515 #434 #424 #473 #475), added field-data comments on 10
-measured issues, and shipped one correction cycle (#691 fixing #531's Go/Node stdin diagnosis —
-reviewed, corrected, and merged rather than reverted). ADR-005's cold-start condition is
-**lifted for engagement metrics**. And yet the machine verdict is **drifting**, because A4
-(finding-016) now fires at its sharpest: **#342/#365/#358 reach a 5-run zero-engagement streak
-while 33 maintainer actions landed everywhere else** — silence on the highest-severity class is
-no longer explainable by general inattention. The run also took +72 issues (watermark #631 →
-#713, 58 arcavenai · 12 Zious11 · 2 drbothen), including the corpus's **first
-maintainer-authored silent-data-loss filing (#635)** and a maintainer keystone proposal
-(#671, factory-graph). _Updated 2026-07-20 · watermark #713 · run 14 · intent vsdd-factory@0.3
+source-of-truth-integrity (P0b) close** (PR #532) — left partial-fix engagement on 5 more
+(#515 #434 #424 #473 #475), added field-data comments on 10 measured issues, and ran one full
+correction cycle (#691 fixing #531 — reviewed and corrected rather than reverted). The
+engagement is real, deliberately low-stakes, and **climbing**: every merge is a
+cheaply-verifiable, recoverable change — exactly the calibration a careful maintainer runs
+before betting architecture on a 427-issue agent-filed backlog — and the acted-on severity
+ceiling rose from *nothing* to a **P0b close** in a single window. The editor's read: a
+maintainer getting his machine running, building confidence that acting on this corpus will
+not take the project in unintended directions — precisely the behavior the quick-wins lane
+exists to invite. The machine verdict is DRIFTING because A4 (finding-016) fires in its
+sharpest form — **#342/#365/#358 at a 5-run zero-engagement streak while 33 actions landed
+elsewhere** — and the editor holds that as the **falsification meter, not the conclusion**:
+RAMPING predicts the acted-on severity ceiling keeps climbing toward the SDL lane over the
+next runs; DRIFTING predicts it stays flat. If the ceiling has not moved past P0b by run-16,
+ramping stops explaining the data. ADR-005's cold-start is **lifted for engagement metrics**.
+The run also took +72 issues (watermark #631 → #713, 58 arcavenai · 12 Zious11 · 2 drbothen),
+including the corpus's **first maintainer-authored silent-data-loss filing (#635)** and a
+maintainer keystone proposal (#671, factory-graph).
+_Updated 2026-07-20 · watermark #713 · run 14 · intent vsdd-factory@0.3
 · finding-005/009 axes + attn facet · vocabulary.json contract (beadle PRs #34/#35) ·
 skills-based refresh (binary render retired per run-10 regression)_
 
@@ -392,11 +400,15 @@ zero-engagement**.
   top-severity classes — an SDL filing (#635), three integrity filings, and a keystone
   consolidation proposal (#671). Independent convergence from the party with ground truth —
   now with commit history to back it (8 merges).
-- **The asymmetry to watch:** engagement flowed to bounded, mechanical, agent-guidance fixes
-  (the 8 merges are all prompt/template/path-discipline changes). The architectural lanes —
-  P0a worktree/merge mechanics, the envelope decision (#410), the attn queue (#510 at 15
-  days) — stayed untouched. The wheel turns where the fixes are small; the alarm fires where
-  they are not.
+- **The phase question (ramp vs drift):** engagement flowed to bounded, mechanical,
+  agent-guidance fixes (the 8 merges are all prompt/template/path-discipline changes) while
+  the architectural lanes — P0a worktree/merge mechanics, the envelope decision (#410), the
+  attn queue (#510 at 15 days) — stayed untouched. Two hypotheses fit this data: a
+  **confidence ramp** (calibrate on recoverable items first; severity ceiling climbs as
+  trust accrues — already nothing → P0b in one window) or **drift** (a stable
+  small-and-easy selection function). The discriminator is the **trajectory of the acted-on
+  severity ceiling**, not any single run's distribution. The A4 clock stays on the board as
+  the falsification meter for the ramp hypothesis.
 
 ## Classification index — run-14 new issues (finding-005 + finding-009 + attn facet)
 
