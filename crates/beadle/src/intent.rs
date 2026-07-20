@@ -79,7 +79,7 @@ fn sequence(text: &str, key: &str) -> Vec<String> {
     let mut items = Vec::new();
 
     // Advance to the key.
-    while let Some(line) = lines.next() {
+    for line in lines.by_ref() {
         if line.trim_start().starts_with(&needle) && line.trim().ends_with(':') {
             break;
         }

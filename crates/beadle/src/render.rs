@@ -8,17 +8,21 @@
 //!
 //! See `_kos/nodes/frontier/question-renderer-editorial-boundary.yaml`.
 
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::Path,
+};
+
 use anyhow::Result;
 use beadle_store::{ClassificationRecord, ClusterRecord, IssueRecord, Record, RunRecord, Store};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
-use time::format_description::well_known::Rfc3339;
-use time::OffsetDateTime;
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-use crate::controls;
-use crate::direction::{self, DirectionReport};
-use crate::intent;
+use crate::{
+    controls,
+    direction::{self, DirectionReport},
+    intent,
+};
 
 /// Body-budget budget line. Exceeding it emits a warning and (future work)
 /// triggers rollup of oldest editorial detail to a linked "Triage backlog" issue.
@@ -209,16 +213,17 @@ fn classification_summary(latest: &HashMap<u32, ClassificationRecord>) -> Classi
         if c.integrity {
             s.integrity += 1;
         }
-        if c.operational_impact.as_deref() == Some("silent-data-loss") {
+        if c.is_silent_data_loss() {
             s.silent_data_loss += 1;
         }
         if c.quick_win_eligible {
             s.quick_win_eligible += 1;
         }
-        match c.priority.as_str() {
-            "P0" => s.p0 += 1,
-            "P1" => s.p1 += 1,
-            _ => {}
+        // Prefix match so P0a/P0b (finding-004 precedence tiers) count as P0.
+        if c.priority.starts_with("P0") {
+            s.p0 += 1;
+        } else if c.priority.starts_with("P1") {
+            s.p1 += 1;
         }
     }
     s
@@ -232,7 +237,7 @@ fn classification_chip(c: &ClassificationRecord) -> String {
     if c.integrity {
         flags.push('⚠');
     }
-    if c.operational_impact.as_deref() == Some("silent-data-loss") {
+    if c.is_silent_data_loss() {
         flags.push('▲');
     }
     if c.quick_win_eligible {
@@ -328,8 +333,11 @@ fn render_direction_block(d: &DirectionReport) -> String {
         ZeroEngagementOrPending::Live(s) => {
             let mut detail = s.rationale.clone();
             if !s.drifting_issues.is_empty() {
-                let names: Vec<String> =
-                    s.drifting_issues.iter().map(|n| format!("#{}", n)).collect();
+                let names: Vec<String> = s
+                    .drifting_issues
+                    .iter()
+                    .map(|n| format!("#{}", n))
+                    .collect();
                 detail.push_str(&format!(" · drifting: {}", names.join(", ")));
             } else if !s.watch_only_issues.is_empty() {
                 let names: Vec<String> = s
@@ -424,12 +432,13 @@ fn render_derived(
         out.push_str("|---|---|---|\n");
         for c in clusters {
             let members = if c.members.len() > 8 {
-                let head: Vec<String> = c.members.iter().take(6).map(|n| format!("#{}", n)).collect();
-                format!(
-                    "{} … (+{} more)",
-                    head.join(", "),
-                    c.members.len() - 6
-                )
+                let head: Vec<String> = c
+                    .members
+                    .iter()
+                    .take(6)
+                    .map(|n| format!("#{}", n))
+                    .collect();
+                format!("{} … (+{} more)", head.join(", "), c.members.len() - 6)
             } else {
                 c.members
                     .iter()
@@ -468,8 +477,7 @@ fn render_derived(
         ));
         if !class_summary.by_report_type.is_empty() {
             out.push_str("| Report type | Count |\n|---|---|\n");
-            let mut pairs: Vec<(&String, &u32)> =
-                class_summary.by_report_type.iter().collect();
+            let mut pairs: Vec<(&String, &u32)> = class_summary.by_report_type.iter().collect();
             pairs.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
             for (rt, n) in pairs {
                 out.push_str(&format!("| `{}` | {} |\n", rt, n));
@@ -542,18 +550,15 @@ fn compose(
 ) -> String {
     let sentinel = build_sentinel(target, run, derived_digest);
     let mut out = String::new();
-    out.push_str(&format!(
-        "# 📋 beadle — Triage Dashboard · {}\n\n",
-        repo
-    ));
+    out.push_str(&format!("# 📋 beadle — Triage Dashboard · {}\n\n", repo));
     out.push_str(&sentinel);
     out.push_str("\n\n");
     out.push_str(EDITOR_SLOT_DIRECTION);
     out.push_str("\n\n");
     out.push_str(derived);
-    out.push_str("\n");
+    out.push('\n');
     out.push_str(EDITOR_SLOT_NOTES);
-    out.push_str("\n");
+    out.push('\n');
     out
 }
 
@@ -628,9 +633,15 @@ mod tests {
             decay: "active".into(),
         };
         assert!(decay_display(&c, 1).starts_with("active"), "gap=0");
-        assert!(decay_display(&c, 3).starts_with("active"), "gap=2 still active");
+        assert!(
+            decay_display(&c, 3).starts_with("active"),
+            "gap=2 still active"
+        );
         assert!(decay_display(&c, 4).starts_with("warming"), "gap=3 warming");
-        assert!(decay_display(&c, 6).starts_with("rollup-candidate"), "gap=5");
+        assert!(
+            decay_display(&c, 6).starts_with("rollup-candidate"),
+            "gap=5"
+        );
         assert!(decay_display(&c, 9).starts_with("archived"), "gap=8");
     }
 
@@ -676,6 +687,7 @@ mod tests {
             integrity: false,
             integrity_anchor: None,
             operational_impact: None,
+            silent_data_loss: false,
             priority: "P2".into(),
             cluster: vec![],
             quick_win_eligible: false,
@@ -845,7 +857,7 @@ mod tests {
 
     fn mk_direction_pending() -> DirectionReport {
         use crate::direction::{
-            FilingDensity, PendingSignal, ShareSignal, Signals, SignalOrPending,
+            FilingDensity, PendingSignal, ShareSignal, SignalOrPending, Signals,
             ZeroEngagementOrPending,
         };
         let _ = ShareSignal {
@@ -876,12 +888,10 @@ mod tests {
                     verdict: "pending",
                     reason: "no classification records".into(),
                 }),
-                silent_data_loss_zero_engagement: ZeroEngagementOrPending::Pending(
-                    PendingSignal {
-                        verdict: "pending",
-                        reason: "no silent-data-loss classifications".into(),
-                    },
-                ),
+                silent_data_loss_zero_engagement: ZeroEngagementOrPending::Pending(PendingSignal {
+                    verdict: "pending",
+                    reason: "no silent-data-loss classifications".into(),
+                }),
             },
         }
     }
@@ -930,7 +940,10 @@ mod tests {
             body.contains("| silent-data-loss-zero-engagement (A4) |"),
             "A4 row"
         );
-        assert!(body.contains("pending — "), "pending signals render their reason");
+        assert!(
+            body.contains("pending — "),
+            "pending signals render their reason"
+        );
     }
 
     #[test]
@@ -977,8 +990,8 @@ mod tests {
     #[test]
     fn render_direction_drifting_names_issues() {
         use crate::direction::{
-            FilingDensity, PendingSignal, Signals, SignalOrPending,
-            ZeroEngagementOrPending, ZeroEngagementSignal,
+            FilingDensity, PendingSignal, SignalOrPending, Signals, ZeroEngagementOrPending,
+            ZeroEngagementSignal,
         };
         let direction = DirectionReport {
             target: "t".into(),

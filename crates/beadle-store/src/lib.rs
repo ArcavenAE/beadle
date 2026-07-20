@@ -4,13 +4,16 @@
 //! schema. This crate only cares about reading and writing records; the
 //! semantics of a run (enumerate, classify, render) live one crate up.
 
+use std::{
+    collections::BTreeMap,
+    fs::{File, OpenOptions},
+    io::{BufRead, BufReader, BufWriter, Write},
+    path::{Path, PathBuf},
+};
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::path::{Path, PathBuf};
 
 /// One row in `state.jsonl`. We keep this as a tagged enum for the well-known
 /// kinds, plus an `Other` catch-all so forward-compat rows survive round-trips.
@@ -98,6 +101,13 @@ pub struct ClassificationRecord {
     pub integrity_anchor: Option<String>,
     #[serde(default)]
     pub operational_impact: Option<String>,
+    /// Safety-cluster flag (finding-004): the issue is in the silent-data-loss
+    /// class. Orthogonal to `operational_impact`, which is the finding-009
+    /// liveness axis. Records ingested before the finding-009 alignment
+    /// carried SDL inside `operational_impact`; read via
+    /// [`ClassificationRecord::is_silent_data_loss`], which covers both.
+    #[serde(default)]
+    pub silent_data_loss: bool,
     pub priority: String,
     #[serde(default)]
     pub cluster: Vec<String>,
@@ -108,6 +118,16 @@ pub struct ClassificationRecord {
     pub cited_evidence: Option<String>,
     #[serde(default)]
     pub quick_win_disqualification: Option<String>,
+}
+
+impl ClassificationRecord {
+    /// True when the record is in the silent-data-loss safety class — either
+    /// via the dedicated `silent_data_loss` field or via the legacy
+    /// pre-finding-009 encoding inside `operational_impact` (stores that have
+    /// not yet run `beadle classify migrate-impact`).
+    pub fn is_silent_data_loss(&self) -> bool {
+        self.silent_data_loss || self.operational_impact.as_deref() == Some("silent-data-loss")
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,7 +202,8 @@ impl Store {
         let reader = BufReader::new(file);
         let mut out = Vec::new();
         for (i, line) in reader.lines().enumerate() {
-            let line = line.with_context(|| format!("read line {} of {}", i + 1, path.display()))?;
+            let line =
+                line.with_context(|| format!("read line {} of {}", i + 1, path.display()))?;
             if line.trim().is_empty() {
                 continue;
             }
@@ -209,6 +230,35 @@ impl Store {
         }
         w.flush()?;
         Ok(())
+    }
+
+    /// Atomically replace the entire store contents: write a temp file, back
+    /// up any existing state to `state.jsonl.bak-<label>`, rename the temp
+    /// into place. Migration-only path — `append` remains the normal write.
+    /// Returns the backup path when a prior state file existed.
+    pub fn rewrite(&self, recs: &[Record], backup_label: &str) -> Result<Option<PathBuf>> {
+        let path = self.state_path();
+        let tmp = self.root.join("state.jsonl.tmp");
+        {
+            let file = File::create(&tmp).with_context(|| format!("create {}", tmp.display()))?;
+            let mut w = BufWriter::new(file);
+            for rec in recs {
+                let s = to_canonical_json(rec)?;
+                writeln!(w, "{}", s)?;
+            }
+            w.flush()?;
+        }
+        let backup = if path.exists() {
+            let bak = self.root.join(format!("state.jsonl.bak-{backup_label}"));
+            std::fs::rename(&path, &bak)
+                .with_context(|| format!("back up {} to {}", path.display(), bak.display()))?;
+            Some(bak)
+        } else {
+            None
+        };
+        std::fs::rename(&tmp, &path)
+            .with_context(|| format!("move {} into place", tmp.display()))?;
+        Ok(backup)
     }
 
     /// Latest RunRecord, or None if the store has none.
@@ -259,8 +309,9 @@ fn canonicalize(v: Value) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn roundtrip_run_record() {

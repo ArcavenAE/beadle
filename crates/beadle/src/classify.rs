@@ -21,7 +21,8 @@
 //!     "provenance": "pilot-derived",
 //!     "integrity": true,
 //!     "integrity_anchor": "spec_process",
-//!     "operational_impact": "silent-data-loss",
+//!     "silent_data_loss": true,
+//!     "operational_impact": "halt",
 //!     "priority": "P0",
 //!     "cluster": ["ratchet-integrity"],
 //!     "quick_win_eligible": false,
@@ -32,55 +33,18 @@
 //! Timestamps default to now (RFC3339); an explicit `ts` in the payload wins
 //! so the skill can replay historical classifications deterministically.
 
+use std::{
+    fs,
+    io::{self, Read},
+    path::Path,
+};
+
 use anyhow::{anyhow, bail, Context, Result};
 use beadle_store::{ClassificationRecord, Record, Store};
 use serde_json::Value;
-use std::fs;
-use std::io::{self, Read};
-use std::path::Path;
-use time::format_description::well_known::Rfc3339;
-use time::OffsetDateTime;
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-use crate::intent;
-
-/// Recognized values on the four bounded axes. These match
-/// `elem-defect-classification-superset`; keep the vocabulary tight so
-/// downstream signals aren't decoding free-text.
-const REPORT_TYPES: &[&str] = &[
-    "task",
-    "bug",
-    "feature",
-    "regression",
-    "security",
-    "dependency",
-    "ci-build",
-    "flaky-test",
-    "tech-debt",
-    "perf",
-    "docs",
-    "question",
-    "rfc",
-];
-const DEFECT_NATURES: &[&str] = &[
-    "syntax",
-    "off-by-one",
-    "null-resource-lifecycle",
-    "concurrency-race",
-    "logic",
-    "algorithmic",
-    "spec-requirements",
-    "design-architectural",
-    "directional-intent-misalignment",
-];
-const REPRODUCIBILITY: &[&str] = &["bohrbug", "mandelbug", "heisenbug", "unknown"];
-const OPERATIONAL_IMPACT: &[&str] = &[
-    "silent-data-loss",
-    "silent-corruption",
-    "false-verdict",
-    "user-visible-error",
-    "degraded-performance",
-    "none",
-];
+use crate::{intent, vocab::vocab};
 
 pub fn ingest(root: &Path, target: &str, payload_path: Option<&Path>) -> Result<()> {
     let intent = intent::load(root, target)?;
@@ -148,10 +112,7 @@ fn validate(
         .and_then(Value::as_str)
         .unwrap_or(default_ts)
         .to_string();
-    let rec_target = obj
-        .get("target")
-        .and_then(Value::as_str)
-        .unwrap_or(target);
+    let rec_target = obj.get("target").and_then(Value::as_str).unwrap_or(target);
     if rec_target != target {
         bail!(
             "record target `{}` does not match ingest target `{}`",
@@ -169,9 +130,10 @@ fn validate(
         .map(|n| n as u32)
         .unwrap_or(latest_run);
 
-    let report_type = req_enum(obj, "report_type", REPORT_TYPES)?;
-    let defect_nature = req_enum(obj, "defect_nature", DEFECT_NATURES)?;
-    let reproducibility = req_enum(obj, "reproducibility", REPRODUCIBILITY)?;
+    let v = vocab();
+    let report_type = req_enum(obj, "report_type", &v.report_type)?;
+    let defect_nature = req_enum(obj, "defect_nature", &v.defect_nature)?;
+    let reproducibility = req_enum(obj, "reproducibility", &v.reproducibility)?;
     let leverage = req_str(obj, "leverage")?;
     let alignment = req_str(obj, "alignment")?;
     let provenance = req_str(obj, "provenance")?;
@@ -184,13 +146,26 @@ fn validate(
         .get("integrity_anchor")
         .and_then(Value::as_str)
         .map(|s| s.to_string());
+    let silent_data_loss = obj
+        .get("silent_data_loss")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let operational_impact = match obj.get("operational_impact").and_then(Value::as_str) {
         Some(s) => {
-            if !OPERATIONAL_IMPACT.contains(&s) {
+            if v.is_legacy_impact(s) {
+                bail!(
+                    "operational_impact `{}` is a legacy pre-finding-009 value; \
+                     the axis takes the liveness tokens {:?} (beadle#32). \
+                     Existing stores re-map via `beadle classify migrate-impact`",
+                    s,
+                    v.operational_impact
+                );
+            }
+            if !v.operational_impact.iter().any(|a| a == s) {
                 bail!(
                     "operational_impact `{}` not in {:?}",
                     s,
-                    OPERATIONAL_IMPACT
+                    v.operational_impact
                 );
             }
             Some(s.to_string())
@@ -202,7 +177,7 @@ fn validate(
         bail!("integrity=true requires `integrity_anchor` naming the systems-of-record tier");
     }
 
-    let priority = req_str(obj, "priority")?;
+    let priority = req_enum(obj, "priority", &v.priority)?;
 
     let cluster = obj
         .get("cluster")
@@ -232,6 +207,16 @@ fn validate(
             "quick_win_eligible=true is invalid when integrity=true (HARD EXCLUSION per elem-defect-classification-superset)"
         );
     }
+    if quick_win_eligible && silent_data_loss {
+        bail!(
+            "quick_win_eligible=true is invalid on silent-data-loss records (LANE EXCLUSION BY RULE, finding-020 F3)"
+        );
+    }
+    if quick_win_eligible && operational_impact.as_deref() == Some("panic") {
+        bail!(
+            "quick_win_eligible=true is invalid on impact=panic records (LANE EXCLUSION BY RULE, finding-020 F3)"
+        );
+    }
 
     Ok(ClassificationRecord {
         ts,
@@ -247,6 +232,7 @@ fn validate(
         integrity,
         integrity_anchor,
         operational_impact,
+        silent_data_loss,
         priority,
         cluster,
         quick_win_eligible,
@@ -263,13 +249,9 @@ fn req_str(obj: &serde_json::Map<String, Value>, key: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("missing/invalid string `{}`", key))
 }
 
-fn req_enum(
-    obj: &serde_json::Map<String, Value>,
-    key: &str,
-    allowed: &[&str],
-) -> Result<String> {
+fn req_enum(obj: &serde_json::Map<String, Value>, key: &str, allowed: &[String]) -> Result<String> {
     let v = req_str(obj, key)?;
-    if !allowed.contains(&v.as_str()) {
+    if !allowed.iter().any(|a| a == &v) {
         bail!("`{}` value `{}` not in {:?}", key, v, allowed);
     }
     Ok(v)
@@ -277,9 +259,10 @@ fn req_enum(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
     use tempfile::TempDir;
+
+    use super::*;
 
     fn intent_yaml() -> &'static str {
         "schema_version: 0.1\nrepo: acme/widget\nmaintainers:\n  - alice\nmeasured_contributors:\n  - bot\n"
@@ -340,7 +323,10 @@ mod tests {
         let path = td.path().join("p.json");
         std::fs::write(&path, payload.to_string()).unwrap();
         let err = ingest(td.path(), "t", Some(&path)).unwrap_err();
-        assert!(err.to_string().contains("payload item 0") || err.chain().any(|c| c.to_string().contains("vibes")));
+        assert!(
+            err.to_string().contains("payload item 0")
+                || err.chain().any(|c| c.to_string().contains("vibes"))
+        );
     }
 
     #[test]
@@ -390,5 +376,110 @@ mod tests {
 
         let store = Store::open(td.path().join("store"), "t").unwrap();
         assert_eq!(store.read_all().unwrap().len(), 2);
+    }
+
+    fn base_payload() -> serde_json::Value {
+        json!({
+            "target": "t", "number": 1, "run": 1,
+            "report_type": "bug", "defect_nature": "logic",
+            "reproducibility": "bohrbug", "leverage": "systemic",
+            "alignment": "advances", "provenance": "pilot-derived",
+            "integrity": false, "priority": "P2", "rationale": "x"
+        })
+    }
+
+    fn run_payload(td: &TempDir, payload: &serde_json::Value) -> Result<()> {
+        let path = td.path().join("p.json");
+        std::fs::write(&path, payload.to_string()).unwrap();
+        ingest(td.path(), "t", Some(&path))
+    }
+
+    #[test]
+    fn accepts_finding_009_liveness_tokens() {
+        let td = TempDir::new().unwrap();
+        setup(&td);
+        for tok in ["panic", "halt", "data_loss", "degraded", "none"] {
+            let mut p = base_payload();
+            p["operational_impact"] = json!(tok);
+            run_payload(&td, &p).unwrap();
+        }
+    }
+
+    #[test]
+    fn rejects_legacy_impact_with_migration_pointer() {
+        let td = TempDir::new().unwrap();
+        setup(&td);
+        let mut p = base_payload();
+        p["operational_impact"] = json!("silent-data-loss");
+        let err = run_payload(&td, &p).unwrap_err();
+        let msg = format!("{:#}", err);
+        assert!(msg.contains("legacy"), "got: {msg}");
+        assert!(msg.contains("migrate-impact"), "got: {msg}");
+    }
+
+    #[test]
+    fn accepts_superset_report_types() {
+        let td = TempDir::new().unwrap();
+        setup(&td);
+        for rt in ["process-gap", "enhancement", "policy", "proposal"] {
+            let mut p = base_payload();
+            p["report_type"] = json!(rt);
+            run_payload(&td, &p).unwrap();
+        }
+    }
+
+    #[test]
+    fn accepts_p0a_p0b_priority_and_rejects_unknown() {
+        let td = TempDir::new().unwrap();
+        setup(&td);
+        for pr in ["P0a", "P0b", "P4"] {
+            let mut p = base_payload();
+            p["priority"] = json!(pr);
+            run_payload(&td, &p).unwrap();
+        }
+        let mut p = base_payload();
+        p["priority"] = json!("high");
+        assert!(run_payload(&td, &p).is_err());
+    }
+
+    #[test]
+    fn rejects_quick_win_on_panic() {
+        let td = TempDir::new().unwrap();
+        setup(&td);
+        let mut p = base_payload();
+        p["operational_impact"] = json!("panic");
+        p["quick_win_eligible"] = json!(true);
+        let err = run_payload(&td, &p).unwrap_err();
+        assert!(format!("{:#}", err).contains("finding-020 F3"));
+    }
+
+    #[test]
+    fn rejects_quick_win_on_silent_data_loss_flag() {
+        let td = TempDir::new().unwrap();
+        setup(&td);
+        let mut p = base_payload();
+        p["silent_data_loss"] = json!(true);
+        p["quick_win_eligible"] = json!(true);
+        let err = run_payload(&td, &p).unwrap_err();
+        assert!(format!("{:#}", err).contains("finding-020 F3"));
+    }
+
+    #[test]
+    fn silent_data_loss_flag_persists_to_store() {
+        let td = TempDir::new().unwrap();
+        setup(&td);
+        let mut p = base_payload();
+        p["silent_data_loss"] = json!(true);
+        p["operational_impact"] = json!("none");
+        run_payload(&td, &p).unwrap();
+        let store = Store::open(td.path().join("store"), "t").unwrap();
+        let recs = store.read_all().unwrap();
+        match &recs[0] {
+            Record::Classification(c) => {
+                assert!(c.silent_data_loss);
+                assert!(c.is_silent_data_loss());
+            }
+            other => panic!("unexpected record {other:?}"),
+        }
     }
 }

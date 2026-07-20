@@ -115,6 +115,18 @@ the factory itself reports a defect it should emit this signal (it has ground tr
 beadle can only infer — finding-009 upstream contract); until it does, beadle infers
 `impact.*` from the issue body + dispatcher/run telemetry.
 
+**Canonical vocabulary manifest.** The bounded token sets for classification
+records — `report_type`, `defect_nature`, `reproducibility`,
+`operational_impact` (store tokens `panic|halt|data_loss|degraded|none`; the
+`impact.*` labels above are their GitHub-label forms), `priority` — live in
+[`vocabulary.json`](vocabulary.json), sibling to this file. That manifest is
+canonical for BOTH this skill and `beadle classify ingest`: the binary embeds
+it at build time, and `tests/vocabulary_contract.rs` holds the two together.
+If this prose and the manifest disagree, the manifest wins and the
+disagreement is a bug (finding-020 F2 — the pre-alignment enum drifted exactly
+this way). Note the store token for the data-loss impact is `data_loss`; the
+label form is `impact.data-loss`.
+
 **Recoverability is a severity input.** Rank what is at risk by recoverability, not
 byte count: regenerable **output** (re-run the generator — cheapest) < **spec /
 process** (the authority code is judged against; only a human amends it) <
@@ -231,11 +243,18 @@ truth — never the dashboard body.
 
 For classification records specifically, use `beadle classify ingest <target>` —
 pipe a JSON array of ClassificationRecord objects on stdin (or `--file <path>`).
-The binary validates the four bounded enums (`report_type`, `defect_nature`,
-`reproducibility`, `operational_impact`), enforces the HARD invariants
+The binary validates the bounded enums (`report_type`, `defect_nature`,
+`reproducibility`, `operational_impact`, `priority`) against
+[`vocabulary.json`](vocabulary.json), enforces the HARD invariants
 (`integrity=true` requires `integrity_anchor`; `quick_win_eligible=true` is
-invalid on integrity items), and appends. If validation fails, fix the payload
-and retry — the taxonomy holds by construction, not by discipline.
+invalid on integrity items, on `silent_data_loss` items, and on `panic`
+impacts — finding-020 F3), and appends. `operational_impact` takes the
+finding-009 liveness tokens verbatim — never re-map them to severity words;
+the safety cluster travels in `integrity`/`integrity_anchor`/`silent_data_loss`.
+Stores written before this alignment re-map via
+`beadle classify migrate-impact <target> --fixture <rich-classifications.json>`.
+If validation fails, fix the payload and retry — the taxonomy holds by
+construction, not by discipline.
 
 Direction signals B (integrity-density) and C (silent-data-loss share) derive
 from these classifications for the current run — if you don't ingest, they emit

@@ -7,9 +7,10 @@
 //!   beadle push   <target>   → write rendered body to the dashboard issue
 //!                              (preserves editor slots, finalizes body_digest)
 
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
 
 mod classify;
 mod controls;
@@ -17,9 +18,11 @@ mod direction;
 mod enumerate;
 mod gh;
 mod intent;
+mod migrate;
 mod push;
 mod render;
 mod sync;
+mod vocab;
 
 #[derive(Parser)]
 #[command(name = "beadle", version, about)]
@@ -43,13 +46,9 @@ enum Cmd {
         full: bool,
     },
     /// Delta-sweep comments on open issues (item E).
-    Sync {
-        target: String,
-    },
+    Sync { target: String },
     /// Render dashboard body from the store (item B/C).
-    Render {
-        target: String,
-    },
+    Render { target: String },
     /// Push rendered body to the dashboard issue.
     Push {
         target: String,
@@ -77,6 +76,19 @@ enum ClassifyCmd {
         #[arg(long)]
         file: Option<PathBuf>,
     },
+    /// Re-map legacy (pre-finding-009) operational_impact values to the
+    /// canonical liveness vocabulary, using rich classification fixtures as
+    /// per-issue ground truth. Fails loud (writing nothing) on records no
+    /// fixture or unambiguous mechanical map can resolve.
+    MigrateImpact {
+        target: String,
+        /// Rich classification fixture(s) carrying ground truth (repeatable).
+        #[arg(long = "fixture")]
+        fixtures: Vec<PathBuf>,
+        /// Report what would change without touching the store.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -96,6 +108,11 @@ fn main() -> Result<()> {
         Cmd::Classify(ClassifyCmd::Ingest { target, file }) => {
             classify::ingest(&root, &target, file.as_deref())
         }
+        Cmd::Classify(ClassifyCmd::MigrateImpact {
+            target,
+            fixtures,
+            dry_run,
+        }) => migrate::migrate_impact(&root, &target, &fixtures, dry_run),
     }
     .with_context(|| "beadle command failed")
 }

@@ -1,0 +1,72 @@
+{
+  "_comment": "Canonical shared classification vocabulary (finding-020 F2 / beadle#32). Both consumers defer to this file: SKILL.md §3 prose describes these axes but this manifest wins on disagreement, and `beadle classify ingest` embeds it at build time. tests/vocabulary_contract.rs holds the skill and the binary together. operational_impact is the finding-009 LIVENESS axis; the safety cluster travels in the record's own integrity/integrity_anchor/silent_data_loss fields and must never be re-merged into this axis.",
+  "schema_version": 1,
+  "report_type": [
+    "task",
+    "bug",
+    "feature",
+    "regression",
+    "security",
+    "dependency",
+    "ci-build",
+    "flaky-test",
+    "tech-debt",
+    "perf",
+    "docs",
+    "question",
+    "rfc",
+    "process-gap",
+    "enhancement",
+    "policy",
+    "proposal",
+    "lesson",
+    "gap",
+    "possibly-out-of-scope"
+  ],
+  "defect_nature": [
+    "syntax",
+    "off-by-one",
+    "null-resource-lifecycle",
+    "concurrency-race",
+    "logic",
+    "algorithmic",
+    "spec-requirements",
+    "design-architectural",
+    "directional-intent-misalignment"
+  ],
+  "reproducibility": [
+    "bohrbug",
+    "mandelbug",
+    "heisenbug",
+    "unknown"
+  ],
+  "operational_impact": [
+    "panic",
+    "halt",
+    "data_loss",
+    "degraded",
+    "none"
+  ],
+  "operational_impact_labels": {
+    "panic": "impact.panic",
+    "halt": "impact.halt",
+    "data_loss": "impact.data-loss",
+    "degraded": "impact.degraded"
+  },
+  "priority": [
+    "P0a",
+    "P0b",
+    "P0",
+    "P1",
+    "P2",
+    "P3",
+    "P4"
+  ],
+  "legacy_operational_impact": {
+    "degraded-performance": "degraded",
+    "silent-data-loss": "data_loss",
+    "silent-corruption": null,
+    "false-verdict": null,
+    "user-visible-error": null
+  }
+}
