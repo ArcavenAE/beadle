@@ -1,0 +1,79 @@
+id: question-grader-fanout-efficiency
+type: question
+confidence: frontier
+title: "Grader fan-out — what schedule, batch size, cascade, and incremental structure does the refresh pass actually want?"
+tags: [beadle, dashboard-refresh, classify, scheduling, tail-latency, incremental-computation, performance, atelier]
+content: |
+  The /dashboard-refresh classify step is a distributed map-reduce over
+  expensive, unreliable LLM workers, designed by feel. Run-14 (2026-07-20):
+  17 parallel graders, > 43 min wall for ~80 issues. Run-13: 8 graders x 13
+  issues, 2/8 stalled ~1 h, recovered by manual ping. Every observed pain
+  point is a named, studied problem (stragglers, retry-unit mismatch,
+  thundering herd, full view recomputation, missing cascade, zero
+  instrumentation). Full analysis + reading list:
+  _kos/ideas/grader-fanout-algorithmics.md.
+
+  Operating rule for this question: MEASURE FIRST (Knuth, TAOCP vol 1) —
+  no optimization ships on intuition; classification quality is the
+  product and wall clock only a constraint.
+
+  Sub-questions:
+
+  A. Cost model — what does a run actually spend? Instrument per-grader
+     (spawn/end ts, #issues, #tool calls, tokens, retries, stalls) and
+     orchestrator phases (enumerate, merge, compose, gate, recompose
+     count). Cheapest shape: perf `note` records in the store; richer:
+     finding-007 OTEL branch. Includes the run-14 profiling ask to the
+     operating agent (posted on aae-orc#62): why 17 agents for ~80 issues,
+     and where the 43+ min went.
+
+  B. Parallelism unit — issue, micro-batch, or batch? Today: parallel
+     between agents, serial within (wall >= batch_size x per-issue
+     latency). Batch exists to amortize the fixed manifest+rubric prompt —
+     a prompt-cache concern solved with a scheduling decision. What batch
+     size minimizes wall x cost under measured per-issue latency and
+     provider rate limits?
+
+  C. Straggler policy — heartbeat, timeout, speculative re-dispatch of a
+     stalled batch's remaining issues (MapReduce backup tasks / hedged
+     requests). What is the cheap version inside Claude Code subagent
+     semantics, replacing the manual resume ping?
+
+  D. Cheap-first cascade — run-13 was 85% process-gap; report-type is
+     cheap to auto-classify. Can a cheap pre-pass (or store priors)
+     pre-fill easy axes and route only ambiguous/integrity-suspect/attn
+     issues to the deep grader? Quality gate required: sampled
+     double-grade agreement; integrity + attn axes NEVER cascade down.
+
+  E. Shared read substrate — one orchestrator-side snapshot (issue bodies,
+     repo tip SHA, relevant excerpts) handed to graders, instead of 17
+     independent fetch storms (429-herd risk observed run-13 era).
+
+  F. Incremental render — the store is append-only; the dashboard is a
+     materialized view; S7 recomputes it fully each run and the composer
+     itself is a regression vector (67 dropped refs, run-13). How far can
+     render move to derived-sections + authored slots, recomputing only
+     what the new run touches? (Differential dataflow / self-adjusting
+     computation are the studied shapes; u47p + iouu are the first steps.)
+
+  G. Gate cost growth — regression-gate check 3 re-verifies closure of
+     every issue ever referenced: O(corpus) per run. Bound it (only
+     issues touched since last run + a sample) without weakening the gate.
+
+  H. Which improvements belong in the SKILL/command (prose discipline) vs
+     the binary (deterministic machinery)? The store/perf records and
+     incremental render lean binary; scheduling policy leans command
+     prose until marvel-managed dispatch exists.
+edges:
+  - target: elem-state-out-of-band
+    type: derives
+  - target: elem-defect-classification-superset
+    type: derives
+  - target: question-renderer-editorial-boundary
+    type: supports
+  - target: question-marvel-team-shape
+    type: supports
+provenance:
+  created_by: agent
+  created_at: "2026-07-20"
+  updated_at: "2026-07-20"
