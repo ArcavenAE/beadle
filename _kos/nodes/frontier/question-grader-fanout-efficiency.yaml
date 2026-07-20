@@ -64,6 +64,49 @@ content: |
      the binary (deterministic machinery)? The store/perf records and
      incremental render lean binary; scheduling policy leans command
      prose until marvel-managed dispatch exists.
+
+  I. Harness dispatch reliability — run-14 showed the dominant wall-clock
+     lever sits BELOW beadle: background-dispatched subagents starved
+     (~10-20x slower than sync for identical work) and slow agents die to
+     the harness timeout reaper. This is an environment property of the
+     Claude Code session, not a beadle schedule choice (orc finding-083 +
+     addendum). Track the harness-level fix/upstream separately; beadle's
+     own policy meanwhile is sync-only grader dispatch with a per-dispatch
+     wall budget under the reaper threshold.
+
+  --- Run-14 profiling data (2026-07-20; aae-orc#62 report + correction,
+      orc finding-083) — first dataset, substantially answering A ---
+
+  Design was 6 graders x 12 issues (27 dispatches for 6 logical batches;
+  the excess was infrastructure failure, not fan-out width). Measured:
+  - Dispatch mode dominated: background graders ran ~10-20x slower than
+    the same prompt dispatched sync (104 min vs 5.3 min for an identical
+    12-issue batch); 11/12 background agents died "Request timed out" in
+    one 4-minute cluster. Mortality tracks per-dispatch wall clock vs the
+    reaper, not batch size per se (a sync 12-issue batch survived at 315 s).
+  - Batch economics: fixed overhead ~75k tokens/agent; ~9.8k tokens/issue
+    at batch-12 vs ~17.5k at batch-6. Six-issue sync hedges: 6/6 survival
+    at ~1.8x per-issue cost — the B trade-off now has numbers.
+  - Serial-within-batch confirmed: ~26 s/issue healthy, ~50 s median,
+    445 s/issue straggler (8.7x median).
+  - Straggler/recovery: hedge-after-timeout completed coverage 6/6 with
+    zero redundant tokens (gap-filler, not racing duplicates); resume-
+    from-transcript recovered 0/3 terminal API deaths (ping efficacy
+    partially rehabilitated by the correction — unresolved).
+  - E is ANSWERED for the current flow: the orchestrator pre-builds grader
+    inputs; graders make exactly 2 tool calls (Read input -> Write output).
+    The read-amplification/fetch-storm hypothesis is retired for graders;
+    it may still apply to orchestrator-side enumeration.
+  - F reinforced: gate pass 1 caught 33 dropped drill-in refs — second
+    instance of the finding-020 F1 composer-compression class.
+
+  Reshaped probe order (aae-orc-6v7e): (1) sync-only dispatch + wall
+  budget in the command prose — cheapest, evidenced, do first; (2) make
+  runs self-profiling (per-grader perf note records: mode, batch size,
+  spawn/end ts, tokens, outcome); (3) hedge-after-timeout as standing
+  straggler policy; (4) batch default ~10-12 sync while the wall budget
+  holds; (5) cascade (D) stays open but its motivation is now token cost
+  (~10-17k/issue), not wall clock; (6) F/G unchanged.
 edges:
   - target: elem-state-out-of-band
     type: derives
@@ -73,6 +116,7 @@ edges:
     type: supports
   - target: question-marvel-team-shape
     type: supports
+edges_note: "finding-083 lives in the orc graph (cross-graph ref, not a local edge)"
 provenance:
   created_by: agent
   created_at: "2026-07-20"
