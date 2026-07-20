@@ -93,19 +93,25 @@ content: |
   not a copy in critic) until critic has running code and a second consumer is real
   (SOUL.md §7 gradual elaboration). See finding-008.
 
-  --- Ingest contract (finding-014) ---
+  --- Ingest contract (finding-014; vocabulary manifest since PR #35) ---
 
   `beadle classify ingest <target>` is the machine-checked bridge between
-  the Phase-0 Claude Code classifier skill and the store. The four bounded
-  enums (report_type, defect_nature, reproducibility, operational_impact)
-  are validated at ingest time — free-text on those axes is rejected, not
-  silently accepted. Two invariants from this node are enforced at the same
-  boundary: `integrity=true` requires `integrity_anchor` naming the
-  systems-of-record tier; `quick_win_eligible=true` is invalid on integrity
-  items (the HARD EXCLUSION on line 72). This is the surface downstream
-  signals (question-direction-verdict-escalation B/C, render's
-  classification-index) derive from — enforcement here means the taxonomy
-  holds by construction, not by discipline.
+  the Phase-0 Claude Code classifier skill and the store. The bounded
+  enums (report_type, defect_nature, reproducibility, operational_impact,
+  priority) are validated at ingest time — free-text on those axes is
+  rejected, not silently accepted. Since PR #35 the enforcement locus is
+  `skills/beadle-triage/vocabulary.json` — the single canonical vocabulary
+  both the skill (SKILL §3 defers to it) and the binary (embedded at build
+  time) load, held together by `crates/beadle/tests/vocabulary_contract.rs`
+  (manifest <-> SKILL prose <-> committed rich fixtures). Invariants from
+  this node enforced at the same boundary: `integrity=true` requires
+  `integrity_anchor` naming the systems-of-record tier;
+  `quick_win_eligible=true` is invalid on integrity items (the HARD
+  EXCLUSION on line 72) and, per finding-020 F3 / SKILL §7a LANE EXCLUSION
+  BY RULE, on `silent_data_loss` items and `panic` impacts. This is the
+  surface downstream signals (question-direction-verdict-escalation B/C,
+  render's classification-index) derive from — enforcement here means the
+  taxonomy holds by construction, not by discipline.
 
   --- Render wiring (finding-015) ---
 
@@ -122,13 +128,18 @@ content: |
   column, making "classifier hasn't run on this target yet" a visible
   gap rather than a silent absence.
 
-  Enum contract caveat (finding-020, run-13): the `classify ingest`
-  validator's operational_impact enum drifted from the finding-009
-  liveness axis this model specifies (panic/halt/data_loss/degraded) —
-  a self-referential attest-vs-verify instance inside beadle's own
-  binary. Store records for runs 10+13 carry a lossy mapping; ground
-  truth lives in the run-N rich fixtures. Defect: ArcavenAE/beadle#32;
-  the model's axis definitions in this node remain authoritative.
+  Enum contract caveat (finding-020, run-13) — RESOLVED in code
+  (PRs #34/#35, merged 2026-07-20): the `classify ingest` validator's
+  operational_impact enum had drifted from the finding-009 liveness axis
+  (panic/halt/data_loss/degraded) — a self-referential attest-vs-verify
+  instance inside beadle's own binary. The enum is now aligned, the record
+  carries `silent_data_loss` explicitly (safety cluster no longer re-merged
+  into the liveness axis), and the vocabulary-manifest contract tests are
+  the tripwire that would have caught this at run-11. Residual: store
+  records for runs 10+13 still carry the lossy mapping until
+  `beadle classify migrate-impact` runs on the machine holding the live
+  store (ground truth in the run-N rich fixtures; work-queue anchor
+  aae-orc-57g6). Defect record: ArcavenAE/beadle#32.
 edges:
   - target: elem-intent-alignment-whitespace
     type: derives
@@ -145,4 +156,4 @@ edges:
 provenance:
   created_by: agent
   created_at: "2026-06-28"
-  updated_at: "2026-07-13"
+  updated_at: "2026-07-20"
