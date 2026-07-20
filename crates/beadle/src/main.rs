@@ -19,6 +19,7 @@ mod enumerate;
 mod gh;
 mod intent;
 mod migrate;
+mod note;
 mod push;
 mod render;
 mod sync;
@@ -65,6 +66,20 @@ enum Cmd {
     /// Ingest ClassificationRecord payload(s) produced by the classifier skill.
     #[command(subcommand)]
     Classify(ClassifyCmd),
+    /// Append a note record to the store (perf ledger entries, audit trails,
+    /// operator remarks). Diagnostic only — nothing gates on notes.
+    Note {
+        target: String,
+        /// Note topic (e.g. `perf`, `migration`).
+        #[arg(long)]
+        topic: String,
+        /// Note body; compact JSON welcome for machine-readable ledgers.
+        #[arg(long)]
+        text: String,
+        /// Run number; defaults to the store's latest run record.
+        #[arg(long)]
+        run: Option<u32>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -113,6 +128,12 @@ fn main() -> Result<()> {
             fixtures,
             dry_run,
         }) => migrate::migrate_impact(&root, &target, &fixtures, dry_run),
+        Cmd::Note {
+            target,
+            topic,
+            text,
+            run,
+        } => note::run(&root, &target, &topic, &text, run),
     }
     .with_context(|| "beadle command failed")
 }
