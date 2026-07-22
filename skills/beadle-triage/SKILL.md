@@ -268,7 +268,70 @@ drops the issue from the alarm entirely — silence is only silent when the
 maintainer has not spoken. This is the signal that catches the exact case
 beadle exists for; when it fires drifting alongside SDL-share drifting, it
 takes precedence in `top_signal` because it names *which issues*, not just
-how many.
+how many. **Denominator (v2, §6b): A4 streaks are reported in maintainer
+attention windows FIRST, with beadle runs and calendar days as shadow — a
+run-denominated streak overstates silence whenever beadle's cadence outpaces
+the maintainers' (it always does).**
+
+### 6b. Capacity-adjusted calibration (v2 — applies to EVERY target)
+
+Every engagement indicator, streak, verdict, and prediction beadle emits is
+conditioned on the target's **maintainer capacity model**, declared in the
+intent manifest (`maintainer_capacity:` — class, team_size, attention_window,
+success_bands). Rationale + literature anchors:
+`_kos/ideas/capacity-adjusted-direction-baselines.md`. The uncalibrated
+failure mode this section exists to prevent: measuring a two-person
+side-project (the *modal* OSS shape — 65% of popular projects have truck
+factor ≤ 2; 60% of maintainers are unpaid, 78% at ≤ 10 h/week across ALL
+their projects) against an implicit full-time standard on beadle's own run
+cadence, and calling rational scarce-attention triage "drift."
+
+1. **Attention window** := a calendar day with ≥ 1 maintainer action
+   (comment / merge / close / label / commit) on the target. Compute from the
+   store's `maintainer_actions` dates; refresh the manifest's
+   `observed_windows` each run. Streaks, cadences, and latencies are
+   denominated in windows first; runs/calendar as shadow.
+2. **Baseline-anchored success bands** (defaults; manifest may tighten):
+   PR acceptance GREEN ≥ 60% (human band ~68–73%; bot/agent band ~37–45%),
+   YELLOW 0.40–0.60, RED < 0.40. Engagement cadence GREEN = ≥ 1 window/month
+   for `episodic-side-project`. Merge latency GREEN = merged within ≤ 2
+   windows of readiness. Report the band AND the raw number.
+3. **Severity ceiling is descriptive, not an alarm.** Report the acted-on
+   ceiling as **selection depth** (`shallow` / `mixed` / `deep`) with its cost
+   covariate stated (share of acted items that arrived with a mergeable diff).
+   Cost-ranked triage under scarcity is rational maintainer behavior, not
+   misalignment.
+4. **Top-level verdict gate:** a 🔴 direction verdict on a capacity-limited
+   target requires BOTH (a) a capacity-adjusted band in red, AND (b) the
+   fix-delivery-cost explanation falsified — i.e. the measured side shipped
+   ready fix PRs against the silent lane and they sat ≥ 2 attention windows.
+   Signal-level `drifting` (e.g. A4) stays visible in its row and in
+   `top_signal`, but does not force the headline red by itself.
+5. **Prediction horizons** (falsification protocol): denominate in attention
+   windows — default 4–6 windows — and test actions a maintainer could take
+   *within one window* (review one PR, answer one question), never
+   re-orderings of their whole triage. A prediction whose horizon spans < 2
+   expected windows at registration is INVALID — re-register it; evaluating
+   it would measure the calendar, not the maintainer.
+6. **Filing-rate governance (the measured side's half):** high-volume
+   agent filing against finite human capacity is the documented AI-DDoS
+   mechanism (arXiv:2607.04003) whose modal outcome is defensive lockdown,
+   not engagement. Do not grow the open measured-issue count while the
+   acted-share is below the manifest threshold; prefer fix-PRs-attached
+   (empirically the entire selection function); zero-new-issue pauses while
+   the maintainer drains are correct behavior, not idleness.
+7. **A4 discharge path is the measured side's.** The alarm stays (data-loss
+   classes are why beadle exists), but its designed discharge is lowering
+   activation energy — shipping SDL fix PRs — not asking part-time humans to
+   re-prioritize prose analyses.
+
+Instrument versioning: verdicts computed under this section are **instrument
+v2 (capacity-adjusted)**. Historical verdicts and evaluated predictions keep
+their recorded results under the instrument that produced them — recalibration
+NEVER retroactively re-scores an evaluated prediction (that would be the exact
+post-hoc re-derivation the falsification protocol forbids). The crate's
+`DirectionReport` (`beadle direction`) still computes v1; post-process per
+this section until it catches up (tracked as a GH issue on ArcavenAE/beadle).
 
 `beadle render <target>` also consumes ingested classifications (finding-015):
 each Open-issues row gains a chip column (`report_type · defect_nature ·

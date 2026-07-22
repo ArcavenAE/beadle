@@ -4,7 +4,11 @@
 #       semantics, and self-referential rubric inversion (see finding-002).
 # v0.3: added integrity_anchors (systems-of-record by recoverability tier) so the
 #       silent-integrity classifier is grounded, not inferred (finding-004/005).
-schema_version: 0.3
+# v0.4: added maintainer_capacity (capacity-adjusted calibration v2 — see
+#       _kos/ideas/capacity-adjusted-direction-baselines.md and SKILL §6b).
+#       Direction verdicts, streak denominators, success bands, and prediction
+#       horizons are conditioned on this block. Operator-ratified 2026-07-22.
+schema_version: 0.4
 
 target:
   repo: drbothen/vsdd-factory
@@ -29,6 +33,33 @@ maintainers:
 measured_contributors:
   - arcavenai   # Skippy — public, reflects on the user; weight concerns highest
   - arcaven     # the human review identity
+
+# Capacity model (v0.4, SKILL §6b). Grounds every engagement expectation in who
+# the maintainers actually are: two humans, hundreds of projects, this repo a
+# side project. Community anchors: 65% of popular projects have truck factor
+# <= 2; 60% of maintainers are unpaid hobbyists, 78% at <= 10 h/week ACROSS ALL
+# their projects; human PR acceptance ~68-73% vs bot/agent ~37-45% (full
+# citations: _kos/ideas/capacity-adjusted-direction-baselines.md).
+maintainer_capacity:
+  class: episodic-side-project   # full-time | part-time-regular | episodic-side-project
+  team_size: 2
+  context: one of hundreds of projects for these maintainers; primary focus elsewhere
+  attention_window: action-day   # a calendar day with >=1 maintainer action on this target
+  # Derived from the store's maintainer_actions dates; refresh each run.
+  observed_windows: ["2026-07-08", "2026-07-15", "2026-07-19", "2026-07-21", "2026-07-22"]
+  success_bands:
+    pr_acceptance:               # vs human ~68-73% / bot ~37-45% literature bands
+      green: ">= 0.60"
+      yellow: "0.40 - 0.60"
+      red: "< 0.40"
+    engagement_cadence:
+      green: ">= 1 attention window with >= 1 action per month"
+      red: "0 windows per quarter"
+    merge_latency:
+      green: "merged within <= 2 attention windows of PR readiness"
+  # All streak metrics (A4 included) report attention-window denominators FIRST;
+  # runs/calendar as shadow. Pre-registered prediction horizons are denominated
+  # in windows (default 4-6) and must test single-window actions (SKILL §6b).
 
 # Composite, weighted intent anchor (no single source is authoritative).
 intent_sources:
