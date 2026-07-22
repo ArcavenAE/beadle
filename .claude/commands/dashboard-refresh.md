@@ -80,6 +80,12 @@ with the **highest-numbered** committed fixture
   A4 SDL-engagement streak + the acted-on severity ceiling (hard/soft, per the
   pre-registered criteria in `_kos/ideas/ramp-vs-drift-phase-qualifier.md`) —
   reported whichever way it points, never only when it flatters a hypothesis.
+- **Calibration is instrument v2 (SKILL §6b, capacity-adjusted):** verdicts,
+  streaks, and latencies are conditioned on the manifest's
+  `maintainer_capacity` block; streak denominators are attention windows
+  first (runs/calendar as shadow); severity ceiling reports as selection
+  depth with its cost covariate; a 🔴 headline requires a red
+  capacity-adjusted band AND a falsified cost explanation.
 - Write the candidate body to
   `tmp/dashboard-snapshots/<target>-312-candidate-<UTC ts>.md`. **Do not post yet.**
 
@@ -127,12 +133,15 @@ if a bad body was ever posted, restore it with the before-snapshot via
    acted-on severity ceiling).
 6. Append the run record (`kind: run`) to the store — the run-14 pass missed
    this; it is part of SKILL §6, not optional.
-7. **If run ≥ 16:** evaluate the declared ramp prediction (store record
-   `kind: note, topic: prediction`, declared run-14, aae-orc#65): the hard
-   ceiling must have moved past P0b — i.e. the maintainer acted on a P0a/SDL
-   item they did not file, discharging A4. Report pass or fail in the run
-   summary and on the board; do not defer, soften, or re-derive the criteria
-   post-hoc.
+7. **Prediction protocol:** any due pre-registered prediction (store record
+   `kind: note, topic: prediction`) is evaluated against its registered
+   criteria exactly as written — report pass or fail in the run summary and
+   on the board; do not defer, soften, or re-derive the criteria post-hoc.
+   Evaluated results are permanent under the instrument that produced them
+   (the run-16 ramp prediction FAILED under v1 and stays failed). NEW
+   predictions must follow SKILL §6b rule 5: horizons in attention windows
+   (default 4–6), single-window actions only; a horizon spanning < 2
+   expected windows is invalid at registration.
 
 ## Guardrails (charter/incidents — non-negotiable)
 
