@@ -409,6 +409,28 @@ to earn the click. Items here may ALSO appear in P0/P1/P2 groupings (the
 facets are orthogonal) — a cross-ref chip (`also P1`) is enough. Never place
 an `attn.*` item in Quick wins; never fold one into a cluster rollup.
 
+**Render-integrity contract (added 2026-07-22 after the run-14→16 regression
+— the lane table rendered as raw pipe text and half the lane was invisible):**
+
+1. **ONE visible table carries EVERY attn-tagged item** — the exact set in
+   the sentinel's `attn` lists. Carried items stay in the table across runs;
+   new runs append rows, they never migrate rows into the agent channel.
+2. **Blank line between the intro blockquote and the table.** GFM lazy
+   continuation absorbs a table that directly follows a `>` line — the whole
+   table renders as run-on pipe text inside the quote. This is the exact
+   defect that shipped in runs 14–16.
+3. **The agent channel `<details>` holds screen NOTES only** (per-run
+   admit/reject rationale in fenced blocks) — never lane rows, never any
+   `|`-table content. A table inside `<details>` needs its own header row
+   and blank-line padding to render; don't rely on that — keep tables out.
+4. **`<details>` hygiene everywhere on the board:** blank line after
+   `<details><summary>…</summary>` and before `</details>`, or the fenced
+   blocks inside render as raw text.
+
+These four are mechanical — the dashboard-refresh regression gate (§3 of the
+command doc) checks them; a hand-curated body that violates them fails the
+gate before posting.
+
 ### 7a. Quick wins — safe to act on  (the low-caution lane)
 Render a group **orthogonal to the P0/P1/P2 impact ordering** — *not* a fourth
 priority tier. Its job: give maintainers the **obviously-broken, easy-fix,
