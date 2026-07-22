@@ -113,6 +113,15 @@ ALL checks must pass:
    candidate state JSON unless it was closed on GitHub (verify closures).
 4. **Classification completeness** — no `_unclassified_` rows; every
    new-since-watermark issue appears in the new run's classification index.
+5. **Markdown render integrity** (SKILL §7d contract; added after the
+   run-14→16 attn-lane regression) — all mechanical:
+   - no table line (`|…`) directly follows a blockquote line (`>…`) without
+     a blank line between (GFM lazy continuation swallows the table);
+   - every `<details><summary>…</summary>` is followed by a blank line;
+   - every issue number in the sentinel's `attn` lists appears as a row in
+     the visible Needs-human-reading table (before that section's
+     `<details>`), never only inside the agent channel;
+   - no `|`-table rows inside any `<details>` block without a header row.
 
 **On any failure:** do NOT post. Report the diff. The live body is untouched;
 if a bad body was ever posted, restore it with the before-snapshot via
