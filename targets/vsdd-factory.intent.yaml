@@ -8,7 +8,11 @@
 #       _kos/ideas/capacity-adjusted-direction-baselines.md and SKILL §6b).
 #       Direction verdicts, streak denominators, success bands, and prediction
 #       horizons are conditioned on this block. Operator-ratified 2026-07-22.
-schema_version: 0.4
+# v0.5: added maintainer_capacity.pr_channel — maintainer-requested soft cap on
+#       concurrent open measured-side PRs (~10; Zious11 via operator, 2026-07-24:
+#       the ~25-PR backlog preceding the 2026-07-19/22 drains was too much for
+#       his analysis tooling). SKILL §6b rule 6 governance, PR-channel analog.
+schema_version: 0.5
 
 target:
   repo: drbothen/vsdd-factory
@@ -46,7 +50,7 @@ maintainer_capacity:
   context: one of hundreds of projects for these maintainers; primary focus elsewhere
   attention_window: action-day   # a calendar day with >=1 maintainer action on this target
   # Derived from the store's maintainer_actions dates; refresh each run.
-  observed_windows: ["2026-07-08", "2026-07-15", "2026-07-19", "2026-07-21", "2026-07-22"]
+  observed_windows: ["2026-07-08", "2026-07-15", "2026-07-19", "2026-07-21", "2026-07-22", "2026-07-23"]
   success_bands:
     pr_acceptance:               # vs human ~68-73% / bot ~37-45% literature bands
       green: ">= 0.60"
@@ -60,6 +64,14 @@ maintainer_capacity:
   # All streak metrics (A4 included) report attention-window denominators FIRST;
   # runs/calendar as shadow. Pre-registered prediction horizons are denominated
   # in windows (default 4-6) and must test single-window actions (SKILL §6b).
+  # Maintainer-requested PR-channel cap (Zious11 via operator, 2026-07-24):
+  # keep concurrent open measured-side PRs to ~10. The ~25-PR backlog before
+  # the 2026-07-19/22 drains overloaded his analysis tooling. Soft cap, same
+  # governance class as §6b rule 6 (filing-rate), applied to the PR channel:
+  # at the cap, queue fixes locally and stagger — do not open more.
+  pr_channel:
+    max_open_measured_prs: 10
+    source: "maintainer request, relayed 2026-07-24 (Zious11 — analysis tooling)"
 
 # Composite, weighted intent anchor (no single source is authoritative).
 intent_sources:

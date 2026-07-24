@@ -319,7 +319,11 @@ cadence, and calling rational scarce-attention triage "drift."
    not engagement. Do not grow the open measured-issue count while the
    acted-share is below the manifest threshold; prefer fix-PRs-attached
    (empirically the entire selection function); zero-new-issue pauses while
-   the maintainer drains are correct behavior, not idleness.
+   the maintainer drains are correct behavior, not idleness. The same
+   governance applies per channel: honor any manifest-declared channel cap
+   (`maintainer_capacity.pr_channel` — e.g. vsdd-factory's maintainer-requested
+   ~10 concurrent open measured PRs); at the cap, queue locally and stagger
+   rather than opening more.
 7. **A4 discharge path is the measured side's.** The alarm stays (data-loss
    classes are why beadle exists), but its designed discharge is lowering
    activation energy — shipping SDL fix PRs — not asking part-time humans to
