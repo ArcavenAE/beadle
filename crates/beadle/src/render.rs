@@ -13,7 +13,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use beadle_store::{ClassificationRecord, ClusterRecord, IssueRecord, Record, RunRecord, Store};
 use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
@@ -50,6 +50,24 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
         })
         .unwrap_or_else(|| synthetic_run(target));
 
+    // Fail loud on a projection of nothing (finding-019, curated-board-restoration
+    // item 1). A dashboard for a run whose classifier never produced records is
+    // the silent-success class this project exists to catch — every row would be
+    // `_unclassified_` and the derived signals `pending`. Refuse to emit (nonzero
+    // exit, nothing written to stdout); `beadle push` inherits the failure via `?`.
+    let current_run = latest_run.run;
+    let classifications_this_run = records
+        .iter()
+        .filter(|r| matches!(r, Record::Classification(c) if c.run == current_run))
+        .count();
+    if classifications_this_run == 0 {
+        bail!(
+            "no classification records for run {current_run} — refusing to emit a dashboard body. \
+             A projection of nothing must never look like a dashboard (finding-019). Run the \
+             classifier skill and `beadle classify ingest <target>` before render/push."
+        );
+    }
+
     let latest_issues = latest_issue_observations(&records);
     let latest_clusters = latest_cluster_observations(&records);
     let comment_stats = comment_stats(&records);
@@ -64,7 +82,6 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
         &latest_issues,
         &latest_clusters,
         &comment_stats,
-        &latest_class,
         &class_summary,
         &direction_report,
     );
@@ -229,31 +246,6 @@ fn classification_summary(latest: &HashMap<u32, ClassificationRecord>) -> Classi
     s
 }
 
-/// Compact chip: `bug · logic · P1 ⚠★` — report_type · defect_nature ·
-/// priority + flag glyphs. Glyphs: `⚠` integrity, `▲` silent-data-loss,
-/// `★` quick-win-eligible.
-fn classification_chip(c: &ClassificationRecord) -> String {
-    let mut flags = String::new();
-    if c.integrity {
-        flags.push('⚠');
-    }
-    if c.is_silent_data_loss() {
-        flags.push('▲');
-    }
-    if c.quick_win_eligible {
-        flags.push('★');
-    }
-    let flag_seg = if flags.is_empty() {
-        String::new()
-    } else {
-        format!(" {}", flags)
-    };
-    format!(
-        "{} · {} · {}{}",
-        c.report_type, c.defect_nature, c.priority, flag_seg
-    )
-}
-
 /// Compute display decay for a cluster given the run it was last updated in
 /// and the current run number.
 fn decay_display(cluster: &ClusterRecord, current_run: u32) -> String {
@@ -369,7 +361,6 @@ fn render_derived(
     issues: &[IssueRecord],
     clusters: &[ClusterRecord],
     comments: &CommentStats,
-    classifications: &HashMap<u32, ClassificationRecord>,
     class_summary: &ClassificationSummary,
     direction: &DirectionReport,
 ) -> String {
@@ -488,40 +479,12 @@ fn render_derived(
 
     out.push_str(&controls::render_board_controls_block());
 
-    out.push_str(&format!(
-        "## Open issues — {} observations (most-recent first)\n\n",
-        issues.len()
-    ));
-    if issues.is_empty() {
-        out.push_str("_no issue observations in store_\n\n");
-    } else {
-        out.push_str("<details><summary>Expand full list</summary>\n\n");
-        out.push_str("| # | Title | Classification | Updated | Author | Labels |\n");
-        out.push_str("|---|---|---|---|---|---|\n");
-        for i in issues {
-            let labels = if i.labels.is_empty() {
-                "—".to_string()
-            } else {
-                i.labels.join(", ")
-            };
-            let chip = classifications
-                .get(&i.number)
-                .map(classification_chip)
-                .unwrap_or_else(|| "_unclassified_".to_string());
-            out.push_str(&format!(
-                "| [#{}](https://github.com/{}/issues/{}) | {} | {} | {} | @{} | {} |\n",
-                i.number,
-                repo,
-                i.number,
-                md_escape(&i.title),
-                md_escape(&chip),
-                short_date(&i.updated_at),
-                i.author,
-                md_escape(&labels),
-            ));
-        }
-        out.push_str("\n</details>\n\n");
-    }
+    // The flat all-issues table was killed (curated-board-restoration item 2 /
+    // finding-019): it is a projection-not-replica violation (B1), busts the
+    // 65,536-byte GitHub issue-body limit at ~300 open issues, and was the only
+    // emitter of `_unclassified_` rows. The curated action plan (skill-authored
+    // slots) is the sole issue-listing surface; the binary frames, it does not
+    // replicate the tab.
 
     out.push_str(&format!(
         "_derived at {}Z · run {} · target `{}` · repo `{}`_\n",
@@ -601,11 +564,6 @@ whatever the compass tells you to say this run._\n\
 
 fn md_escape(s: &str) -> String {
     s.replace('|', "\\|").replace('\n', " ")
-}
-
-fn short_date(iso: &str) -> String {
-    // "2026-07-01T15:56:36Z" -> "2026-07-01"
-    iso.split('T').next().unwrap_or(iso).to_string()
 }
 
 fn sha256_hex(s: &str) -> String {
@@ -747,23 +705,6 @@ mod tests {
     }
 
     #[test]
-    fn chip_shows_flags_and_priority() {
-        let plain = mk_class(1, 1, "2026-07-01T00:00:00Z");
-        assert_eq!(classification_chip(&plain), "bug · logic · P2");
-
-        let mut integrity = plain.clone();
-        integrity.integrity = true;
-        integrity.integrity_anchor = Some("spec_process".into());
-        integrity.priority = "P0".into();
-        assert_eq!(classification_chip(&integrity), "bug · logic · P0 ⚠");
-
-        let mut sdl_qw = plain.clone();
-        sdl_qw.operational_impact = Some("silent-data-loss".into());
-        sdl_qw.quick_win_eligible = true;
-        assert_eq!(classification_chip(&sdl_qw), "bug · logic · P2 ▲★");
-    }
-
-    #[test]
     fn render_includes_classification_zones() {
         let issue = IssueRecord {
             ts: "2026-07-01T00:00:00Z".into(),
@@ -810,14 +751,19 @@ mod tests {
             &[issue],
             &[],
             &CommentStats::default(),
-            &latest_class,
             &summary,
             &direction,
         );
         assert!(body.contains("## Classification summary"), "summary header");
         assert!(body.contains("| Integrity"), "integrity row");
-        assert!(body.contains("bug · logic · P0 ⚠"), "chip in row");
-        assert!(body.contains("Classification"), "chip column header");
+        assert!(
+            body.contains("| Classified issues | 1 |"),
+            "classified count"
+        );
+        assert!(
+            body.contains("| P0 / P1 | 1 / 0 |"),
+            "P0 counted in summary"
+        );
     }
 
     #[test]
@@ -845,13 +791,155 @@ mod tests {
             &[],
             &[],
             &CommentStats::default(),
-            &empty,
             &summary,
             &direction,
         );
         assert!(
             body.contains("no classifications in store"),
             "pending disclosure must be surfaced"
+        );
+    }
+
+    /// Build a minimal on-disk workspace (intent + store) for exercising the
+    /// public `render::run` fail-loud guard end-to-end.
+    fn setup_workspace(run_no: u32, class_runs: &[u32]) -> tempfile::TempDir {
+        let td = tempfile::TempDir::new().unwrap();
+        let root = td.path();
+        std::fs::create_dir_all(root.join("targets")).unwrap();
+        std::fs::write(root.join("targets/t.intent.yaml"), "repo: acme/widget\n").unwrap();
+
+        let store = Store::open(root.join("store"), "t").unwrap();
+        let mut recs = vec![
+            Record::Run(RunRecord {
+                ts: "2026-07-01T00:00:00Z".into(),
+                target: "t".into(),
+                run: run_no,
+                watermark_before: 0,
+                watermark_after: 10,
+                counts: Default::default(),
+                digest: "d".into(),
+                warmup: None,
+                intent_version: None,
+                new_this_run: vec![10],
+                notes: None,
+            }),
+            Record::Issue(IssueRecord {
+                ts: "2026-07-01T00:00:00Z".into(),
+                target: "t".into(),
+                number: 10,
+                observed_in_run: run_no,
+                title: "wobble".into(),
+                author: "alice".into(),
+                state: "open".into(),
+                created_at: "2026-07-01T00:00:00Z".into(),
+                updated_at: "2026-07-01T00:00:00Z".into(),
+                closed_at: None,
+                labels: vec![],
+                assignees: vec![],
+                body_len: 0,
+                body_sha256: "s".into(),
+            }),
+        ];
+        for (i, &r) in class_runs.iter().enumerate() {
+            recs.push(Record::Classification(Box::new(mk_class(
+                10 + i as u32,
+                r,
+                "2026-07-01T00:00:00Z",
+            ))));
+        }
+        store.append(&recs).unwrap();
+        td
+    }
+
+    #[test]
+    fn render_run_fails_loud_on_zero_classifications_for_current_run() {
+        // Current run is 3; the only classification is for an earlier run 2.
+        // A projection of nothing must never look like a dashboard (finding-019).
+        let td = setup_workspace(3, &[2]);
+        let err = super::run(td.path(), "t").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("no classification records for run 3"),
+            "error must name the gap (pending/reason pattern per finding-014): {msg}"
+        );
+    }
+
+    #[test]
+    fn render_run_succeeds_when_classification_exists_for_current_run() {
+        // A classification for the current run 3 clears the guard; the emitted
+        // body must not carry the killed flat table's `_unclassified_` marker.
+        let td = setup_workspace(3, &[3]);
+        let body = super::run(td.path(), "t").expect("render should succeed");
+        assert!(!body.is_empty(), "a cleared guard must emit a body");
+        assert!(
+            !body.contains("_unclassified_"),
+            "no code path may emit an *unclassified* row"
+        );
+    }
+
+    fn mk_issue(number: u32, title: &str) -> IssueRecord {
+        IssueRecord {
+            ts: "2026-07-01T00:00:00Z".into(),
+            target: "t".into(),
+            number,
+            observed_in_run: 1,
+            title: title.into(),
+            author: "alice".into(),
+            state: "open".into(),
+            created_at: "2026-07-01T00:00:00Z".into(),
+            updated_at: "2026-07-01T00:00:00Z".into(),
+            closed_at: None,
+            labels: vec![],
+            assignees: vec![],
+            body_len: 0,
+            body_sha256: "s".into(),
+        }
+    }
+
+    #[test]
+    fn render_derived_has_no_flat_all_issues_table() {
+        // The flat all-issues table is killed (curated-board-restoration item 2):
+        // it violates B1 (projection, not replica) and was the sole emitter of
+        // `_unclassified_` rows. Issues present, none classified — the old table
+        // would have listed every row as `_unclassified_`.
+        let issues = vec![mk_issue(10, "wobble"), mk_issue(11, "wibble")];
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        let summary = classification_summary(&empty);
+        let direction = mk_direction_pending();
+        let run = RunRecord {
+            ts: "2026-07-01T00:00:00Z".into(),
+            target: "t".into(),
+            run: 3,
+            watermark_before: 0,
+            watermark_after: 11,
+            counts: Default::default(),
+            digest: "d".into(),
+            warmup: None,
+            intent_version: None,
+            new_this_run: vec![],
+            notes: None,
+        };
+        let body = render_derived(
+            "t",
+            "acme/widget",
+            &run,
+            &issues,
+            &[],
+            &CommentStats::default(),
+            &summary,
+            &direction,
+        );
+        assert!(
+            !body.contains("_unclassified_"),
+            "no code path may emit an *unclassified* row"
+        );
+        assert!(
+            !body.contains("Expand full list"),
+            "flat all-issues table must be removed"
+        );
+        assert!(
+            !body.contains("## Open issues —"),
+            "flat all-issues section header must be removed"
         );
     }
 
@@ -921,7 +1009,6 @@ mod tests {
             &[],
             &[],
             &CommentStats::default(),
-            &empty,
             &summary,
             &direction,
         );
@@ -971,7 +1058,6 @@ mod tests {
             &[],
             &[],
             &CommentStats::default(),
-            &empty,
             &summary,
             &direction,
         );
