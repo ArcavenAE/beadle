@@ -31,6 +31,15 @@ struct GhIssueRef {
 
 pub fn run(root: &Path, target: &str, dry_run: bool) -> Result<()> {
     let intent = intent::load(root, target)?;
+
+    // Render FIRST so push inherits the fail-loud guard before any side effect.
+    // render::run refuses to emit when the current run has zero classifications;
+    // running it before the dashboard fetch and the control-request note append
+    // means a push against an unclassified run fails cleanly — no GitHub read,
+    // no notes appended, no checkbox left half-processed — so a retried push
+    // before classification lands cannot strand duplicate control-request notes.
+    let rendered = render::run(root, target)?;
+
     let dashboard = find_dashboard_issue(&intent.repo)?;
     eprintln!(
         "beadle push: target={target} repo={} dashboard=#{} dry_run={dry_run}",
@@ -38,13 +47,11 @@ pub fn run(root: &Path, target: &str, dry_run: bool) -> Result<()> {
     );
 
     // Scan the LIVE body for checked board-control boxes (F5 Tier 2).
-    // Record one Note per verb before rendering; the fresh render always
-    // emits unchecked boxes, so the next push through the same body
-    // resets the box (natural de-bounce). Dispatch of the requested
-    // routines is deferred — Phase-1 gh-aw will drain the notes queue.
+    // Record one Note per verb; the fresh render always emits unchecked boxes,
+    // so the next push through the same body resets the box (natural de-bounce).
+    // Dispatch of the requested routines is deferred — Phase-1 gh-aw will drain
+    // the notes queue.
     record_board_controls(root, target, &dashboard.body, dry_run)?;
-
-    let rendered = render::run(root, target)?;
 
     // Extract editor slots from the LIVE body; preserve them across regen.
     let direction = extract_slot(&dashboard.body, DIRECTION_OPEN, DIRECTION_CLOSE)
@@ -314,6 +321,50 @@ mod tests {
         // returned empty, so `record_board_controls` returned before touching
         // the filesystem.
         assert!(!td.path().join("store").exists());
+    }
+
+    #[test]
+    fn push_fails_loud_before_side_effects_on_zero_classifications() {
+        // render::run runs first in push, so a current run with zero
+        // classifications makes push bail with the guard error BEFORE fetching
+        // the dashboard or appending any control-request note (finding-019 /
+        // u47p). Hermetic: had the guard not short-circuited first, push would
+        // reach the `gh` dashboard fetch and fail with a different error.
+        let td = tempfile::TempDir::new().unwrap();
+        let root = td.path();
+        std::fs::create_dir_all(root.join("targets")).unwrap();
+        std::fs::write(root.join("targets/t.intent.yaml"), "repo: acme/widget\n").unwrap();
+        let store = Store::open(root.join("store"), "t").unwrap();
+        store
+            .append(&[Record::Run(beadle_store::RunRecord {
+                ts: "2026-07-01T00:00:00Z".into(),
+                target: "t".into(),
+                run: 3,
+                watermark_before: 0,
+                watermark_after: 10,
+                counts: Default::default(),
+                digest: "d".into(),
+                warmup: None,
+                intent_version: None,
+                new_this_run: vec![10],
+                notes: None,
+            })])
+            .unwrap();
+
+        let err = super::run(root, "t", true).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("no classification records for run 3"),
+            "push must inherit the render guard before any side effect: {msg}"
+        );
+
+        let recs = store.read_all().unwrap();
+        assert!(
+            !recs
+                .iter()
+                .any(|r| matches!(r, Record::Note(n) if n.topic == "control-request")),
+            "guard must short-circuit before appending control-request notes"
+        );
     }
 
     #[test]
