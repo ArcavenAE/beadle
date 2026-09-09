@@ -8,7 +8,7 @@ that manifest and weights them by what the named **maintainers** actually act on
 
 | File | Target | Status |
 |---|---|---|
-| `vsdd-factory.intent.yaml` | `drbothen/vsdd-factory` | populated (v0) |
+| `vsdd-factory.intent.yaml` | `BOHICA-LABS/vsdd-factory` | populated (v0) |
 | `prism.intent.yaml` | DrBothen's Prism | **draft — unpopulated** |
 
 ## Adding a target

@@ -32,7 +32,7 @@ Paste into Claude Code (or `claude -p "$(cat prompts/create-dashboard.md | sed -
 ```
 BEGIN PROMPT
 You are running beadle (ArcavenAE/beadle) to create and maintain the triage
-dashboard for drbothen/vsdd-factory, AS the arcavenai identity. cwd is the beadle
+dashboard for BOHICA-LABS/vsdd-factory, AS the arcavenai identity. cwd is the beadle
 repo root.
 
 STEP 0 — HARD IDENTITY GUARD (do this first; abort on mismatch, post nothing):
@@ -56,13 +56,13 @@ STEP 2 — Discover the dashboard issue (sentinel-first, title-second). The body
   title is the secondary/fallback key (it can be hand-edited; the sentinel can't):
     TITLE='📋 beadle — Triage Dashboard'
     # candidate set = union of both, by arcavenai, open:
-    gh issue list --repo drbothen/vsdd-factory --state open --author arcavenai \
+    gh issue list --repo BOHICA-LABS/vsdd-factory --state open --author arcavenai \
       --search "beadle-state in:body" --json number,author,title,body
-    gh issue list --repo drbothen/vsdd-factory --state open \
+    gh issue list --repo BOHICA-LABS/vsdd-factory --state open \
       --search "\"$TITLE\" in:title" --json number,author,title
     # merge by issue number; filter to author arcavenai.
   - EXACTLY ONE candidate authored by arcavenai:
-      → rewrite its body in place: gh issue edit <n> --repo drbothen/vsdd-factory
+      → rewrite its body in place: gh issue edit <n> --repo BOHICA-LABS/vsdd-factory
         --body-file <generated>. Never open a second. Preserve any human-toggled
         checkbox selections you act on, then reset them.
   - MORE THAN ONE candidate authored by arcavenai:
@@ -76,7 +76,7 @@ STEP 2 — Discover the dashboard issue (sentinel-first, title-second). The body
       → re-run the discovery query one more time IMMEDIATELY before creating (a
         concurrent run may have just created it — this narrows, but does not fully
         close, the create race). If it now exists, branch above.
-      → otherwise create it: gh issue create --repo drbothen/vsdd-factory
+      → otherwise create it: gh issue create --repo BOHICA-LABS/vsdd-factory
         --title "$TITLE" --body-file <generated>
       → pin it: get the node id (gh issue view <n> --json id) and call the GraphQL
         pinIssue mutation. If it returns FORBIDDEN, note that arcavenai lacks
