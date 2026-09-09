@@ -1,4 +1,4 @@
-# beadle intent manifest — drbothen/vsdd-factory
+# beadle intent manifest — BOHICA-LABS/vsdd-factory (transferred from drbothen 2026-09)
 # Schema is frontier (charter F1); this is the working v0 shape.
 # v0.2: added self_referential flag, provenance_signal axis, corpus-level minutiae
 #       semantics, and self-referential rubric inversion (see finding-002).
@@ -15,7 +15,7 @@
 schema_version: 0.5
 
 target:
-  repo: drbothen/vsdd-factory
+  repo: BOHICA-LABS/vsdd-factory
   default_branch: develop
   local_checkout: ~/work/vsdd-factory   # for the already-fixed / citation-exists checks
 

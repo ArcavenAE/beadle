@@ -6,7 +6,7 @@ argument-hint: [target] (default vsdd-factory)
 # /dashboard-refresh — skills-based dashboard refresh with regression gate
 
 Target: `$ARGUMENTS` (default `vsdd-factory`, dashboard issue `#312` on
-`drbothen/vsdd-factory` — resolve other targets via `targets/<target>.intent.yaml`).
+`BOHICA-LABS/vsdd-factory` — resolve other targets via `targets/<target>.intent.yaml`).
 
 Distilled from the sessions of 2026-07-02 (run 10 — binary-render regression,
 skill restoration) and 2026-07-05 (run 11 — curated restoration + fail/restore
@@ -22,7 +22,7 @@ any point in this workflow.**
 1. `mkdir -p tmp/dashboard-snapshots`
 2. Fetch the live dashboard body and metadata:
    - body → `tmp/dashboard-snapshots/<target>-312-before-<UTC yyyy-mm-ddTHH-MM-SS>.md`
-   - `gh issue view 312 -R drbothen/vsdd-factory --json body,updatedAt,title,number` →
+   - `gh issue view 312 -R BOHICA-LABS/vsdd-factory --json body,updatedAt,title,number` →
      same path + `.json`
 3. Sanity-check the snapshot: non-empty, contains the `<!-- beadle-state:v1` sentinel,
    and its `"run":N` / `"watermark":W` parse. Record N and W.
@@ -125,12 +125,12 @@ ALL checks must pass:
 
 **On any failure:** do NOT post. Report the diff. The live body is untouched;
 if a bad body was ever posted, restore it with the before-snapshot via
-`gh issue edit 312 -R drbothen/vsdd-factory --body-file <before-snapshot>`.
+`gh issue edit 312 -R BOHICA-LABS/vsdd-factory --body-file <before-snapshot>`.
 
 ## 4. Post + record (only after the gate passes)
 
 1. Present a before/after delta summary (sections, counts, new P0/P1 items).
-2. Update the dashboard: `gh issue edit 312 -R drbothen/vsdd-factory --body-file <candidate>`
+2. Update the dashboard: `gh issue edit 312 -R BOHICA-LABS/vsdd-factory --body-file <candidate>`
    (allow-listed autonomous action per charter B2 — a bounded, reversible
    dashboard rewrite; free-text public comments stay propose-not-act).
 3. Save the pushed body as `tmp/dashboard-snapshots/<target>-312-after-<UTC ts>.md`.
