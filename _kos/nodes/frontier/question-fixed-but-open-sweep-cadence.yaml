@@ -1,0 +1,61 @@
+id: question-fixed-but-open-sweep-cadence
+type: question
+confidence: frontier
+title: "Fixed-but-open sweep — when does the refresh re-verify open issues against the shipped tree, and how do the verdicts feed the instrument?"
+tags: [beadle, dashboard-refresh, verification, maintainer-signal, a4, propose-not-act]
+content: |
+  Run 18 (finding-023) added a step the /dashboard-refresh command does not
+  yet name: enumerate open issues whose fix might have landed, verify each
+  at a pinned upstream SHA on a read-only worktree, and table the verdicts.
+  28 candidates -> 7 FIXED, 9 PARTIAL, 12 NOT-FIXED; five of the FIXED were
+  shipped in rc.24 seven weeks earlier and had been counting as untouched
+  A4 windows because the fixing PRs used no closing keyword. The sweep also
+  found four of beadle's own claims wrong at the source (corrections owed
+  under the upstream-claim-gate).
+
+  Sub-questions:
+
+  A. Trigger — every run, or only when the gap since the last run exceeds
+     one attention window? Cost at run 18: five verifier agents, ~26 min
+     wall, for 28 candidates; the candidate set scales with maintainer
+     PR volume in the gap, not with corpus size.
+
+  B. Candidate enumeration — issue numbers cited in merged PR bodies and
+     release notes since the watermark, plus every A4/quick-win lane
+     member regardless of citation? Run 18 used both; the second source
+     is what caught #358 (cited in prose, no keyword).
+
+  C. Verdict taxonomy — FIXED / PARTIAL / NOT-FIXED with released_in
+     (merged vs tagged) and a named residual for PARTIAL. Nine of 28 were
+     PARTIAL; collapsing them either way would have been wrong. Is a
+     fourth state (fixed-at-HEAD, unreleased: #641) worth its own token?
+
+  D. Instrument coupling — should A4 untouched-window counts be
+     sweep-adjusted (a verified-fixed member stops counting from its
+     release date), or reported raw with the sweep verdict beside it?
+     Raw + beside preserves the compass derivation from data; adjusted
+     hides a real closure-hygiene signal about the maintainer channel.
+
+  E. Flow of the proposal — Tier-1 accept-deferral controls plus comment
+     drafts in the fixture (run-18 shape) vs a single batched "verified
+     fixed, please close" comment. Propose-not-act (B2) bounds both;
+     which one the maintainers act on is the only measure that matters.
+
+  F. Where it lives — command prose (a standing step in
+     /dashboard-refresh §2) vs binary (a `beadle sweep` that emits the
+     candidate list from the store + gh, leaving verification to agents).
+     Same H-split as question-grader-fanout-efficiency.
+edges:
+  - target: elem-maintainer-compass
+    type: derives
+  - target: elem-propose-not-act
+    type: derives
+  - target: question-grader-fanout-efficiency
+    type: supports
+  - target: question-maintainer-progress-gamification
+    type: supports
+edges_note: "finding-023 (beadle) is the source; aae-orc finding-158 records the gh --limit truncation hit during the same run"
+provenance:
+  created_by: agent
+  session: 2026-09-09-beadle-run18-refresh
+  created_at: "2026-09-12"

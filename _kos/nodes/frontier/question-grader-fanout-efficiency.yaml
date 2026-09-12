@@ -107,6 +107,24 @@ content: |
   straggler policy; (4) batch default ~10-12 sync while the wall budget
   holds; (5) cascade (D) stays open but its motivation is now token cost
   (~10-17k/issue), not wall clock; (6) F/G unchanged.
+  --- Run-18 data (2026-09-09; beadle finding-023) — second dataset for A
+      and a null observation for I ---
+
+  Dispatch: 3 graders (11+11+10 issues, sync-batch prompts) + 5 verifiers
+  (fixed-but-open candidates at a pinned SHA) + 1 sweep, 9 agents from
+  19:04:26Z. The harness Agent tool ran every dispatch in the BACKGROUND
+  despite the sync-only policy (aae-orc-0nud still open) — the policy is a
+  prose instruction the harness does not honor as a mode. Outcome: 9/9
+  returned ok, zero hedges, zero timeouts; grader wall 12.5–14.8 min for
+  10–11 issues (~75 s/issue including the pinned-worktree reads the
+  verifiers share), longest agent 26m19s (verify-D). No starvation, no
+  reaper deaths: a null observation against the run-14 failure, under a
+  newer harness. Sub-question A is now answered by discipline: every run
+  writes perf `note` records (dispatch ledger + phase summary) to the
+  store — run 17 retroactively, run 18 live. Phase costs run 18: enumerate
+  ~15 min, grading ~26 min wall, compose ~40 min across 5 script passes,
+  gate <1 min. The composer remains the dominant human-time cost (F).
+
 edges:
   - target: elem-state-out-of-band
     type: derives
@@ -120,4 +138,4 @@ edges_note: "finding-083 lives in the orc graph (cross-graph ref, not a local ed
 provenance:
   created_by: agent
   created_at: "2026-07-20"
-  updated_at: "2026-07-20"
+  updated_at: "2026-09-12"

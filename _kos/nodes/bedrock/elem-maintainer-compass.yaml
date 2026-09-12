@@ -23,6 +23,18 @@ content: |
   opinion. First derivation against vsdd-factory (run 10): 157 events,
   0 maintainer / 157 measured / 0 other — reproducing the run-9 hand-authored
   gap of 161:0 within observation-frame drift.
+  Run-18 qualification (finding-023, 2026-09-09): the compass reads closure
+  as an engagement event, and closure on an episodic side project depends
+  on the maintainer typing the closing keyword. Five verified-fixed issues
+  (#358 #637 #690 #580 #757, all shipped in rc.24; #358 a P0a in the A4
+  lane) stayed open for seven weeks because the fixing PRs named them in
+  prose only, so the instrument counted them as untouched windows. The
+  correction is a fixed-but-open sweep at a pinned upstream SHA, recorded
+  as PARTIAL/FIXED/NOT-FIXED verdicts with released_in, and surfaced as
+  close PROPOSALS (controls + comment drafts), never closes. Compass
+  reading stays derived from data; the sweep adds a second data source
+  (merged PR bodies + release ancestry) beside comment_event rows.
+
 edges:
   - target: elem-intent-alignment-whitespace
     type: supports
@@ -31,4 +43,4 @@ edges:
 provenance:
   created_by: agent
   created_at: "2026-06-27"
-  updated_at: "2026-07-01"
+  updated_at: "2026-09-12"
