@@ -20,5 +20,38 @@ pub fn generate(schema_json: &str) -> String {
         .add_root_schema(schema)
         .expect("typify accepts the schema");
     let file = syn::parse2::<syn::File>(space.to_stream()).expect("generated tokens parse");
-    format!("{HEADER}{}", prettyplease::unparse(&file))
+    let body = open_principal(prettyplease::unparse(&file));
+    format!("{HEADER}{body}")
+}
+
+/// sender.principal is the one field the schema leaves open
+/// (additionalProperties: true) and reserves for a principal model that does
+/// not exist yet, so typify's closed struct (a lone `kind`) would drop any
+/// claim a future writer adds. Rewrite the field to serde_json::Value so unknown
+/// claims round-trip, and drop the now-unused struct. content.data is already a
+/// Value; authority.seat stays typed because the schema closes it and its epoch
+/// is a fencing token receiver logic reads (R-55, R-69). The two edits are
+/// asserted, so a typify upgrade that changes the output fails here loudly
+/// rather than silently shipping the lossy struct again.
+fn open_principal(src: String) -> String {
+    let field = "    pub principal: ::std::option::Option<DirectorEnvelopeSenderPrincipal>,";
+    let field_new = "    pub principal: ::std::option::Option<::serde_json::Value>,";
+    assert!(
+        src.contains(field),
+        "generator: principal field shape changed; update open_principal"
+    );
+    let src = src.replace(field, field_new);
+
+    let struct_block = "///`DirectorEnvelopeSenderPrincipal`
+#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+pub struct DirectorEnvelopeSenderPrincipal {
+    ///Open. Seeded values: none, launcher.
+    pub kind: ::std::string::String,
+}
+";
+    assert!(
+        src.contains(struct_block),
+        "generator: principal struct shape changed; update open_principal"
+    );
+    src.replace(struct_block, "")
 }

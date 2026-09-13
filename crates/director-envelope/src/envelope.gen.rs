@@ -593,7 +593,7 @@ pub struct DirectorEnvelopeSender {
     ///The roster address, stable across restarts. Closed character class (R-76): no dot, star, angle bracket, or space, because it is interpolated into a NATS subject (director#3).
     pub agent_id: DirectorEnvelopeSenderAgentId,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
-    pub principal: ::std::option::Option<DirectorEnvelopeSenderPrincipal>,
+    pub principal: ::std::option::Option<::serde_json::Value>,
     ///Current role. Informational only, never a routing or authorization input (R-71, R-82).
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub role: ::std::option::Option<::std::string::String>,
@@ -657,12 +657,6 @@ impl<'de> ::serde::Deserialize<'de> for DirectorEnvelopeSenderAgentId {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
     }
-}
-///`DirectorEnvelopeSenderPrincipal`
-#[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-pub struct DirectorEnvelopeSenderPrincipal {
-    ///Open. Seeded values: none, launcher.
-    pub kind: ::std::string::String,
 }
 ///`DirectorEnvelopeSenderWorkspace`
 #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

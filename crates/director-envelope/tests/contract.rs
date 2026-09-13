@@ -160,6 +160,42 @@ fn round_trip() {
 /// Every valid fixture also decodes into the generated types, and every one of
 /// them survives the round trip; the types and the validator agree on the
 /// accepted set.
+/// sender.principal is the reserved open object. A future writer may add claims
+/// this crate has no field for; they must survive a typed decode and reserialize
+/// rather than being silently dropped. This is why principal is serde_json::Value,
+/// not a generated struct (mirrors the Go half; marvel-builder 2026-09-13).
+#[test]
+fn open_principal_claims_round_trip() {
+    let raw = serde_json::json!({
+        "schema_version": 1,
+        "message_id": "01JZ0000000000000000000009",
+        "sender": {
+            "agent_id": "planner",
+            "workspace": "aae-orc",
+            "principal": { "kind": "launcher", "sub": "did:example:42", "scopes": ["bus.send"] }
+        },
+        "recipient": { "address": "agent://ops/builder" },
+        "performative": "INFORM",
+        "authority": { "strength": "direct" },
+        "content": { "type": "text", "data": "hi" },
+        "sent_at": "2026-09-13T02:00:00Z"
+    });
+    let bytes = serde_json::to_vec(&raw).unwrap();
+    validate(&bytes).expect("valid envelope with extended principal");
+    let e: Envelope = serde_json::from_slice(&bytes).expect("decode");
+    let principal = e.sender.principal.as_ref().expect("principal present");
+    assert_eq!(
+        principal["sub"], "did:example:42",
+        "unknown claim dropped on decode"
+    );
+    assert_eq!(principal["scopes"][0], "bus.send");
+    let out = serde_json::to_value(&e).unwrap();
+    assert_eq!(
+        out["sender"]["principal"]["sub"], "did:example:42",
+        "unknown claim dropped on reserialize"
+    );
+}
+
 #[test]
 fn valid_fixtures_decode_and_round_trip() {
     for (name, data) in fixtures("valid-") {
