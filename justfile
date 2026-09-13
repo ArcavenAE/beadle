@@ -21,3 +21,13 @@ docs:
 
 # Everything CI runs
 ci: lint check
+
+# Regenerate crates/director-envelope/src/envelope.gen.rs from the vendored
+# director envelope schema (the pinned copy of marvel's canonical; see
+# crates/director-envelope/contracts/PINNED.md). A test fails when this is skipped.
+contracts-gen:
+    cargo run -q -p director-envelope --example contracts-gen
+
+# Contract checks: the pin guard, the regeneration guard, and marvel's fixture replay
+contracts-check:
+    cargo test -p director-envelope
