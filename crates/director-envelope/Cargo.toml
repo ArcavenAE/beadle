@@ -1,0 +1,26 @@
+[package]
+name = "director-envelope"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Director envelope types and validator, generated from the canonical JSON Schema (aae-orc-b69n)"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+# The generated newtypes check their patterns with regress (typify's choice);
+# chrono and uuid carry the date-time and uuid formats the schema annotates.
+chrono = { version = "0.4", default-features = false, features = ["serde", "std"] }
+uuid = { version = "1", features = ["serde"] }
+regress = "0.10"
+jsonschema = { version = "0.56", default-features = false }
+
+[dev-dependencies]
+# The generator and its drift guard only; nothing here ships in the binary.
+typify = { version = "0.8", default-features = false }
+schemars = "0.8"
+prettyplease = "0.2"
+syn = { version = "2", features = ["full"] }
+sha2 = { workspace = true }

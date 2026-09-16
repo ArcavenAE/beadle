@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/beadle-store", "crates/beadle"]
+members = ["crates/beadle-store", "crates/beadle", "crates/director-envelope"]
 
 [workspace.package]
 version = "0.1.0"

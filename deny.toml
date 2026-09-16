@@ -21,6 +21,9 @@ allow = [
     "Zlib",
     "CC0-1.0",
     "MPL-2.0",
+    # MIT-0 (MIT No Attribution): borrow-or-share, reached through the
+    # jsonschema validator in crates/director-envelope.
+    "MIT-0",
 ]
 
 [bans]
