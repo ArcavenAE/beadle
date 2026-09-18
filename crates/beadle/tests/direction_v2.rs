@@ -113,7 +113,7 @@ fn maintainer_comment(number: u32, day: &str, run: u32) -> Value {
 fn note_row(run: u32, topic: &str, text: &str) -> Value {
     json!({
         "kind": "note",
-        "ts": format!("2026-09-18T00:00:00Z"),
+        "ts": "2026-09-18T00:00:00Z".to_string(),
         "target": "t",
         "run": run,
         "topic": topic,
