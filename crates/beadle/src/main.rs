@@ -6,6 +6,8 @@
 //!   beadle render <target>   → materialize dashboard body to stdout
 //!   beadle push   <target>   → write rendered body to the dashboard issue
 //!                              (preserves editor slots, finalizes body_digest)
+//!   beadle verify <target>   → run the /dashboard-refresh §3 regression gate
+//!                              over a candidate body before it is posted
 
 use std::path::PathBuf;
 
@@ -23,6 +25,7 @@ mod note;
 mod push;
 mod render;
 mod sync;
+mod verify;
 mod vocab;
 
 #[derive(Parser)]
@@ -66,6 +69,25 @@ enum Cmd {
     /// Ingest ClassificationRecord payload(s) produced by the classifier skill.
     #[command(subcommand)]
     Classify(ClassifyCmd),
+    /// Run the `/dashboard-refresh` §3 regression gate over a candidate body.
+    ///
+    /// Exits non-zero when the candidate loses something the before-snapshot
+    /// carried. Render-integrity checks are regression-relative: a violation
+    /// inherited from the before-snapshot warns, a newly introduced one fails.
+    Verify {
+        /// Target name; selects `targets/<name>.verify.json` for declared renames.
+        target: String,
+        /// The body being replaced (live body, or the prior run's fixture).
+        #[arg(long)]
+        before: PathBuf,
+        /// The body proposed for posting.
+        #[arg(long)]
+        candidate: PathBuf,
+        /// Declared-rename allowlist (JSON). Defaults to
+        /// `targets/<target>.verify.json` when it exists.
+        #[arg(long)]
+        renames: Option<PathBuf>,
+    },
     /// Append a note record to the store (perf ledger entries, audit trails,
     /// operator remarks). Diagnostic only — nothing gates on notes.
     Note {
@@ -128,6 +150,12 @@ fn main() -> Result<()> {
             fixtures,
             dry_run,
         }) => migrate::migrate_impact(&root, &target, &fixtures, dry_run),
+        Cmd::Verify {
+            target,
+            before,
+            candidate,
+            renames,
+        } => verify::run(&root, &target, &before, &candidate, renames.as_deref()),
         Cmd::Note {
             target,
             topic,

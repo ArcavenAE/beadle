@@ -50,7 +50,13 @@ maintainer_capacity:
   context: one of hundreds of projects for these maintainers; primary focus elsewhere
   attention_window: action-day   # a calendar day with >=1 maintainer action on this target
   # Derived from the store's maintainer_actions dates; refresh each run.
-  observed_windows: ["2026-07-08", "2026-07-15", "2026-07-19", "2026-07-21", "2026-07-22", "2026-07-23"]
+  observed_windows: ["2026-07-08", "2026-07-15", "2026-07-19", "2026-07-21",
+    "2026-07-22", "2026-07-23", "2026-07-24", "2026-07-25", "2026-08-07",
+    "2026-08-10", "2026-08-13", "2026-08-15", "2026-08-16", "2026-08-17",
+    "2026-08-25", "2026-08-26", "2026-08-27", "2026-08-28", "2026-08-29",
+    "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-03", "2026-09-04",
+    "2026-09-05", "2026-09-06", "2026-09-07", "2026-09-08", "2026-09-09",
+    "2026-09-11", "2026-09-12"]
   success_bands:
     pr_acceptance:               # vs human ~68-73% / bot ~37-45% literature bands
       green: ">= 0.60"

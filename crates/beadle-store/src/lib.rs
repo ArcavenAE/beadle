@@ -84,7 +84,38 @@ pub struct IssueRecord {
     pub body_sha256: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// The 👤 attention lane (`attn`): the issue needs a human decision that no
+/// amount of analysis can supply. `subtype` names the kind of decision
+/// (`governance`, `direction`, …) with NO `attn.` prefix; `order` is the
+/// reading order within the lane (`reply-needed`, `standing`, …); `why` is
+/// the one-paragraph case for the human's attention.
+///
+/// Historical fixtures carry two older encodings of the same facet — a bare
+/// string subtype with sibling `attn_reading_order` / `attn_why` keys
+/// (run-12), and `{type, reason, reading_order}` (run-14). Neither is
+/// accepted on ingest; `scripts/backfill-classification-fields.py` normalizes
+/// them into this shape.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Attn {
+    pub subtype: String,
+    #[serde(default)]
+    pub order: Option<String>,
+    #[serde(default)]
+    pub why: Option<String>,
+}
+
+/// A "this may already be fixed upstream" verdict: what the fix is believed to
+/// be (`by`), how sure we are (`confidence`: low/medium/high), and what a
+/// human or a later run must check to settle it (`verify`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PossiblyFixed {
+    pub by: String,
+    pub confidence: String,
+    #[serde(default)]
+    pub verify: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClassificationRecord {
     pub ts: String,
     pub target: String,
@@ -118,9 +149,30 @@ pub struct ClassificationRecord {
     pub cited_evidence: Option<String>,
     #[serde(default)]
     pub quick_win_disqualification: Option<String>,
+    /// Short human title for the issue — finding-005 row legibility ("title
+    /// leads, verdict trails"). Absent on rows classified before the field
+    /// existed; renderers fall back to `#<number>`.
+    #[serde(default)]
+    pub short_title: Option<String>,
+    /// Where the issue sits in the maintainer's triage queue:
+    /// `needs-triage` | `accepted` | `needs-information`.
+    #[serde(default)]
+    pub triage_state: Option<String>,
+    /// The 👤 attention lane. `None` means the issue is not in the lane.
+    #[serde(default)]
+    pub attn: Option<Attn>,
+    /// The fixed-but-open sweep verdict. `None` means not swept, or swept and
+    /// found still open.
+    #[serde(default)]
+    pub possibly_fixed: Option<PossiblyFixed>,
 }
 
 impl ClassificationRecord {
+    /// True when the record is in the 👤 attention lane.
+    pub fn is_in_attn_lane(&self) -> bool {
+        self.attn.is_some()
+    }
+
     /// True when the record is in the silent-data-loss safety class — either
     /// via the dedicated `silent_data_loss` field or via the legacy
     /// pre-finding-009 encoding inside `operational_impact` (stores that have
@@ -364,6 +416,109 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(store.watermark().unwrap(), 100);
+    }
+
+    fn full_classification() -> ClassificationRecord {
+        ClassificationRecord {
+            ts: "2026-09-09T19:13:30Z".into(),
+            target: "t".into(),
+            number: 762,
+            run: 18,
+            report_type: "enhancement".into(),
+            defect_nature: "design-architectural".into(),
+            reproducibility: "mandelbug".into(),
+            leverage: "systemic".into(),
+            alignment: "advances".into(),
+            provenance: "maintainer-authored".into(),
+            integrity: false,
+            integrity_anchor: None,
+            operational_impact: Some("degraded".into()),
+            silent_data_loss: false,
+            priority: "P2".into(),
+            cluster: vec!["convergence-tuning".into()],
+            quick_win_eligible: false,
+            rationale: "r".into(),
+            cited_evidence: Some("e".into()),
+            quick_win_disqualification: Some("d".into()),
+            short_title: Some("Records-tier treadmill".into()),
+            triage_state: Some("accepted".into()),
+            attn: Some(Attn {
+                subtype: "governance".into(),
+                order: Some("reply-needed".into()),
+                why: Some("a consent loop only a human can close".into()),
+            }),
+            possibly_fixed: Some(PossiblyFixed {
+                by: "PR #776".into(),
+                confidence: "low".into(),
+                verify: Some("treat as open".into()),
+            }),
+        }
+    }
+
+    /// beadle#66: the four late-added fields must survive the store, and the
+    /// serialized row must carry all 25 keys (21 + the four).
+    #[test]
+    fn classification_roundtrips_late_added_fields() {
+        let td = TempDir::new().unwrap();
+        let store = Store::open(td.path(), "t").unwrap();
+        let rec = full_classification();
+        store
+            .append(&[Record::Classification(Box::new(rec.clone()))])
+            .unwrap();
+
+        let line = std::fs::read_to_string(store.state_path()).unwrap();
+        let v: Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(v.as_object().unwrap().len(), 25, "row must carry 25 keys");
+
+        match &store.read_all().unwrap()[0] {
+            Record::Classification(c) => {
+                assert_eq!(c.short_title.as_deref(), Some("Records-tier treadmill"));
+                assert_eq!(c.triage_state.as_deref(), Some("accepted"));
+                assert_eq!(c.attn, rec.attn);
+                assert_eq!(c.possibly_fixed, rec.possibly_fixed);
+                assert!(c.is_in_attn_lane());
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    /// Rows written before the fields existed must still load — ~300 of them
+    /// are in the live vsdd-factory store.
+    #[test]
+    fn classification_without_late_added_fields_still_loads() {
+        let line = r#"{"kind":"classification","ts":"t","target":"x","number":1,"run":9,"report_type":"bug","defect_nature":"logic","reproducibility":"bohrbug","leverage":"a","alignment":"b","provenance":"c","integrity":false,"integrity_anchor":null,"operational_impact":null,"silent_data_loss":false,"priority":"P2","cluster":[],"quick_win_eligible":false,"rationale":"r","cited_evidence":null,"quick_win_disqualification":null}"#;
+        match serde_json::from_str::<Record>(line).unwrap() {
+            Record::Classification(c) => {
+                assert!(c.short_title.is_none());
+                assert!(c.attn.is_none());
+                assert!(!c.is_in_attn_lane());
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    /// Why `#[serde(deny_unknown_fields)]` is NOT the schema-drift alarm here,
+    /// kept as an executable note (beadle#66 / aae-orc-l5b5i).
+    ///
+    /// `Record` is internally tagged with an untagged `Other` catch-all. With
+    /// the attribute on `ClassificationRecord`, a drifted row does not error —
+    /// the variant declines it and the row lands in `Record::Other`, where it
+    /// round-trips happily while vanishing from every consumer that matches on
+    /// `Record::Classification`. That converts a loud failure into exactly the
+    /// silent system-of-record disagreement beadle#66 is about. The gate lives
+    /// in `classify::ingest` instead, which owns the payload contract; the
+    /// store stays permissive so historical rows keep loading.
+    #[test]
+    fn unknown_key_on_a_classification_row_is_not_caught_by_serde() {
+        let line = r#"{"kind":"classification","ts":"t","target":"x","number":1,"run":9,"report_type":"bug","defect_nature":"logic","reproducibility":"bohrbug","leverage":"a","alignment":"b","provenance":"c","integrity":false,"priority":"P2","rationale":"r","alignment_rationale":"DRIFT"}"#;
+        match serde_json::from_str::<Record>(line).unwrap() {
+            // Today: parsed as a Classification, the extra key dropped.
+            Record::Classification(c) => assert_eq!(c.number, 1),
+            // With deny_unknown_fields it would land here instead — accepted,
+            // invisible, and unclassified. Worse, not better.
+            Record::Other(v) => panic!("fell through to Other: {v}"),
+            other => panic!("unexpected {other:?}"),
+        }
     }
 
     #[test]

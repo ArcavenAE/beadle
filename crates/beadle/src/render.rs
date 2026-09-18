@@ -24,9 +24,33 @@ use crate::{
     intent,
 };
 
-/// Body-budget budget line. Exceeding it emits a warning and (future work)
-/// triggers rollup of oldest editorial detail to a linked "Triage backlog" issue.
-const BODY_BUDGET_BYTES: usize = 55 * 1024;
+/// Largest dashboard body GitHub has been *observed* to accept, in bytes.
+///
+/// Measured, not documented. `BOHICA-LABS/vsdd-factory#312` carries an
+/// 87,232-byte (85,420-character) body that `gh issue edit` wrote and GitHub
+/// stores and serves intact — run 19 verified the stored body byte-for-byte
+/// against what was sent. That live body contradicts both figures usually
+/// quoted as "the limit": the constant this replaces (55 KiB = 56,320 B) by
+/// 1.55x, and the 65,536-character figure GitHub's own docs cite by 1.30x.
+///
+/// So this number is evidence of what works, NOT a limit. Crossing it means
+/// "past anything we have watched succeed," never "too big."
+const BODY_OBSERVED_ACCEPTED_BYTES: usize = 87_232;
+
+/// GitHub's true maximum issue-body size — once somebody measures it.
+///
+/// `None` means unmeasured, and **the rollup path stays blocked while it is
+/// `None`** (ArcavenAE/beadle#70, `aae-orc-veq8a`). Carrying editorial content
+/// forward across regens is the one job this board cannot fail at, so eviction
+/// may not be driven by a guess: it needs a measured number here, obtained by
+/// bisecting body size against a real repo until the API rejects the write.
+/// Until then `body_size_report` is advisory telemetry and nothing acts on it.
+const BODY_HARD_LIMIT_BYTES: Option<usize> = None;
+
+/// The observed-accepted floor may only ever rise, and only on new evidence:
+/// lowering it would re-create exactly the defect above — a body GitHub is
+/// known to accept, reported as oversized.
+const _: () = assert!(BODY_OBSERVED_ACCEPTED_BYTES >= 87_232);
 
 /// Cluster decay thresholds — runs since last add.
 const DECAY_WARMING: u32 = 3;
@@ -68,6 +92,16 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
         );
     }
 
+    // A row that claims a known `kind` but fails its struct falls through to
+    // `Record::Other` and vanishes from every tally below — invisibly. Run 19's
+    // store carries one: a hand-written `kind:"issue"` row closing #365, missing
+    // four required fields, so the renderer still reads #365 from its run-9
+    // `open` observation. Surface it; this renderer cannot fix the row, but it
+    // must not consume a store with silent holes and report totals as if whole.
+    for line in unparsed_row_report(&records) {
+        eprintln!("beadle render: WARN {line}");
+    }
+
     let latest_issues = latest_issue_observations(&records);
     let latest_clusters = latest_cluster_observations(&records);
     let comment_stats = comment_stats(&records);
@@ -88,21 +122,80 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
     let derived_digest = sha256_hex(&derived);
     let body = compose(target, &intent.repo, &latest_run, &derived, &derived_digest);
 
-    let bytes = body.len();
-    if bytes > BODY_BUDGET_BYTES {
-        eprintln!(
-            "beadle render: WARN body {} bytes exceeds budget {} — item C rollup pending classifications in store",
-            bytes, BODY_BUDGET_BYTES
-        );
-    } else {
-        eprintln!(
-            "beadle render: body {} bytes ({}% of budget)",
-            bytes,
-            (bytes * 100) / BODY_BUDGET_BYTES
-        );
-    }
+    eprintln!("{}", body_size_report(body.len()));
 
     Ok(body)
+}
+
+/// Rows that reached [`Record::Other`] while claiming a kind this renderer
+/// knows — i.e. malformed records silently excluded from every derived count.
+/// One line per affected kind, naming issue numbers where the row carries one.
+fn unparsed_row_report(records: &[Record]) -> Vec<String> {
+    const KNOWN: [&str; 6] = [
+        "run",
+        "issue",
+        "classification",
+        "comment_event",
+        "cluster",
+        "note",
+    ];
+    let mut by_kind: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for rec in records {
+        let Record::Other(v) = rec else { continue };
+        let Some(kind) = v.get("kind").and_then(|k| k.as_str()) else {
+            continue;
+        };
+        if !KNOWN.contains(&kind) {
+            continue;
+        }
+        let who = v
+            .get("number")
+            .and_then(|n| n.as_u64())
+            .map(|n| format!("#{n}"))
+            .unwrap_or_else(|| "?".to_string());
+        by_kind.entry(kind.to_string()).or_default().push(who);
+    }
+    by_kind
+        .into_iter()
+        .map(|(kind, who)| {
+            format!(
+                "{} `{}` row(s) in the store failed to parse and are excluded from all counts \
+                 ({}) — malformed records, not missing ones",
+                who.len(),
+                kind,
+                who.join(", ")
+            )
+        })
+        .collect()
+}
+
+/// Advisory size telemetry for the composed body.
+///
+/// Reports, never gates: no caller trims, rolls up or evicts on the strength of
+/// this line, because no measured limit exists to justify it
+/// ([`BODY_HARD_LIMIT_BYTES`]). The `ERROR` arm is unreachable until one does.
+fn body_size_report(bytes: usize) -> String {
+    if let Some(limit) = BODY_HARD_LIMIT_BYTES {
+        if bytes > limit {
+            return format!(
+                "beadle render: ERROR body {bytes} bytes exceeds the measured GitHub limit \
+                 of {limit} — the push will be rejected"
+            );
+        }
+    }
+    if bytes > BODY_OBSERVED_ACCEPTED_BYTES {
+        format!(
+            "beadle render: NOTE body {bytes} bytes is past the largest body GitHub is \
+             observed to have accepted ({BODY_OBSERVED_ACCEPTED_BYTES}) — advisory only; \
+             no limit is known to be exceeded and nothing is trimmed"
+        )
+    } else {
+        format!(
+            "beadle render: body {bytes} bytes ({}% of the largest observed-accepted body, \
+             {BODY_OBSERVED_ACCEPTED_BYTES})",
+            (bytes * 100) / BODY_OBSERVED_ACCEPTED_BYTES
+        )
+    }
 }
 
 fn synthetic_run(target: &str) -> RunRecord {
@@ -159,6 +252,40 @@ fn latest_cluster_observations(records: &[Record]) -> Vec<ClusterRecord> {
     let mut out: Vec<ClusterRecord> = by_name.into_values().collect();
     out.sort_by_key(|c| c.name.clone());
     out
+}
+
+/// Issue-state tallies over the latest observation of each issue number.
+///
+/// `observed` is what the Baseline used to print as "Open issues": every number
+/// beadle has ever seen, open or closed. Counting that as open overstated the
+/// board by 15 on run 19 (529 printed against GitHub's 514). The open count is
+/// now the tally of records whose latest observation carries `state=open`.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct IssueStates {
+    /// Distinct issue numbers with at least one observation.
+    observed: usize,
+    open: usize,
+    closed: usize,
+    /// Latest observation carries a state this renderer does not recognise.
+    /// Never folded into `open` — an unreadable state is not evidence of one.
+    unknown: usize,
+}
+
+fn issue_states(issues: &[IssueRecord]) -> IssueStates {
+    let mut t = IssueStates {
+        observed: issues.len(),
+        ..Default::default()
+    };
+    for i in issues {
+        if i.state.eq_ignore_ascii_case("open") {
+            t.open += 1;
+        } else if i.state.eq_ignore_ascii_case("closed") {
+            t.closed += 1;
+        } else {
+            t.unknown += 1;
+        }
+    }
+    t
 }
 
 #[derive(Debug, Default, Clone)]
@@ -246,9 +373,33 @@ fn classification_summary(latest: &HashMap<u32, ClassificationRecord>) -> Classi
     s
 }
 
+/// Whether a cluster record is current enough for its decay to mean anything.
+///
+/// `last_added_run` dates the last member add *as known when the record was
+/// written*. Read from a record that is itself N runs old, the gap to the
+/// current run measures how long ago cluster records stopped being written —
+/// not how long the cluster has been quiet. The two coincide only while
+/// something keeps writing them.
+fn cluster_record_is_current(cluster: &ClusterRecord, current_run: u32) -> bool {
+    cluster.run >= current_run
+}
+
 /// Compute display decay for a cluster given the run it was last updated in
 /// and the current run number.
+///
+/// A record older than the current run gets no verdict at all. The store's 13
+/// cluster records are all from run 9 while the skill has maintained cluster
+/// state in the board's curated zones since, so every row used to read
+/// `archived (10 runs quiet)` about clusters that were being actively worked —
+/// a confident wrong verdict, which is worse than none (ArcavenAE/beadle#68).
 fn decay_display(cluster: &ClusterRecord, current_run: u32) -> String {
+    if !cluster_record_is_current(cluster, current_run) {
+        return format!(
+            "unmaintained — no cluster record since run {} ({} run(s) stale; decay not computable)",
+            cluster.run,
+            current_run.saturating_sub(cluster.run),
+        );
+    }
     let gap = current_run.saturating_sub(cluster.last_added_run);
     if gap >= DECAY_ARCHIVED {
         format!("archived ({} runs quiet)", gap)
@@ -373,10 +524,26 @@ fn render_derived(
     out.push_str("## Baseline (derived from store)\n\n");
     out.push_str("| Metric | Value | Provenance |\n");
     out.push_str("|---|---|---|\n");
+    let states = issue_states(issues);
     out.push_str(&format!(
-        "| Open issues | {} | count(issue records, latest observation) |\n",
-        issues.len()
+        "| Open issues | {} | issue records whose latest observation is `state=open` |\n",
+        states.open
     ));
+    out.push_str(&format!(
+        "| Closed (observed) | {} | latest observation is `state=closed` |\n",
+        states.closed
+    ));
+    out.push_str(&format!(
+        "| Observed issues | {} | distinct numbers ever observed (open + closed) |\n",
+        states.observed
+    ));
+    if states.unknown > 0 {
+        out.push_str(&format!(
+            "| Unreadable state | {} | latest observation is neither `open` nor `closed` — \
+             counted as neither |\n",
+            states.unknown
+        ));
+    }
     out.push_str(&format!(
         "| Comment events | {} | count(comment_event) — {} issues touched |\n",
         comments.total, comments.issues_with_comments
@@ -394,14 +561,19 @@ fn render_derived(
         comments.other
     ));
     out.push_str(&format!(
-        "| filed_vs_acted_gap | {} : {} | measured open : maintainer actions |\n",
-        issues.len(),
-        comments.maintainer
+        "| filed_vs_acted_gap | {} : {} | open issues : maintainer actions |\n",
+        states.open, comments.maintainer
     ));
     out.push_str(&format!(
         "| Watermark | #{} | max(issue.number) |\n\n",
         run.watermark_after
     ));
+    out.push_str(
+        "_State is each issue's **last observation**, not a live read. `beadle enum` fetches \
+         only `--state open` and only above the watermark, so an issue closed after it was last \
+         observed still reads open here until something re-observes it \
+         (ArcavenAE/beadle#67)._\n\n",
+    );
 
     out.push_str("### Top commenters (per-actor totals, all runs)\n\n");
     let mut actor_pairs: Vec<(&String, &u32)> = comments.per_actor.iter().collect();
@@ -419,8 +591,22 @@ fn render_derived(
     if clusters.is_empty() {
         out.push_str("_no clusters recorded_\n\n");
     } else {
-        out.push_str("| Cluster | Members | Decay |\n");
-        out.push_str("|---|---|---|\n");
+        let newest_record_run = clusters.iter().map(|c| c.run).max().unwrap_or(0);
+        if clusters
+            .iter()
+            .any(|c| !cluster_record_is_current(c, run.run))
+        {
+            out.push_str(&format!(
+                "_Stale cluster records: the newest was written in run {}, this is run {}. \
+                 Membership below is as of the run in *As of* and may be short of what the \
+                 board tracks now; decay verdicts are suppressed for those rows, because a \
+                 run-{} record cannot show whether a cluster has been quiet since \
+                 (ArcavenAE/beadle#68)._\n\n",
+                newest_record_run, run.run, newest_record_run
+            ));
+        }
+        out.push_str("| Cluster | Members | As of | Decay |\n");
+        out.push_str("|---|---|---|---|\n");
         for c in clusters {
             let members = if c.members.len() > 8 {
                 let head: Vec<String> = c
@@ -438,9 +624,10 @@ fn render_derived(
                     .join(", ")
             };
             out.push_str(&format!(
-                "| `{}` | {} | {} |\n",
+                "| `{}` | {} | run {} | {} |\n",
                 c.name,
                 members,
+                c.run,
                 decay_display(c, run.run)
             ));
         }
@@ -453,13 +640,13 @@ fn render_derived(
     } else {
         out.push_str(&format!(
             "| Metric | Value | Notes |\n|---|---|---|\n\
-             | Classified issues | {} | of {} observed |\n\
+             | Classified issues | {} | of {} observed (open + closed) |\n\
              | Integrity (⚠) | {} | HARD: requires `integrity_anchor` |\n\
              | Silent-data-loss (▲) | {} | operational_impact axis |\n\
              | Quick-win eligible (★) | {} | HARD: never on integrity=true |\n\
              | P0 / P1 | {} / {} | priority axis |\n\n",
             class_summary.total,
-            issues.len(),
+            states.observed,
             class_summary.integrity,
             class_summary.silent_data_loss,
             class_summary.quick_win_eligible,
@@ -576,31 +763,137 @@ fn sha256_hex(s: &str) -> String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn decay_progresses() {
-        // Cluster last added in run 1. gap = current_run - last_added_run.
-        // Thresholds: warming≥3, rollup≥5, archived≥8.
-        let c = ClusterRecord {
+    /// A cluster record written in `run`, whose last member add was in
+    /// `last_added_run`.
+    fn mk_cluster(run: u32, last_added_run: u32) -> ClusterRecord {
+        ClusterRecord {
             ts: "2026-07-01T00:00:00Z".into(),
             target: "t".into(),
             name: "n".into(),
-            run: 1,
+            run,
             description: None,
             members: vec![1],
-            last_added_run: 1,
+            last_added_run,
             decay: "active".into(),
-        };
-        assert!(decay_display(&c, 1).starts_with("active"), "gap=0");
+        }
+    }
+
+    fn mk_run(run: u32, watermark_after: u32) -> RunRecord {
+        RunRecord {
+            ts: "2026-07-01T00:00:00Z".into(),
+            target: "t".into(),
+            run,
+            watermark_before: 0,
+            watermark_after,
+            counts: Default::default(),
+            digest: "d".into(),
+            warmup: None,
+            intent_version: None,
+            new_this_run: vec![],
+            notes: None,
+        }
+    }
+
+    fn derive(issues: &[IssueRecord], clusters: &[ClusterRecord], run: &RunRecord) -> String {
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        render_derived(
+            "t",
+            "acme/widget",
+            run,
+            issues,
+            clusters,
+            &CommentStats::default(),
+            &classification_summary(&empty),
+            &mk_direction_pending(),
+        )
+    }
+
+    #[test]
+    fn decay_progresses_while_records_are_current() {
+        // gap = current_run - last_added_run, read off a record written THIS
+        // run. Thresholds: warming≥3, rollup≥5, archived≥8.
         assert!(
-            decay_display(&c, 3).starts_with("active"),
+            decay_display(&mk_cluster(1, 1), 1).starts_with("active"),
+            "gap=0"
+        );
+        assert!(
+            decay_display(&mk_cluster(3, 1), 3).starts_with("active"),
             "gap=2 still active"
         );
-        assert!(decay_display(&c, 4).starts_with("warming"), "gap=3 warming");
         assert!(
-            decay_display(&c, 6).starts_with("rollup-candidate"),
+            decay_display(&mk_cluster(4, 1), 4).starts_with("warming"),
+            "gap=3 warming"
+        );
+        assert!(
+            decay_display(&mk_cluster(6, 1), 6).starts_with("rollup-candidate"),
             "gap=5"
         );
-        assert!(decay_display(&c, 9).starts_with("archived"), "gap=8");
+        assert!(
+            decay_display(&mk_cluster(9, 1), 9).starts_with("archived"),
+            "gap=8"
+        );
+    }
+
+    #[test]
+    fn stale_cluster_record_yields_no_decay_verdict() {
+        // The specimen: 13 records all written in run 9, read during run 19,
+        // every row claiming `archived (10 runs quiet)` about clusters the
+        // board was actively working. The gap measured the age of the records,
+        // not the silence of the clusters (ArcavenAE/beadle#68).
+        let stale = mk_cluster(9, 9);
+        let out = decay_display(&stale, 19);
+        assert!(
+            out.contains("unmaintained"),
+            "names the real condition: {out}"
+        );
+        assert!(out.contains("run 9"), "dates the last record: {out}");
+        for verdict in ["archived", "rollup-candidate", "warming", "active ("] {
+            assert!(
+                !out.contains(verdict),
+                "a fossil must not render `{verdict}`: {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn one_run_of_staleness_is_already_uncomputable() {
+        // No grace period: a record from the previous run cannot show whether a
+        // member was added during this one. Suppression is not a severity dial.
+        assert!(decay_display(&mk_cluster(18, 18), 19).contains("unmaintained"));
+        assert!(!decay_display(&mk_cluster(19, 19), 19).contains("unmaintained"));
+    }
+
+    #[test]
+    fn cluster_table_dates_rows_and_flags_stale_records() {
+        let body = derive(&[], &[mk_cluster(9, 9)], &mk_run(19, 10));
+        assert!(
+            body.contains("| Cluster | Members | As of | Decay |"),
+            "As-of column"
+        );
+        assert!(body.contains("| run 9 |"), "row carries the record's run");
+        assert!(
+            body.contains(
+                "_Stale cluster records: the newest was written in run 9, this is run 19."
+            ),
+            "section-level caveat names both runs"
+        );
+        assert!(
+            !body.contains("archived ("),
+            "no archived verdict may survive on fossil records"
+        );
+    }
+
+    #[test]
+    fn current_cluster_records_render_without_the_stale_caveat() {
+        let body = derive(&[], &[mk_cluster(19, 11)], &mk_run(19, 10));
+        assert!(
+            body.contains("archived (8 runs quiet)"),
+            "verdict still works"
+        );
+        assert!(
+            !body.contains("_Stale cluster records"),
+            "no caveat when records are current"
+        );
     }
 
     #[test]
@@ -652,6 +945,7 @@ mod tests {
             rationale: "r".into(),
             cited_evidence: None,
             quick_win_disqualification: None,
+            ..Default::default()
         }
     }
 
@@ -940,6 +1234,180 @@ mod tests {
         assert!(
             !body.contains("## Open issues —"),
             "flat all-issues section header must be removed"
+        );
+    }
+
+    fn mk_issue_state(number: u32, run: u32, state: &str) -> IssueRecord {
+        let mut i = mk_issue(number, "wobble");
+        i.observed_in_run = run;
+        i.state = state.into();
+        i
+    }
+
+    #[test]
+    fn issue_states_tallies_by_latest_state() {
+        let t = issue_states(&[
+            mk_issue_state(1, 1, "open"),
+            mk_issue_state(2, 1, "closed"),
+            mk_issue_state(3, 1, "OPEN"),
+            mk_issue_state(4, 1, "merged"),
+        ]);
+        assert_eq!(
+            t,
+            IssueStates {
+                observed: 4,
+                open: 2,
+                closed: 1,
+                unknown: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn closed_observation_supersedes_an_earlier_open_one() {
+        // The store's real shape for #204, #226, #229, …: an `open` row from an
+        // early enumerate run and a later `closed` row. Counting distinct
+        // numbers read all of them as open (529 against GitHub's 514).
+        let issues = latest_issue_observations(&[
+            Record::Issue(mk_issue_state(204, 9, "open")),
+            Record::Issue(mk_issue_state(204, 17, "closed")),
+        ]);
+        let t = issue_states(&issues);
+        assert_eq!(t.observed, 1);
+        assert_eq!(t.open, 0, "a closed issue is not an open issue");
+        assert_eq!(t.closed, 1);
+    }
+
+    #[test]
+    fn baseline_open_count_excludes_closed_and_carries_the_gap() {
+        let issues = vec![
+            mk_issue_state(1, 1, "open"),
+            mk_issue_state(2, 1, "open"),
+            mk_issue_state(3, 1, "closed"),
+        ];
+        let body = derive(&issues, &[], &mk_run(1, 3));
+        assert!(body.contains("| Open issues | 2 |"), "open excludes closed");
+        assert!(body.contains("| Closed (observed) | 1 |"), "closed row");
+        assert!(
+            body.contains("| Observed issues | 3 |"),
+            "the old count survives under its real name"
+        );
+        assert!(
+            body.contains("| filed_vs_acted_gap | 2 : 0 |"),
+            "the gap inherits the corrected open count, not the observed one"
+        );
+        assert!(
+            body.contains("`beadle enum` fetches only `--state open`"),
+            "the caveat names why a stale `open` can persist"
+        );
+    }
+
+    #[test]
+    fn classification_denominator_stays_the_observed_set() {
+        // "of N observed" means what it says: classifications are kept for
+        // closed issues too, so the denominator is open + closed, not open.
+        let issues = vec![mk_issue_state(1, 1, "open"), mk_issue_state(2, 1, "closed")];
+        let mut latest_class = HashMap::new();
+        latest_class.insert(1, mk_class(1, 1, "2026-07-01T00:00:00Z"));
+        let body = render_derived(
+            "t",
+            "acme/widget",
+            &mk_run(1, 2),
+            &issues,
+            &[],
+            &CommentStats::default(),
+            &classification_summary(&latest_class),
+            &mk_direction_pending(),
+        );
+        assert!(
+            body.contains("| Classified issues | 1 | of 2 observed (open + closed) |"),
+            "denominator is the observed set, labelled as such"
+        );
+    }
+
+    #[test]
+    fn unreadable_state_is_counted_as_neither_open_nor_closed() {
+        let body = derive(&[mk_issue_state(1, 1, "transferred")], &[], &mk_run(1, 1));
+        assert!(body.contains("| Open issues | 0 |"), "not silently open");
+        assert!(
+            body.contains("| Closed (observed) | 0 |"),
+            "not silently closed"
+        );
+        assert!(
+            body.contains("| Unreadable state | 1 |"),
+            "surfaced instead"
+        );
+    }
+
+    #[test]
+    fn baseline_omits_the_unreadable_row_when_every_state_parses() {
+        let body = derive(&[mk_issue_state(1, 1, "open")], &[], &mk_run(1, 1));
+        assert!(!body.contains("Unreadable state"), "no empty alarm row");
+    }
+
+    #[test]
+    fn malformed_rows_claiming_a_known_kind_are_reported() {
+        // Run 19's store: a hand-written `kind:"issue"` row closing #365 with
+        // four required fields missing. `Record::Other` swallows it, so every
+        // tally silently omits it. Counts must not be reported as whole.
+        let rows = vec![
+            Record::Other(serde_json::json!({"kind": "issue", "number": 365})),
+            Record::Other(serde_json::json!({"kind": "note", "topic": "perf"})),
+            Record::Other(serde_json::json!({"kind": "something-new", "number": 1})),
+            Record::Issue(mk_issue_state(1, 1, "open")),
+        ];
+        let report = unparsed_row_report(&rows);
+        assert_eq!(
+            report.len(),
+            2,
+            "one line per affected known kind: {report:?}"
+        );
+        assert!(report[0].contains("`issue`") && report[0].contains("#365"));
+        assert!(report[1].contains("`note`"));
+        assert!(
+            !report.iter().any(|l| l.contains("something-new")),
+            "a genuinely unknown kind is forward-compat, not a defect"
+        );
+    }
+
+    #[test]
+    fn body_size_report_is_advisory_past_the_observed_accepted_size() {
+        let out = body_size_report(BODY_OBSERVED_ACCEPTED_BYTES + 1);
+        assert!(out.contains("advisory only"), "says what it is: {out}");
+        assert!(out.contains("NOTE"), "not an error: {out}");
+        assert!(
+            !out.contains("ERROR") && !out.contains("exceeds budget"),
+            "no limit is known to be exceeded: {out}"
+        );
+    }
+
+    #[test]
+    fn body_size_report_measures_against_the_observed_accepted_size() {
+        // The live board (87,232 B) was 155% of the constant this replaces; a
+        // size line that calls a working body oversized is the defect
+        // (ArcavenAE/beadle#70).
+        let out = body_size_report(BODY_OBSERVED_ACCEPTED_BYTES / 2);
+        assert!(
+            out.contains("50%"),
+            "percentage is of observed-accepted: {out}"
+        );
+        assert!(
+            !out.contains("NOTE"),
+            "below observed-accepted is unremarkable"
+        );
+    }
+
+    #[test]
+    fn rollup_stays_blocked_until_a_hard_limit_is_measured() {
+        // Load-bearing invariant, not a style assertion: the board's job is to
+        // carry editorial content forward, so nothing may evict it against a
+        // guessed threshold. Whoever sets BODY_HARD_LIMIT_BYTES must derive it
+        // by measurement — this test failing is the prompt to prove that.
+        // (The observed-accepted floor is guarded at compile time beside the
+        // constant; this covers the half that can only be checked at runtime.)
+        assert!(
+            BODY_HARD_LIMIT_BYTES.is_none(),
+            "a hard limit appeared; show the measurement before any rollup path reads it"
         );
     }
 

@@ -23,3 +23,16 @@ and the fact that the live body carries an inherited render-integrity violation
 (one `<details>` block holding one 30-row table; the gate reports per row, so it
 prints 30 entries for one defect — count the table, not the rows)
 that an absolute check would block forever.
+
+### Ported to `beadle verify`
+
+`beadle verify <target> --before <snapshot> --candidate <file>` is the Rust
+port (aae-orc-agwo8). It agrees with this script check-for-check — verified
+differentially over the run-18 → run-19 pair plus 17 seeded mutations — and
+moves the two things the script hardcodes out of the code: the declared-rename
+allowlist lives in `targets/<target>.verify.json`, where every entry must carry
+a `why`, and a before-snapshot whose sentinel is missing or unparseable errors
+out instead of raising a traceback.
+
+This script stays as the reference implementation and the differential oracle;
+the binary is what the refresh flow calls.

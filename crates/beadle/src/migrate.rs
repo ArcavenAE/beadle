@@ -191,6 +191,7 @@ mod tests {
             rationale: "r".into(),
             cited_evidence: None,
             quick_win_disqualification: None,
+            ..Default::default()
         }))
     }
 
