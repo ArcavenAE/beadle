@@ -1,0 +1,15 @@
+{
+  "_comment": "Declared-heading-rename allowlist for `beadle verify vsdd-factory`. A heading in the before-snapshot that is absent from the candidate FAILS the gate unless it appears here with a `why`. Entries are evidence that a rename was intended, so keep the justification specific enough to audit later.",
+  "renames": [
+    {
+      "from": "### Run-18 index (NEW)",
+      "to": "### Run-18 index (carried forward — folded)",
+      "why": "run-18 carry precedent: the prior run's index is retitled and folded into a <details> when its successor's index lands; no rows are dropped"
+    },
+    {
+      "from": "### 🟢 P1/P2/P3 — Run-18 findings (NEW · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)",
+      "to": "### 🟢 P1/P2/P3 — Run-18 findings (carried — folded · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)",
+      "why": "same run-18 carry precedent applied to the findings lane: NEW becomes carried — folded, row counts unchanged"
+    }
+  ]
+}
