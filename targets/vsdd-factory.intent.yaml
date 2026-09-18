@@ -12,7 +12,12 @@
 #       concurrent open measured-side PRs (~10; Zious11 via operator, 2026-07-24:
 #       the ~25-PR backlog preceding the 2026-07-19/22 drains was too much for
 #       his analysis tooling). SKILL §6b rule 6 governance, PR-channel analog.
-schema_version: 0.5
+# v0.6: added maintainer_capacity.observed — the run-scoped measurements the
+#       JSONL store cannot hold (it carries no PR records), so the crate can
+#       score the pr_acceptance and merge_latency bands instead of emitting
+#       `pending`. Same refresh discipline as observed_windows: the run
+#       refreshes it. See beadle#46 / aae-orc-it9r3.
+schema_version: 0.6
 
 target:
   repo: BOHICA-LABS/vsdd-factory
@@ -78,6 +83,38 @@ maintainer_capacity:
   pr_channel:
     max_open_measured_prs: 10
     source: "maintainer request, relayed 2026-07-24 (Zious11 — analysis tooling)"
+
+  # v0.6 — run-scoped OBSERVATIONS. The store holds issues, comments and
+  # classifications; it holds no PR records, so pr_acceptance and merge_latency
+  # have no store-side input. Declare them here and the crate scores the bands;
+  # omit them and it reports `pending` with the gap named (never a false green).
+  # Refresh with observed_windows each run. Run-19 values are the ones the
+  # run-19 board published (BOHICA-LABS/vsdd-factory#312, sentinel + §Direction
+  # Health); `fixes:` is what each PR actually repairs, which is what §6b
+  # rule 4(b) tests against the silent (A4) lane.
+  observed:
+    as_of_run: 19
+    pr_acceptance:
+      merged: 30
+      decided: 31
+    # VERIFY EACH RUN — `fixes:` on an UNMERGED entry here is the only field in
+    # this block that can move the headline. Rule 4 is conjunctive, so the block
+    # reaches the verdict solely through condition (b), which fires when a
+    # declared PR is simultaneously unmerged, `fixes:` an A4 member, and ready
+    # >= 2 windows. Everything else can be arbitrarily stale without moving the
+    # run's headline. Staleness cuts BOTH ways and the second way is the quiet
+    # one: a lane-fix PR recorded unmerged after it actually merged manufactures
+    # a red; one recorded merged — or simply omitted — while it actually rots
+    # suppresses a red §6b rule 7 says was earned. There is no cross-check
+    # against GitHub; `red_gate.condition_b_evidence` discloses in the output
+    # that this is operator-maintained, which is disclosure, not verification.
+    measured_prs:
+      - number: 729
+        ready: "2026-08-01"      # rounds answered 07-23; re-review asked 08-01
+        fixes: [515]
+      - number: 768
+        ready: "2026-08-04"      # arcaven, CI action pinning; never reviewed
+        fixes: []
 
 # Composite, weighted intent anchor (no single source is authoritative).
 intent_sources:
