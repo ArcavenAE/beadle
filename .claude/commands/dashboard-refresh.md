@@ -1,5 +1,5 @@
 ---
-description: Backup → skills-based triage refresh → verify no section regression → post. Never uses the beadle binary.
+description: Backup → skills-based triage refresh → verify no section regression → post. Uses the binary for classify/verify; never for render/push.
 argument-hint: [target] (default vsdd-factory)
 ---
 
@@ -15,7 +15,8 @@ rule). This command exists because the `beadle` Rust binary's render path is
 table and strips the analysis (P0a/P0b/P1/P2 intent grouping, quick wins,
 direction health, classification index, maintainer progress). The Claude Code
 skill carries the discipline. **Do not run `beadle render` / `beadle push` at
-any point in this workflow.**
+any point in this workflow.** The binary's *other* paths are load-bearing here and are used: `classify ingest` (§2) writes the store, and `beadle
+verify` (§3) runs the gate.
 
 ## 1. Backup (never skip, never proceed on failure)
 
@@ -30,10 +31,27 @@ any point in this workflow.**
 
 ## 2. Refresh — run the SKILL, not the binary
 
+**Build first, and name the artifact.** The classification vocabulary is embedded
+in the binary at build time, so a stale artifact silently enforces an old
+contract. Run `ax build beadle` (or `cargo build -p beadle`) before any
+`classify ingest`, and invoke the binary you just built by path — never whichever
+`target/{debug,release}/beadle` happens to be lying around.
+
+Run-19 hit this: `target/release/beadle` was from 2026-07-01 and enforced a
+13-value `report_type` vocabulary against the manifest's 20, rejecting the
+canonical `process-gap`. Runs 17 and 18 had happened to use `target/debug`, so
+the correct behaviour had been reached by luck. **The error blames `payload item
+0`, not the binary** — so the natural fix is to edit the payload down to the
+tokens the binary accepts, which silently re-creates the exact enum drift
+finding-020 F2 recorded and looks like a clean ingest. If `classify ingest`
+rejects a token that IS in `skills/beadle-triage/vocabulary.json`, the binary is
+stale; rebuild, do not edit the payload. See `_kos/findings/finding-024-*` and
+ArcavenAE/beadle#64.
+
 Follow `skills/beadle-triage/SKILL.md` (the load-bearing analysis discipline),
 with the **highest-numbered** committed fixture
 `docs/fixtures/<target>-312-curated-run<N>.md` as the **shape canon**
-(run-14 at time of writing). Key operational notes from the sessions:
+(**run-19** as of 2026-09-18). Key operational notes from the sessions:
 
 - Enumerate open issues with number > W (the sentinel watermark).
 - Classify new issues in **batches of ~10–12 via parallel subagents dispatched
@@ -91,8 +109,27 @@ with the **highest-numbered** committed fixture
 
 ## 3. Verify — the regression gate (fail = restore, from 2026-07-05)
 
-Compare the candidate against BOTH the before-snapshot and the fixture canon.
-ALL checks must pass:
+Run the gate:
+
+```sh
+ax build beadle   # never a stale artifact; see §2
+./target/debug/beadle verify <target> \
+  --before tmp/dashboard-snapshots/<target>-312-before-<ts>.md \
+  --candidate tmp/dashboard-snapshots/<target>-312-candidate-<ts>.md
+```
+
+Non-zero exit = do not post. `beadle verify` mechanizes checks 1, 2, 3, 5 and
+the `_unclassified_` half of 4; declared renames come from
+`targets/<target>.verify.json`, where an entry without a `why` is a hard
+config error. `tools/dashboard-gate.py` is the reference implementation and
+the differential oracle — when the two disagree, the Python is right until
+proven otherwise.
+
+**The binary does not replace the reading.** Check 4's other half (every
+new-since-watermark issue actually appears in the new run's index) needs
+GitHub state the gate does not have, and no mechanical check tells you the
+analysis is *good*. Compare the candidate against BOTH the before-snapshot
+and the fixture canon by eye as well. ALL checks must pass:
 
 1. **Section presence** — every one of these exists (heading match, order per canon):
    - `<!-- beadle-state:v1` sentinel with parseable JSON (run = N+1, watermark > W)
@@ -108,13 +145,27 @@ ALL checks must pass:
    - `## Controls`
 2. **No section loss** — every `##`/`###` heading present in the before-snapshot
    is present in the candidate (renames must be justified in the run summary).
-3. **No coverage shrinkage** — every issue number referenced in the
-   before-snapshot's state JSON (p0 lists, clusters, indexes) appears in the
-   candidate state JSON unless it was closed on GitHub (verify closures).
+3. **No coverage shrinkage — PER AXIS, not by union.** Every issue number
+   referenced in the before-snapshot's state JSON (p0 lists, clusters, indexes)
+   appears in the candidate state JSON unless it was closed on GitHub (verify
+   closures). **Compare each axis on its own.** A union comparison is blind to
+   any loss confined to a single axis, because the dropped numbers still appear
+   under some other key — run-19 lost 11 issues from
+   `operational_impact.degraded_new` and a union check passed it clean. A
+   manual per-axis diff caught it.
+   Corollary: a per-run axis (`*_new`) is *expected* to reset, so it must roll
+   its previous members into a `*_prior` counterpart (the board's existing
+   `quick_wins_new` / `quick_wins_prior` idiom) or the classification is
+   silently discarded.
 4. **Classification completeness** — no `_unclassified_` rows; every
    new-since-watermark issue appears in the new run's classification index.
 5. **Markdown render integrity** (SKILL §7d contract; added after the
-   run-14→16 attn-lane regression) — all mechanical:
+   run-14→16 attn-lane regression) — all mechanical, and all **relative to the
+   before-snapshot**: a violation already present in the live body *warns*, a
+   newly introduced one *fails*. Absolute checks would block every future post —
+   the live body carries an inherited violation from run-18 (one `<details>`
+   holding one 30-row table), and a gate that refuses to post until historic
+   debt is cleaned is a gate nobody can use:
    - no table line (`|…`) directly follows a blockquote line (`>…`) without
      a blank line between (GFM lazy continuation swallows the table);
    - every `<details><summary>…</summary>` is followed by a blank line;
