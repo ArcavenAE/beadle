@@ -19,5 +19,7 @@ warns, a newly introduced one fails.
 
 Run-19 found two things with it that the command doc's own wording would have
 missed: `operational_impact.degraded_new` silently dropping 11 members on reset,
-and the fact that the live body carries 30 inherited render-integrity violations
+and the fact that the live body carries an inherited render-integrity violation
+(one `<details>` block holding one 30-row table; the gate reports per row, so it
+prints 30 entries for one defect — count the table, not the rows)
 that an absolute check would block forever.

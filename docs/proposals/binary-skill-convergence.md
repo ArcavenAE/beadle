@@ -194,7 +194,9 @@ the strengthened semantics run-19 landed on:
 2. Per-run axes (`*_new`) must roll members into a `*_prior` counterpart.
 3. Render-integrity checks are **regression-relative** — a pre-existing violation
    warns, a new one fails. Absolute checks would block every post forever: the
-   live body carries 30 inherited `5d` violations from run-18.
+   live body carries an inherited `5d` violation from run-18 — one `<details>`
+   block holding one 30-row table (the gate reports it per row, so it surfaces
+   as 30 entries; the defect is one table).
 4. Declared renames allowlisted with justification.
 
 *Why so high:* the gate is the only thing standing between a bad render and the
@@ -309,24 +311,45 @@ be grown safely." Do them first and in either order.
   the binary.** finding-019 and ADR-007 both rule this out, and run-19's #834
   override is a live example of judgment no rule reproduces.
 - **Do not make the gate absolute rather than regression-relative.** The live body
-  carries 30 inherited violations; an absolute gate blocks every future post.
+  carries an inherited violation (one 30-row table inside a `<details>`); an
+  absolute gate blocks every future post.
 - **Do not trim carried content to fit a 65,536 budget** that empirically is not
   the limit. Fix the constant instead.
 
 ## 8. Defects found while writing this
 
-| | Where | Status |
-|---|---|---|
-| Ingest drops 4 fields on every record | `beadle-store/src/lib.rs:88` | **unfiled** — P0-1 |
-| Open count ignores `IssueRecord.state` (529 vs 514) | `render.rs` baseline | **unfiled** — P2-1 |
-| Cluster decay computed from ~run-9 fossils | `render.rs` clusters | **unfiled** — P2-1 |
-| `direction` emits a verdict contradicting the board | `direction.rs` | **unfiled** — P1-2 |
-| Body-budget constant (56,320) is 1.55× below observed-good (87,232) | `render.rs:29` | **unfiled** — P3 |
-| Stale release binary embeds stale vocabulary | build/workflow | filed: **#64**, finding-024 |
-| `/dashboard-refresh` §3 check 3 is union-based, misses per-axis loss | command doc | fixed in run-19's gate; formalise in P0-2 |
+All filed 2026-09-18 against `a10c158`, counts verified under the claim gate.
 
-Per the three-layer capture rubric these are layer-1 records; the five unfiled
-ones warrant GitHub issues on this repo when someone commits to the work.
+| | Where | GitHub | bd |
+|---|---|---|---|
+| Ingest drops 4 fields from every record | `beadle-store/src/lib.rs:88` | **#66** | `aae-orc-l5b5i` (P0) |
+| Open count ignores `IssueRecord.state` (529 vs 514) | `render.rs` baseline | **#67** | `aae-orc-nhlyq` (P2) |
+| Cluster decay computed from run-9 fossils | `render.rs` clusters | **#68** | `aae-orc-nhlyq` (P2) |
+| `direction` verdict contradicts the board (🔴 vs 🟡) | `direction.rs` | **#69** | `aae-orc-it9r3` (P1) |
+| Body-budget constant 1.55× below observed-good | `render.rs:29` | **#70** | `aae-orc-veq8a` (P3) |
+| Stale release binary embeds stale vocabulary | build/workflow | #64 | `aae-orc-ety14` (P3) |
+| §3 check 3 is union-based, blind to per-axis loss | command doc | — | `aae-orc-agwo8` (P0) |
+
+### Work items
+
+| Rec | bd | Blocked on |
+|---|---|---|
+| P0-1 store fidelity | `aae-orc-l5b5i` | — |
+| P0-2 `beadle verify` | `aae-orc-agwo8` | — |
+| P1-1 curated zones | `aae-orc-iouu` (pre-existing) | P0-1 |
+| P1-2 direction v2 | `aae-orc-it9r3` | — |
+| P1-3 carry-forward from store | `aae-orc-lle2s` | P0-1 |
+| P2-1 counts + cluster decay | `aae-orc-nhlyq` | — |
+| P2-2 Tier-1 controls from data | `aae-orc-89eaq` | P0-1 |
+| P2-3 section scaffolds | `aae-orc-2n15r` | P0-1, P1-1 |
+| P3 build-before-ingest | `aae-orc-ety14` | — |
+| P3 body budget | `aae-orc-veq8a` | — |
+| P3 render tail (legend, ledger) | `aae-orc-r1w1n` | — |
+| **Re-run this assessment** | `aae-orc-5buzr` | P0-1, P0-2 |
+
+`aae-orc-5buzr` carries the method, so the next pass re-measures rather than
+trusting the numbers above. They are a measurement at a timestamp, not standing
+facts — the open count, A4 streaks, body size and verdict pair will all expire.
 
 ## 9. Honest summary
 
