@@ -18,3 +18,7 @@
 .idea/
 .vscode/
 .beads
+
+# Python byproducts (scripts/)
+__pycache__/
+*.pyc
