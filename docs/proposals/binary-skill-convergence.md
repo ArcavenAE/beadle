@@ -320,12 +320,20 @@ be grown safely." Do them first and in either order.
 
 All filed 2026-09-18 against `a10c158`, counts verified under the claim gate.
 
+One correction: the `direction` v1/v2 defect was filed as #69 and then closed as
+a duplicate of **#46**, which predates it by two months and is referenced from
+SKILL §6b as the tracking issue. It was one grep away and was not made. Run-19's
+measured divergence now lives as a comment on #46. Recorded rather than tidied
+away: finding-116 already named this gap — the rules gate *consuming* and
+*publishing* a claim, not *filing* one, and searching for an existing issue
+before opening a new one has no trigger anywhere in the rule set.
+
 | | Where | GitHub | bd |
 |---|---|---|---|
 | Ingest drops 4 fields from every record | `beadle-store/src/lib.rs:88` | **#66** | `aae-orc-l5b5i` (P0) |
 | Open count ignores `IssueRecord.state` (529 vs 514) | `render.rs` baseline | **#67** | `aae-orc-nhlyq` (P2) |
 | Cluster decay computed from run-9 fossils | `render.rs` clusters | **#68** | `aae-orc-nhlyq` (P2) |
-| `direction` verdict contradicts the board (🔴 vs 🟡) | `direction.rs` | **#69** | `aae-orc-it9r3` (P1) |
+| `direction` verdict contradicts the board (🔴 vs 🟡) | `direction.rs` | **#46** (pre-existing) | `aae-orc-it9r3` (P1) |
 | Body-budget constant 1.55× below observed-good | `render.rs:29` | **#70** | `aae-orc-veq8a` (P3) |
 | Stale release binary embeds stale vocabulary | build/workflow | #64 | `aae-orc-ety14` (P3) |
 | §3 check 3 is union-based, blind to per-axis loss | command doc | — | `aae-orc-agwo8` (P0) |
