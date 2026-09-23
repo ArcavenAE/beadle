@@ -15,7 +15,8 @@ use std::{
 
 use anyhow::{Result, bail};
 use beadle_store::{
-    ClassificationRecord, ClusterRecord, IssueRecord, Record, RunRecord, Store, working_run,
+    ClassificationRecord, ClusterRecord, IssueRecord, Record, RunRecord, Store,
+    latest_issue_observations, working_run,
 };
 use sha2::{Digest, Sha256};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -253,25 +254,6 @@ fn synthetic_run(target: &str) -> RunRecord {
         new_this_run: vec![],
         notes: None,
     }
-}
-
-/// For each issue number, take the most-recent observation seen in the store.
-fn latest_issue_observations(records: &[Record]) -> Vec<IssueRecord> {
-    let mut by_number: HashMap<u32, IssueRecord> = HashMap::new();
-    for rec in records {
-        if let Record::Issue(i) = rec {
-            let keep = by_number
-                .get(&i.number)
-                .map(|prev| prev.observed_in_run <= i.observed_in_run)
-                .unwrap_or(true);
-            if keep {
-                by_number.insert(i.number, i.clone());
-            }
-        }
-    }
-    let mut out: Vec<IssueRecord> = by_number.into_values().collect();
-    out.sort_by_key(|i| std::cmp::Reverse(i.number));
-    out
 }
 
 /// For each cluster name, take the most-recent observation.
