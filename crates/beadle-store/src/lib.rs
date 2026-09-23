@@ -5,7 +5,7 @@
 //! semantics of a run (enumerate, classify, render) live one crate up.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
     path::{Path, PathBuf},
@@ -252,6 +252,31 @@ impl Record {
 /// an older run's record after a newer one.
 pub fn working_run(records: &[Record]) -> u32 {
     records.iter().filter_map(Record::run).max().unwrap_or(0)
+}
+
+/// For each issue number, the most-recent observation in the store.
+///
+/// "Most recent" is by `observed_in_run`, not file order: a resumed pass can
+/// append an older run's observation after a newer one. Lives here rather than
+/// in `render` because enumeration needs the same view — it has to know what
+/// the store currently believes is open in order to notice that GitHub has
+/// closed something (ArcavenAE/beadle#81).
+pub fn latest_issue_observations(records: &[Record]) -> Vec<IssueRecord> {
+    let mut by_number: HashMap<u32, IssueRecord> = HashMap::new();
+    for rec in records {
+        if let Record::Issue(i) = rec {
+            let keep = by_number
+                .get(&i.number)
+                .map(|prev| prev.observed_in_run <= i.observed_in_run)
+                .unwrap_or(true);
+            if keep {
+                by_number.insert(i.number, i.clone());
+            }
+        }
+    }
+    let mut out: Vec<IssueRecord> = by_number.into_values().collect();
+    out.sort_by_key(|i| std::cmp::Reverse(i.number));
+    out
 }
 
 /// A store rooted at `store/<target>/`.
