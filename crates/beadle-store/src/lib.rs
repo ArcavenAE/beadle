@@ -219,6 +219,41 @@ pub struct NoteRecord {
     pub text: String,
 }
 
+impl Record {
+    /// The run this record belongs to, whatever its kind.
+    ///
+    /// `Other` has no run on purpose: a row that failed its struct must not
+    /// get a vote on which run a pass is working in. See [`working_run`].
+    pub fn run(&self) -> Option<u32> {
+        match self {
+            Record::Run(r) => Some(r.run),
+            Record::Issue(i) => Some(i.observed_in_run),
+            Record::Classification(c) => Some(c.run),
+            Record::CommentEvent(e) => Some(e.observed_in_run),
+            Record::Cluster(c) => Some(c.run),
+            Record::Note(n) => Some(n.run),
+            Record::Other(_) => None,
+        }
+    }
+}
+
+/// The run a pass is working in: the highest run ANY record claims, not the
+/// highest run that has a `Run` record.
+///
+/// The two differ for the whole length of a pass, and that gap is a defect
+/// (finding-019 root cause 4, observed in runs 10 and 11). `beadle enum`
+/// appends observations tagged with the new run immediately; the `Run` record
+/// is only written later, at push. Anything keying on `Record::Run` therefore
+/// computes against the PREVIOUS run for the entire pass it is supposed to
+/// inform — direction reported `run: 9` and "no classification records for
+/// run 9" while 66 fresh run-10 records sat in the same store.
+///
+/// Max, not last: file order is not run order, and a resumed pass can append
+/// an older run's record after a newer one.
+pub fn working_run(records: &[Record]) -> u32 {
+    records.iter().filter_map(Record::run).max().unwrap_or(0)
+}
+
 /// A store rooted at `store/<target>/`.
 pub struct Store {
     root: PathBuf,
@@ -519,6 +554,89 @@ mod tests {
             Record::Other(v) => panic!("fell through to Other: {v}"),
             other => panic!("unexpected {other:?}"),
         }
+    }
+
+    /// Records written during a pass, before the run record exists.
+    fn jsonl_mid_pass() -> &'static str {
+        concat!(
+            r#"{"kind":"run","ts":"t","target":"x","run":19,"watermark_after":830,"#,
+            r#""counts":{},"digest":"d"}"#,
+            "\n",
+            r#"{"kind":"issue","ts":"t","target":"x","number":901,"observed_in_run":20,"#,
+            r#""title":"a","author":"b","state":"open","created_at":"t","updated_at":"t","#,
+            r#""body_len":1,"body_sha256":"s"}"#,
+            "\n",
+            r#"{"kind":"note","ts":"t","target":"x","run":20,"topic":"perf","text":"t"}"#,
+            "\n",
+        )
+    }
+
+    fn read_jsonl(body: &str) -> (TempDir, Vec<Record>) {
+        let td = TempDir::new().unwrap();
+        let path = td.path().join("t").join("state.jsonl");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, body).unwrap();
+        let recs = Store::open(td.path(), "t").unwrap().read_all().unwrap();
+        (td, recs)
+    }
+
+    #[test]
+    fn working_run_is_the_open_run_not_the_last_finalized_one() {
+        let (_td, recs) = read_jsonl(jsonl_mid_pass());
+        // The defect this guards: the newest `Run` RECORD still says 19 while
+        // the pass is demonstrably working in 20. Anything keying on
+        // `Record::Run` reads 19 for the whole pass.
+        let newest_run_record = recs
+            .iter()
+            .rev()
+            .find_map(|r| match r {
+                Record::Run(rr) => Some(rr.run),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(newest_run_record, 19, "the stale value the defect reads");
+        assert_eq!(working_run(&recs), 20, "the run the pass is actually in");
+    }
+
+    #[test]
+    fn working_run_takes_the_max_not_the_last() {
+        // A resumed pass can append an older run's record after a newer one, so
+        // file order is not run order.
+        let body = format!(
+            "{}{}",
+            jsonl_mid_pass(),
+            concat!(
+                r#"{"kind":"note","ts":"t","target":"x","run":3,"topic":"x","text":"late"}"#,
+                "\n"
+            )
+        );
+        let (_td, recs) = read_jsonl(&body);
+        assert_eq!(recs.last().unwrap().run(), Some(3));
+        assert_eq!(working_run(&recs), 20);
+    }
+
+    #[test]
+    fn a_malformed_row_gets_no_vote_on_the_working_run() {
+        // `Other` is where a row that claims a known kind and fails its struct
+        // lands. It must not be able to drag a pass into a run nothing else is
+        // working in.
+        let body = format!(
+            "{}{}",
+            jsonl_mid_pass(),
+            concat!(
+                r#"{"kind":"issue","number":999,"observed_in_run":99}"#,
+                "\n"
+            )
+        );
+        let (_td, recs) = read_jsonl(&body);
+        assert!(matches!(recs.last().unwrap(), Record::Other(_)));
+        assert_eq!(recs.last().unwrap().run(), None);
+        assert_eq!(working_run(&recs), 20);
+    }
+
+    #[test]
+    fn working_run_of_an_empty_store_is_zero() {
+        assert_eq!(working_run(&[]), 0);
     }
 
     #[test]
