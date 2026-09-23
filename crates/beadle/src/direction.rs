@@ -38,7 +38,7 @@ use std::{
 
 use anyhow::Result;
 use beadle_store::{
-    ClassificationRecord, CommentEventRecord, NoteRecord, Record, RunRecord, Store,
+    ClassificationRecord, CommentEventRecord, NoteRecord, Record, RunRecord, Store, working_run,
 };
 use serde::Serialize;
 use time::{
@@ -176,7 +176,11 @@ pub fn compute(target: &str, records: &[Record]) -> DirectionReport {
             }
         })
         .collect();
-    let latest_run = runs.last().map(|r| r.run).unwrap_or(0);
+    // The run this pass is working in, not the run that last got a `Run`
+    // record. `enum` tags observations with the new run immediately; the run
+    // record lands at push. Keying on `Record::Run` computed every signal
+    // against the previous run for the whole pass (finding-019 root cause 4).
+    let latest_run = working_run(records);
 
     let classifications_this_run: Vec<ClassificationRecord> = records
         .iter()

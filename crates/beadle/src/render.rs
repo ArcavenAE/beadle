@@ -13,10 +13,12 @@ use std::{
     path::Path,
 };
 
-use anyhow::{bail, Result};
-use beadle_store::{ClassificationRecord, ClusterRecord, IssueRecord, Record, RunRecord, Store};
+use anyhow::{Result, bail};
+use beadle_store::{
+    ClassificationRecord, ClusterRecord, IssueRecord, Record, RunRecord, Store, working_run,
+};
 use sha2::{Digest, Sha256};
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 use crate::{
     controls,
@@ -62,7 +64,7 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
     let store = Store::open(root.join("store"), target)?;
     let records = store.read_all()?;
 
-    let latest_run = records
+    let last_finalized = records
         .iter()
         .rev()
         .find_map(|r| {
@@ -73,6 +75,19 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
             }
         })
         .unwrap_or_else(|| synthetic_run(target));
+
+    // A pass OPENS when `enum` tags observations with the new run, and only
+    // closes at push when the run record is written. Rendering against the last
+    // finalized run means the whole pass renders the previous run's board while
+    // the fresh records sit ignored in the same store, and `direction` — which
+    // now derives the working run — would disagree with the body it is embedded
+    // in. Render against the open run.
+    let working = working_run(&records);
+    let latest_run = if working > last_finalized.run {
+        provisional_run(&last_finalized, working)
+    } else {
+        last_finalized
+    };
 
     // Fail loud on a projection of nothing (finding-019, curated-board-restoration
     // item 1). A dashboard for a run whose classifier never produced records is
@@ -195,6 +210,30 @@ fn body_size_report(bytes: usize) -> String {
              {BODY_OBSERVED_ACCEPTED_BYTES})",
             (bytes * 100) / BODY_OBSERVED_ACCEPTED_BYTES
         )
+    }
+}
+
+/// The run record for a pass that has opened but not been finalized.
+///
+/// Carries the working run number and nothing it has not earned: the watermark
+/// does not advance until push, the counts and digest are not known yet, and
+/// `warmup` says plainly that this is provisional so no reader mistakes it for
+/// a finalized run.
+fn provisional_run(last: &RunRecord, run: u32) -> RunRecord {
+    RunRecord {
+        ts: OffsetDateTime::now_utc()
+            .format(&Rfc3339)
+            .unwrap_or_default(),
+        target: last.target.clone(),
+        run,
+        watermark_before: last.watermark_after,
+        watermark_after: last.watermark_after,
+        counts: Default::default(),
+        digest: String::new(),
+        warmup: Some("provisional — run opened, not yet finalized".to_string()),
+        intent_version: last.intent_version.clone(),
+        new_this_run: vec![],
+        notes: None,
     }
 }
 
