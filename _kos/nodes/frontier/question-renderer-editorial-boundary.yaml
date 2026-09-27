@@ -88,6 +88,16 @@ content: |
   editorial notes) is open. Working assumption: option 2 remains the
   default divider; revisit only when a section arises whose ownership is
   genuinely mixed rather than whole-owned-per-side.
+
+  Render regression (finding-019): a mechanically correct `beadle render` body
+  (flat `_unclassified_` table, no intent-grouped action plan, quick-wins lane,
+  or direction narrative) was judged by the user as worse than the issues tab.
+  The finding concludes the analysis zones (action-plan grouping, quick-wins
+  narrative, cluster readings, direction interpretation, maintainer-progress
+  framing) must never be delegated to the renderer: the binary may frame them
+  (skeleton, digests, controls, slot preservation) but not author them, and it
+  proposes curated-zone slots plus a fail-loud render when a run has zero
+  classifications.
 edges:
   - target: elem-state-out-of-band
     type: derives

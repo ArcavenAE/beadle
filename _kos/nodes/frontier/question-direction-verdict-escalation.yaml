@@ -110,6 +110,12 @@ content: |
   runs of real classifier output. Also open: A3 window question
   (trailing-3-run share vs all-history, deferred to same calibration
   pass).
+
+  First cut (finding-013): shipped `beadle direction <target> [--write-note]`
+  computing signal A from run records, with B and C surfaced by name as
+  `pending` plus a reason rather than inferred or omitted; it also records why
+  the verdict is the max of the three signals (a weighted vote would let volume
+  drown severity).
 edges:
   - target: elem-maintainer-compass
     type: derives

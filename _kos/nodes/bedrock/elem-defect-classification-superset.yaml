@@ -140,6 +140,14 @@ content: |
   `beadle classify migrate-impact` runs on the machine holding the live
   store (ground truth in the run-N rich fixtures; work-queue anchor
   aae-orc-57g6). Defect record: ArcavenAE/beadle#32.
+
+  Stale-artifact caveat (finding-024, run-19): because the vocabulary manifest
+  is embedded at build time, a `target/release/beadle` built before the
+  manifest's last change rejected the canonical `process-gap` report_type, and
+  the error blamed the payload rather than the binary. The contract test holds
+  the source tree together in CI but cannot see a stale artifact in `target/`;
+  the finding records a rebuild as the fix and a startup hash check against the
+  on-disk `vocabulary.json` as the open detection gap.
 edges:
   - target: elem-intent-alignment-whitespace
     type: derives

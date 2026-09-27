@@ -98,6 +98,12 @@ content: |
 
   Dispatch of the requested routines is DEFERRED. Notes accumulate as a request
   queue; Phase-1 gh-aw drains it.
+
+  Origin (finding-003): the user request that opened this question. It named
+  the two-tier split (per-issue verbs vs board-level maintenance requests) and
+  the cheap-poll-then-act discipline, and recorded the safe-routine boundary
+  (read, analyze, or regenerate yes; irreversible public action no) as the
+  B2-derived constraint that keeps Tier 2 inside propose-not-act.
 edges:
   - target: question-dashboard-discovery-robustness
     type: supports
