@@ -25,6 +25,20 @@ content: |
   - integrity_anchors (finding-004/005) — systems-of-record by recoverability tier
     (regenerable / spec_process / learning), so the silent-integrity classifier is
     grounded, not inferred.
+
+  Tooling context (run-17 wrap, the manifest v0.5 `maintainer_capacity.pr_channel`
+  edit). Two ambient-tooling findings arose while landing that manifest change;
+  their subjects are likely fleet or GitHub tooling rather than the schema
+  itself, and they are cited here because this is the work they interrupted:
+  - finding-021: `just check` shells out to bare `python3 -c "import yaml"` and
+    fails for every YAML file (including the intent manifests) on a machine
+    whose system python lacks PyYAML; running the same check through
+    `uvx --with pyyaml` passed all five files.
+  - finding-022: `git push` to GitHub over SSH returned
+    `Permission denied (publickey)` for about five minutes with the correct key,
+    apparently depending on which GitHub SSH backend answered; a retry
+    succeeded, and the finding warns against rewiring local SSH config for this
+    symptom.
 edges:
   - target: elem-intent-alignment-whitespace
     type: derives
