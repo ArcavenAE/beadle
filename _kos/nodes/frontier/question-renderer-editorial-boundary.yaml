@@ -97,7 +97,8 @@ content: |
   framing) must never be delegated to the renderer: the binary may frame them
   (skeleton, digests, controls, slot preservation) but not author them, and it
   proposes curated-zone slots plus a fail-loud render when a run has zero
-  classifications.
+  classifications. The fail-loud render landed in #56 (763b52d); the
+  curated-zone slots are still open (aae-orc-iouu).
 edges:
   - target: elem-state-out-of-band
     type: derives
