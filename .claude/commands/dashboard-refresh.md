@@ -1,5 +1,5 @@
 ---
-description: Backup → skills-based triage refresh → verify no section regression → post. Uses the binary for classify/verify; never for render/push.
+description: Backup → skills-based triage refresh → verify no section regression → post. Uses the binary for classify; the gate is tools/dashboard-gate.py; never render/push.
 argument-hint: [target] (default vsdd-factory)
 ---
 
@@ -15,8 +15,8 @@ rule). This command exists because the `beadle` Rust binary's render path is
 table and strips the analysis (P0a/P0b/P1/P2 intent grouping, quick wins,
 direction health, classification index, maintainer progress). The Claude Code
 skill carries the discipline. **Do not run `beadle render` / `beadle push` at
-any point in this workflow.** The binary's *other* paths are load-bearing here and are used: `classify ingest` (§2) writes the store, and `beadle
-verify` (§3) runs the gate.
+any point in this workflow.** The binary's `classify ingest` path is load-bearing here and is used (§2 writes the store); the §3 gate is
+`tools/dashboard-gate.py`.
 
 ## 1. Backup (never skip, never proceed on failure)
 
@@ -109,7 +109,27 @@ with the **highest-numbered** committed fixture
 
 ## 3. Verify — the regression gate (fail = restore, from 2026-07-05)
 
-Run the gate:
+The scheduled refresh runs the Python gate, from the repo's `tools/`:
+
+```sh
+python3 tools/dashboard-gate.py \
+  tmp/dashboard-snapshots/<target>-312-before-<ts>.md \
+  tmp/dashboard-snapshots/<target>-312-candidate-<ts>.md
+```
+
+Non-zero exit = do not post. The gate mechanizes checks 1, 2, 3, 5 and the
+`_unclassified_` half of 4. Its declared renames and declared removals (a
+retired heading or cumulative sentinel axis) are hardcoded in the script
+(`DECLARED_RENAMES`, `DECLARED_REMOVALS`), so a rename or removal the refresh
+relies on needs an entry there, with its reason.
+
+`beadle verify` is the Rust port of the same gate. It agrees with the script
+check for check (verified differentially; see `tools/README.md`) and differs in
+one place: it reads declared renames and removals from
+`targets/<target>.verify.json`, where an entry without a `why` is a hard
+config error. The scheduled refresh does not call it, so an entry in a
+target's `verify.json` has no effect on a scheduled post. Run it by hand to
+check a candidate against that file:
 
 ```sh
 ax build beadle   # never a stale artifact; see §2
@@ -118,15 +138,9 @@ ax build beadle   # never a stale artifact; see §2
   --candidate tmp/dashboard-snapshots/<target>-312-candidate-<ts>.md
 ```
 
-Non-zero exit = do not post. `beadle verify` mechanizes checks 1, 2, 3, 5 and
-the `_unclassified_` half of 4; declared renames and declared removals (a
-retired heading or cumulative sentinel axis) come from
-`targets/<target>.verify.json`, where an entry without a `why` is a hard
-config error. `tools/dashboard-gate.py` is the reference implementation and
-the differential oracle — when the two disagree, the Python is right until
-proven otherwise.
+When the two disagree, the Python is right until proven otherwise.
 
-**The binary does not replace the reading.** Check 4's other half (every
+**The gate does not replace the reading.** Check 4's other half (every
 new-since-watermark issue actually appears in the new run's index) needs
 GitHub state the gate does not have, and no mechanical check tells you the
 analysis is *good*. Compare the candidate against BOTH the before-snapshot

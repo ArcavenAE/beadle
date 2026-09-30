@@ -40,5 +40,7 @@ allowlist lives in `targets/<target>.verify.json`, where every entry must carry
 a `why`, and a before-snapshot whose sentinel is missing or unparseable errors
 out instead of raising a traceback.
 
-This script stays as the reference implementation and the differential oracle;
-the binary is what the refresh flow calls.
+This script stays as the reference implementation and the differential oracle,
+and it is the gate the scheduled refresh runs. The scheduled refresh does not
+call `beadle verify`, so `targets/<target>.verify.json` does not govern a
+scheduled post.
