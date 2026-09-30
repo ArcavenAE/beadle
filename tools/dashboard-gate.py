@@ -54,11 +54,22 @@ if sc and str(sc["run"]) not in cand_idx:
     fails.append(f"1: new Run-{sc['run']} index missing")
 
 # ---- 2. no section loss --------------------------------------------------
+# Each rename maps the before heading to (candidate heading, reason); the
+# reason is printed with the warning, as `beadle verify` prints its `why`.
+_RUN18 = "run-18 carry precedent"
+# One-time ISO/IEC 25010 transition entries, not a category schema: they let
+# the boards retire today's grouping once. They do not fix which categories
+# a board carries, and new categories need no entry here.
+_T25010 = "one-time ISO/IEC 25010 transition: the index stops naming the retired grouping"
 DECLARED_RENAMES = {
  "### Run-18 index (NEW)":
-   "### Run-18 index (carried forward — folded)",
+   ("### Run-18 index (carried forward — folded)", _RUN18),
  "### 🟢 P1/P2/P3 — Run-18 findings (NEW · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)":
-   "### 🟢 P1/P2/P3 — Run-18 findings (carried — folded · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)",
+   ("### 🟢 P1/P2/P3 — Run-18 findings (carried — folded · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)", _RUN18),
+ "## Classification index (finding-005 + finding-009 + attn facet + IEEE 1044 + ODC + ISO/IEC 25010)":
+   ("## Classification index (finding-005 + finding-009 + attn facet + IEEE 1044 + ODC)", _T25010),
+ "## Classification index (report type + defect nature + reproducibility + IEEE 1044 + ODC + ISO/IEC 25010)":
+   ("## Classification index (report type + defect nature + reproducibility + IEEE 1044 + ODC)", _T25010),
 }
 # A removal the run intends, with the reason. Headings are H2/H3 lines, exact.
 # Axes are top-level sentinel keys: one covers its `key.sub` sub-axes too. A
@@ -72,6 +83,7 @@ DECLARED_REMOVALS = {
   "### 🟢 P3: Papercuts, docs, tests, and design questions, grouped by ISO/IEC 25010 characteristic": _G25010,
   "### 🟢 P2: Correctness and operability, grouped by ISO/IEC 25010 characteristic": _G25010,
   "### 🟢 P3: Papercuts, docs, diagnostics and design questions, grouped by ISO/IEC 25010 characteristic": _G25010,
+  "### 🟢 P3: Papercuts, docs, design questions, and dependency bumps, grouped by ISO/IEC 25010 characteristic": _G25010,
   "## Quality characteristic groups (ISO/IEC 25010:2023)": _G25010,
  },
  "axes": {
@@ -93,9 +105,9 @@ if sb:
 for h in hb:
     if h in hc:
         continue
-    tgt = DECLARED_RENAMES.get(h)
+    tgt, why = DECLARED_RENAMES.get(h, (None, None))
     if tgt and tgt in hc:
-        warns.append(f"2: declared rename (run-18 carry precedent) -> {h[:60]!r} => {tgt[:60]!r}")
+        warns.append(f"2: declared rename -> {h[:60]!r} => {tgt[:60]!r} ({why})")
     elif h in DECLARED_REMOVALS["headings"]:
         warns.append(f"2: declared removal -> {h[:60]!r} ({DECLARED_REMOVALS['headings'][h]})")
     else:

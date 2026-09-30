@@ -159,5 +159,53 @@ class DeclaredRemovals(unittest.TestCase):
         self.assertIn("3: 1 tracked issue(s) dropped from state: [99]", out)
 
 
+CI_RENAMES = [
+    (
+        "## Classification index (finding-005 + finding-009 + attn facet + IEEE 1044 + ODC + ISO/IEC 25010)",
+        "## Classification index (finding-005 + finding-009 + attn facet + IEEE 1044 + ODC)",
+    ),
+    (
+        "## Classification index (report type + defect nature + reproducibility + IEEE 1044 + ODC + ISO/IEC 25010)",
+        "## Classification index (report type + defect nature + reproducibility + IEEE 1044 + ODC)",
+    ),
+]
+P3_DEPENDENCY_VARIANT = (
+    "### 🟢 P3: Papercuts, docs, design questions, and dependency bumps, "
+    "grouped by ISO/IEC 25010 characteristic"
+)
+
+
+class Transition25010(unittest.TestCase):
+    """One-time ISO/IEC 25010 transition entries, pinned by their exact text."""
+
+    def setUp(self):
+        self.s = {"run": 1, "watermark": 10, "tracked": [5]}
+        self.c = {**self.s, "run": 2, "watermark": 11}
+
+    def test_the_dependency_bumps_p3_variant_is_a_declared_removal(self):
+        rc, out = run_gate(body(self.s, [P3_DEPENDENCY_VARIANT]), body(self.c))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("WARN 2: declared removal -> '### 🟢 P3: Papercuts, docs, design questions, and d", out)
+
+    def test_each_classification_index_retitle_is_a_declared_rename(self):
+        for old, new in CI_RENAMES:
+            with self.subTest(old=old):
+                rc, out = run_gate(body(self.s, [old]), body(self.c, [new]))
+                self.assertEqual(rc, 0, out)
+                self.assertIn("WARN 2: declared rename", out)
+
+    def test_a_retitle_to_anything_else_still_fails(self):
+        old, _ = CI_RENAMES[0]
+        rc, out = run_gate(body(self.s, [old]), body(self.c, ["## Classification index (other)"]))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("2: HEADING LOST -> " + old[:60], out)
+
+    def test_the_rename_warning_does_not_claim_the_run18_precedent(self):
+        old, new = CI_RENAMES[0]
+        rc, out = run_gate(body(self.s, [old]), body(self.c, [new]))
+        line = next(l for l in out.splitlines() if l.startswith("WARN 2: declared rename"))
+        self.assertNotIn("run-18", line)
+
+
 if __name__ == "__main__":
     unittest.main()
