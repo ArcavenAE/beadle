@@ -565,6 +565,32 @@ pub fn evaluate(
         }
     }
 
+    // A declared removal the before-snapshot never carried is stale, and one
+    // the candidate still carries did not happen. Both warn: an allowlist can
+    // serve more than one board, so neither is a loss.
+    for r in removals {
+        if let Some(h) = r.heading.as_deref() {
+            if !headings_before.contains(&h) {
+                rep.warns.push(format!(
+                    "2: stale declared removal, heading not in before-snapshot -> {:?}",
+                    clip(h, 60)
+                ));
+            } else if headings_cand.contains(h) {
+                rep.warns.push(format!(
+                    "2: declared removal still present in candidate -> {:?}",
+                    clip(h, 60)
+                ));
+            }
+        }
+        if let Some(a) = r.axis.as_deref() {
+            if sb.get(a).is_none() {
+                rep.warns.push(format!(
+                    "3b: stale declared removal, key not in before-snapshot -> '{a}'"
+                ));
+            }
+        }
+    }
+
     // ---- 2. no section loss (declared renames allowlisted) ---------------
     for h in &headings_before {
         if headings_cand.contains(h) {
@@ -1181,5 +1207,54 @@ mod tests {
         let (renames, removals) = load_declared(dir.path(), "x", Some(&p)).expect("valid config");
         assert!(renames.is_empty());
         assert_eq!(removals.len(), 1);
+    }
+
+    #[test]
+    fn a_declared_removal_the_board_never_carried_warns_as_stale() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(base_state(19, 836), &[18, 19], "");
+        let declared = [
+            removal(Some("## Gone"), None, "retired"),
+            removal(None, Some("iso25010"), "retired"),
+        ];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(r.passed(), "stale entries warn, never fail: {:?}", r.fails);
+        assert!(r
+            .warns
+            .iter()
+            .any(|w| w.contains("2: stale declared removal")));
+        assert!(r
+            .warns
+            .iter()
+            .any(|w| w.contains("3b: stale declared removal")));
+    }
+
+    #[test]
+    fn a_declared_heading_still_in_the_candidate_warns() {
+        let before = doc(base_state(18, 830), &[18], "## Kept\n");
+        let cand = doc(base_state(19, 836), &[18, 19], "## Kept\n");
+        let declared = [removal(Some("## Kept"), None, "retired")];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(r.passed(), "{:?}", r.fails);
+        assert!(r
+            .warns
+            .iter()
+            .any(|w| w.contains("still present in candidate")));
+    }
+
+    #[test]
+    fn a_string_valued_key_counts_as_carried() {
+        let mut sb = base_state(18, 830);
+        sb["taxonomy_group"] = json!("ISO/IEC 25010:2023");
+        let before = doc(sb, &[18], "");
+        let cand = doc(base_state(19, 836), &[18, 19], "");
+        let declared = [removal(None, Some("taxonomy_group"), "retired")];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(r.passed(), "{:?}", r.fails);
+        assert!(
+            r.warns.iter().all(|w| !w.contains("stale")),
+            "{:?}",
+            r.warns
+        );
     }
 }

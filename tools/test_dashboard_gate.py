@@ -20,13 +20,17 @@ GATE = pathlib.Path(__file__).with_name("dashboard-gate.py")
 
 
 def declared_removals():
+    # Run only the constant assignments the allowlist is built from, not the
+    # gate itself (which reads argv at import).
     tree = ast.parse(GATE.read_text())
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(t, ast.Name) and t.id == "DECLARED_REMOVALS" for t in node.targets
-        ):
-            return ast.literal_eval(node.value)
-    return None
+    keep = [
+        n for n in tree.body
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id in ("_G25010", "DECLARED_REMOVALS") for t in n.targets)
+    ]
+    ns = {}
+    exec(compile(ast.Module(body=keep, type_ignores=[]), str(GATE), "exec"), ns)
+    return ns.get("DECLARED_REMOVALS")
 
 
 REQUIRED = [
@@ -90,10 +94,36 @@ class DeclaredRemovals(unittest.TestCase):
 
     def test_declared_heading_removal_warns_and_passes(self):
         heads = list(self.decl["headings"])
+        self.assertTrue(heads, "no declared headings; this test would pass vacuously")
         s = {"run": 1, "watermark": 10, "tracked": [5]}
         rc, out = run_gate(body(s, heads), body({**s, "run": 2, "watermark": 11}))
         self.assertEqual(rc, 0, out)
-        self.assertEqual(out.count("WARN 2: declared removal"), len(heads), out)
+        self.assertEqual(out.count("WARN 2: declared removal ->"), len(heads), out)
+        self.assertNotIn("2: stale", out)
+
+    def test_a_declared_removal_the_board_never_carried_warns_as_stale(self):
+        s = {"run": 1, "watermark": 10, "tracked": [5]}
+        rc, out = run_gate(body(s), body({**s, "run": 2, "watermark": 11}))
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(
+            out.count("WARN 2: stale declared removal"), len(self.decl["headings"]), out
+        )
+        self.assertEqual(out.count("WARN 3b: stale declared removal"), len(self.decl["axes"]), out)
+
+    def test_a_declared_heading_still_in_the_candidate_warns(self):
+        h = next(iter(self.decl["headings"]))
+        s = {"run": 1, "watermark": 10, "tracked": [5]}
+        rc, out = run_gate(body(s, [h]), body({**s, "run": 2, "watermark": 11}, [h]))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("WARN 2: declared removal still present in candidate", out)
+
+    def test_a_string_valued_key_counts_as_carried(self):
+        # taxonomy_group is a string on the live boards, not an axis
+        s = {"run": 1, "watermark": 10, "tracked": [5], "taxonomy_group": "ISO/IEC 25010:2023"}
+        cand = {"run": 2, "watermark": 11, "tracked": [5]}
+        rc, out = run_gate(body(s), body(cand))
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("key not in before-snapshot -> 'taxonomy_group'", out)
 
     def test_undeclared_heading_loss_still_fails(self):
         s = {"run": 1, "watermark": 10, "tracked": [5]}
