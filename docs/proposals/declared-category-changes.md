@@ -49,7 +49,10 @@ and which issues sat under each heading.
 
 **Which issues sat under a heading.** The gate already holds both bodies. The
 issues under a heading are the `#N` references between that heading and the
-next heading of the same or higher level.
+next heading of the same or higher level, so a `####` sub-heading inside a
+theme stays part of that theme. A category heading with table rows or list
+items but no extracted `#N` warns (`2: <heading> has rows but no issue
+references`), since the extraction then has nothing to protect.
 
 ## 3. The rule
 
@@ -59,21 +62,30 @@ when both hold:
 1. **The run declared it.** The candidate's sentinel state JSON carries
    `category_changes` for this run: a list of entries, each with `kind`
    (`retired`, `merged`, `renamed` or `split`), `from` (the before-heading's
-   theme text), `into` (zero or more candidate headings), and `why`. The
+   theme text), `into` (candidate headings), and `why`. `into` is non-empty
+   for `merged`, `renamed` and `split`, and every `into` names a candidate
+   category heading; an empty `into` for those kinds, or an `into` naming a
+   schema heading, is a config error. The
    discovery step writes it; the run summary shows it. `category_changes` is a
    per-run key, so it joins `PER_RUN` and resets each run.
 2. **No issue under it is lost.** Every issue referenced under the retired
-   heading in the before body is referenced somewhere in the candidate body,
-   or was closed on GitHub, as check 3 already allows. For `merged`,
-   `renamed` and `split`, each such issue must appear under one of the `into`
-   headings.
+   heading in the before body is referenced under a candidate P1 or P2
+   category heading. A reference anywhere else does not count: not in the
+   Classification index, the carried-forward run indexes, Baseline,
+   Maintainer progress, any other schema heading, or the sentinel. For
+   `merged`, `renamed` and `split`, each such issue must appear under one of
+   the `into` headings. There is no exemption for an issue closed on GitHub:
+   neither gate reads closure today (`verify.rs` and `dashboard-gate.py` have
+   no closed state), and check 3 fails any number that leaves the state
+   (section 7).
 
 Otherwise it fails, as today:
 
 - an undeclared missing heading fails `2: HEADING LOST`;
 - a declared change that loses an issue fails with the issue numbers:
   `2: declared <kind> of <heading> lost issues [...]`;
-- a declaration against a schema heading is a config error, not a warning.
+- a declaration against a schema heading, in `from` or in `into`, is a
+  config error, not a warning.
 
 Declarations that name a heading the before-snapshot never carried warn as
 stale, the same way #88's static removals do.
@@ -99,27 +111,42 @@ a discovery pass is the expected case.
 3. Two P1 themes `merged` into one, one issue missing from the candidate:
    fails, naming that issue.
 4. A `retired` theme whose issues all moved to other themes: passes. The same
-   with one issue closed on GitHub and absent: passes.
-5. A declaration against `## Controls`: config error.
+   with one issue absent from every candidate category heading: fails, naming
+   it, whether or not the issue is closed on GitHub.
+5. A declaration against `## Controls`: config error. A `merged` whose `into`
+   names `## Baseline`: config error. A `renamed` with an empty `into`: config
+   error.
 6. A `category_changes` entry naming a heading the before-snapshot lacks:
    stale warning.
 7. `category_changes` from the previous run does not carry into this one
    (per-run key).
-8. The Python gate and `beadle verify` agree on cases 1 to 7.
+8. A retired theme whose issues survive only in the Classification index (or
+   only in the sentinel): fails, naming them.
+9. Extraction boundary: a theme with a `####` sub-heading holding issues
+   counts those issues as the theme's; the next `###` theme ends it.
+10. A category heading with rows but no `#N`: passes with the rows-without-
+    references warning.
+11. The Python gate and `beadle verify` agree on cases 1 to 10.
 
 ## 6. Edits, in order (none made by this PR)
 
 | # | Edit | Depends on |
 |---|---|---|
 | C-1 | Schema versus category headings: the schema list from `REQUIRED_SECTIONS` plus static config; category headings by level and priority marker | none |
-| C-2 | Issues-under-heading extraction from a body | none |
+| C-2 | Issues-under-heading extraction from a body (same-or-higher-level boundary; the rows-without-references warning) | none |
 | C-3 | `category_changes` read from the candidate state, added to `PER_RUN`; the rule in section 3 in `verify.rs` and `dashboard-gate.py` | C-1, C-2 |
 | C-4 | The skills flow: the discovery step writes `category_changes` and the run summary shows it | C-3, and the discovery step itself |
 
 The discovery step (which categories are in use or useful) is the operator's
 planned LLM process and is not designed here; C-4 is only its interface.
 
-## 7. Open question
+## 7. Open questions
+
+- Closure. An issue closed on GitHub has no gate-readable source today, for
+  this rule or for check 3. If closed issues should be allowed to leave the
+  board, the refresh would fetch a closed list into the candidate state and
+  both checks would consult it. That is a separate change; until it exists,
+  this rule grants no closure exemption.
 
 - Whether a discovered change should also be proposed rather than applied the
   first time (the run posts, and a human confirms the regroup on the next
