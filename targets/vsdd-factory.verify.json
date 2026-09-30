@@ -11,5 +11,16 @@
       "to": "### 🟢 P1/P2/P3 — Run-18 findings (carried — folded · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)",
       "why": "same run-18 carry precedent applied to the findings lane: NEW becomes carried — folded, row counts unchanged"
     }
+  ],
+  "_comment_removals": "Declared removals. A heading or cumulative sentinel axis in the before-snapshot that is absent from the candidate FAILS the gate unless it appears here with a `why`. Each entry names exactly one `heading` (exact H2/H3 line) or `axis` (a top-level sentinel key, covering its key.sub sub-axes). A declared axis never excuses issue numbers that leave state entirely.",
+  "removals": [
+    {
+      "axis": "iso25010",
+      "why": "ISO/IEC 25010 grouping retired from the board; issues stay tracked on their other axes"
+    },
+    {
+      "axis": "taxonomy_group",
+      "why": "the taxonomy group axis went with the ISO/IEC 25010 grouping it indexed"
+    }
   ]
 }
