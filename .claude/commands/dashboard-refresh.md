@@ -119,7 +119,8 @@ ax build beadle   # never a stale artifact; see §2
 ```
 
 Non-zero exit = do not post. `beadle verify` mechanizes checks 1, 2, 3, 5 and
-the `_unclassified_` half of 4; declared renames come from
+the `_unclassified_` half of 4; declared renames and declared removals (a
+retired heading or cumulative sentinel axis) come from
 `targets/<target>.verify.json`, where an entry without a `why` is a hard
 config error. `tools/dashboard-gate.py` is the reference implementation and
 the differential oracle — when the two disagree, the Python is right until

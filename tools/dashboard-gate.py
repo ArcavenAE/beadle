@@ -60,14 +60,44 @@ DECLARED_RENAMES = {
  "### 🟢 P1/P2/P3 — Run-18 findings (NEW · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)":
    "### 🟢 P1/P2/P3 — Run-18 findings (carried — folded · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)",
 }
+# A removal the run intends, with the reason. Headings are H2/H3 lines, exact.
+# Axes are top-level sentinel keys: one covers its `key.sub` sub-axes too. A
+# declared axis only excuses the axis vanishing (3b); its issue numbers must
+# still survive somewhere in state (3). The list serves every board, so an
+# entry a board never carried warns as stale rather than failing.
+_G25010 = "ISO/IEC 25010 grouping retired from the board; its rows stay in the P2/P3 lanes"
+DECLARED_REMOVALS = {
+ "headings": {
+  "### 🟢 P2: Correctness and operability defects, grouped by ISO/IEC 25010 characteristic": _G25010,
+  "### 🟢 P3: Papercuts, docs, tests, and design questions, grouped by ISO/IEC 25010 characteristic": _G25010,
+  "### 🟢 P2: Correctness and operability, grouped by ISO/IEC 25010 characteristic": _G25010,
+  "### 🟢 P3: Papercuts, docs, diagnostics and design questions, grouped by ISO/IEC 25010 characteristic": _G25010,
+  "## Quality characteristic groups (ISO/IEC 25010:2023)": _G25010,
+ },
+ "axes": {
+  "iso25010": "ISO/IEC 25010 grouping retired from the board; issues stay tracked on their other axes",
+  "taxonomy_group": "the taxonomy group axis went with the ISO/IEC 25010 grouping it indexed",
+ },
+}
 hb = re.findall(r'^#{2,3} .*$', before, re.M)
 hc = set(re.findall(r'^#{2,3} .*$', cand, re.M))
+for h in DECLARED_REMOVALS["headings"]:
+    if h not in hb:
+        warns.append(f"2: stale declared removal, heading not in before-snapshot -> {h[:60]!r}")
+    elif h in hc:
+        warns.append(f"2: declared removal still present in candidate -> {h[:60]!r}")
+if sb:
+    for a in DECLARED_REMOVALS["axes"]:
+        if a not in sb:
+            warns.append(f"3b: stale declared removal, key not in before-snapshot -> '{a}'")
 for h in hb:
     if h in hc:
         continue
     tgt = DECLARED_RENAMES.get(h)
     if tgt and tgt in hc:
         warns.append(f"2: declared rename (run-18 carry precedent) -> {h[:60]!r} => {tgt[:60]!r}")
+    elif h in DECLARED_REMOVALS["headings"]:
+        warns.append(f"2: declared removal -> {h[:60]!r} ({DECLARED_REMOVALS['headings'][h]})")
     else:
         fails.append(f"2: HEADING LOST -> {h[:95]}")
 
@@ -109,7 +139,10 @@ if sb and sc:
     ab, ac = axes(sb), axes(sc)
     for k, vb_ in ab.items():
         vc_ = ac.get(k)
-        if vc_ is None:
+        why = DECLARED_REMOVALS["axes"].get(k.split('.', 1)[0])
+        if vc_ is None and why:
+            warns.append(f"3b: declared removal -> axis '{k}' ({why})")
+        elif vc_ is None:
             fails.append(f"3b: cumulative axis '{k}' disappeared from state")
         elif vb_ - vc_:
             fails.append(f"3b: axis '{k}' lost {len(vb_-vc_)} issue(s): {sorted(vb_-vc_)[:20]}")

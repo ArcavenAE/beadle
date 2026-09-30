@@ -24,6 +24,12 @@ and the fact that the live body carries an inherited render-integrity violation
 prints 30 entries for one defect — count the table, not the rows)
 that an absolute check would block forever.
 
+A run that retires a heading or a cumulative sentinel axis declares it in
+`DECLARED_REMOVALS` with its reason (`beadle verify` reads the same from the
+`removals` list in `targets/<target>.verify.json`). A declared removal warns
+instead of failing checks 2 and 3b, and never excuses an issue number that
+leaves state entirely. Tests: `python3 -m unittest tools/test_dashboard_gate.py`.
+
 ### Ported to `beadle verify`
 
 `beadle verify <target> --before <snapshot> --candidate <file>` is the Rust

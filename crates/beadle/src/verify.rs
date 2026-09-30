@@ -93,15 +93,34 @@ pub struct Rename {
     pub why: String,
 }
 
-/// Load the declared-rename allowlist. `--renames` wins; otherwise
+/// A heading or cumulative sentinel axis the run intends to retire, with the
+/// justification that makes it a removal rather than a loss. Exactly one of
+/// `heading` and `axis` is set. A top-level axis covers its `axis.key`
+/// sub-axes. A declared axis excuses only the axis vanishing (3b); its issue
+/// numbers must still survive somewhere in state (3).
+#[derive(Debug, Clone, Deserialize)]
+pub struct Removal {
+    #[serde(default)]
+    pub heading: Option<String>,
+    #[serde(default)]
+    pub axis: Option<String>,
+    #[serde(default)]
+    pub why: String,
+}
+
+/// Load the declared renames and removals. `--renames` wins; otherwise
 /// `targets/<target>.verify.json` is used when it exists; otherwise empty.
-fn load_renames(root: &Path, target: &str, explicit: Option<&Path>) -> Result<Vec<Rename>> {
+fn load_declared(
+    root: &Path,
+    target: &str,
+    explicit: Option<&Path>,
+) -> Result<(Vec<Rename>, Vec<Removal>)> {
     let path: PathBuf = match explicit {
         Some(p) => p.to_path_buf(),
         None => {
             let default = root.join(format!("targets/{target}.verify.json"));
             if !default.exists() {
-                return Ok(Vec::new());
+                return Ok((Vec::new(), Vec::new()));
             }
             default
         }
@@ -111,7 +130,7 @@ fn load_renames(root: &Path, target: &str, explicit: Option<&Path>) -> Result<Ve
     let doc: Value =
         serde_json::from_str(&raw).with_context(|| format!("parse {} as JSON", path.display()))?;
     let arr = if doc.is_array() {
-        doc
+        doc.clone()
     } else {
         doc.get("renames").cloned().unwrap_or(Value::Array(vec![]))
     };
@@ -131,7 +150,35 @@ fn load_renames(root: &Path, target: &str, explicit: Option<&Path>) -> Result<Ve
             );
         }
     }
-    Ok(renames)
+
+    let removals: Vec<Removal> = match doc.get("removals") {
+        Some(v) => serde_json::from_value(v.clone()).with_context(|| {
+            format!(
+                "{}: expected removals as a list of {{heading|axis,why}}",
+                path.display()
+            )
+        })?,
+        None => Vec::new(),
+    };
+    for r in &removals {
+        let name = match (&r.heading, &r.axis) {
+            (Some(h), None) if !h.trim().is_empty() => h,
+            (None, Some(a)) if !a.trim().is_empty() => a,
+            _ => bail!(
+                "{}: a declared removal names exactly one non-empty `heading` or `axis`",
+                path.display()
+            ),
+        };
+        if r.why.trim().is_empty() {
+            bail!(
+                "{}: declared removal {:?} has no `why`; an allowlisted removal \
+                 must carry a justification",
+                path.display(),
+                clip(name, 60)
+            );
+        }
+    }
+    Ok((renames, removals))
 }
 
 // --------------------------------------------------------------- sentinel ---
@@ -429,7 +476,12 @@ impl Report {
 
 /// Run every check. Errors only when the gate itself cannot operate (a missing
 /// before-snapshot sentinel); everything else lands in the report.
-pub fn evaluate(before: &str, candidate: &str, renames: &[Rename]) -> Result<Report> {
+pub fn evaluate(
+    before: &str,
+    candidate: &str,
+    renames: &[Rename],
+    removals: &[Removal],
+) -> Result<Report> {
     let sb = sentinel(before)
         .ok_or_else(|| anyhow!("before-snapshot sentinel missing or unparseable"))?;
     let sc = sentinel(candidate);
@@ -513,6 +565,32 @@ pub fn evaluate(before: &str, candidate: &str, renames: &[Rename]) -> Result<Rep
         }
     }
 
+    // A declared removal the before-snapshot never carried is stale, and one
+    // the candidate still carries did not happen. Both warn: an allowlist can
+    // serve more than one board, so neither is a loss.
+    for r in removals {
+        if let Some(h) = r.heading.as_deref() {
+            if !headings_before.contains(&h) {
+                rep.warns.push(format!(
+                    "2: stale declared removal, heading not in before-snapshot -> {:?}",
+                    clip(h, 60)
+                ));
+            } else if headings_cand.contains(h) {
+                rep.warns.push(format!(
+                    "2: declared removal still present in candidate -> {:?}",
+                    clip(h, 60)
+                ));
+            }
+        }
+        if let Some(a) = r.axis.as_deref() {
+            if sb.get(a).is_none() {
+                rep.warns.push(format!(
+                    "3b: stale declared removal, key not in before-snapshot -> '{a}'"
+                ));
+            }
+        }
+    }
+
     // ---- 2. no section loss (declared renames allowlisted) ---------------
     for h in &headings_before {
         if headings_cand.contains(h) {
@@ -525,9 +603,16 @@ pub fn evaluate(before: &str, candidate: &str, renames: &[Rename]) -> Result<Rep
                 clip(&r.to, 60),
                 r.why
             )),
-            _ => rep
-                .fails
-                .push(format!("2: HEADING LOST -> {}", clip(h, 95))),
+            _ => match removals.iter().find(|r| r.heading.as_deref() == Some(*h)) {
+                Some(r) => rep.warns.push(format!(
+                    "2: declared removal -> {:?} ({})",
+                    clip(h, 60),
+                    r.why
+                )),
+                None => rep
+                    .fails
+                    .push(format!("2: HEADING LOST -> {}", clip(h, 95))),
+            },
         }
     }
 
@@ -551,11 +636,16 @@ pub fn evaluate(before: &str, candidate: &str, renames: &[Rename]) -> Result<Rep
         let ab = axes(&sb);
         let ac = axes(sc);
         for (k, vb) in &ab {
-            match ac.get(k) {
-                None => rep
+            let top = k.split('.').next().unwrap_or(k);
+            let declared = removals.iter().find(|r| r.axis.as_deref() == Some(top));
+            match (ac.get(k), declared) {
+                (None, Some(r)) => rep
+                    .warns
+                    .push(format!("3b: declared removal -> axis '{k}' ({})", r.why)),
+                (None, None) => rep
                     .fails
                     .push(format!("3b: cumulative axis '{k}' disappeared from state")),
-                Some(vc) => {
+                (Some(vc), _) => {
                     let lost: Vec<i64> = vb.difference(vc).copied().collect();
                     if !lost.is_empty() {
                         rep.fails.push(format!(
@@ -758,9 +848,9 @@ pub fn run(
         .with_context(|| format!("read before-snapshot {}", before_path.display()))?;
     let candidate = fs::read_to_string(candidate_path)
         .with_context(|| format!("read candidate {}", candidate_path.display()))?;
-    let renames = load_renames(root, target, renames_path)?;
+    let (renames, removals) = load_declared(root, target, renames_path)?;
 
-    let report = evaluate(&before, &candidate, &renames)?;
+    let report = evaluate(&before, &candidate, &renames, &removals)?;
     print!("{}", report.render());
     if !report.passed() {
         bail!(
@@ -817,7 +907,7 @@ mod tests {
     }
 
     fn gate(before: &str, cand: &str) -> Report {
-        evaluate(before, cand, &[]).expect("gate runs")
+        evaluate(before, cand, &[], &[]).expect("gate runs")
     }
 
     #[test]
@@ -994,7 +1084,7 @@ mod tests {
             to: "### Run-18 findings (carried)".into(),
             why: "run-18 carry precedent".into(),
         }];
-        let r = evaluate(&before, &cand, &declared).expect("gate runs");
+        let r = evaluate(&before, &cand, &declared, &[]).expect("gate runs");
         assert!(r.passed(), "declared rename should pass: {:?}", r.fails);
         assert!(r.warns.iter().any(|w| w.contains("declared rename")));
         assert!(r.warns.iter().any(|w| w.contains("run-18 carry precedent")));
@@ -1028,5 +1118,143 @@ mod tests {
     fn code_fences_inside_details_are_not_tables() {
         let blk = "<details>\n<summary>s</summary>\n\n```\n| not | a | table |\n```\n\n</details>";
         assert!(render_violations(blk).iter().all(|v| v.code != "5d"));
+    }
+
+    fn removal(heading: Option<&str>, axis: Option<&str>, why: &str) -> Removal {
+        Removal {
+            heading: heading.map(Into::into),
+            axis: axis.map(Into::into),
+            why: why.into(),
+        }
+    }
+
+    #[test]
+    fn declared_heading_removal_warns_instead_of_failing() {
+        let before = doc(base_state(18, 830), &[18], "## ISO/IEC 25010 group\n");
+        let cand = doc(base_state(19, 836), &[18, 19], "");
+        assert!(!gate(&before, &cand).passed());
+
+        let declared = [removal(
+            Some("## ISO/IEC 25010 group"),
+            None,
+            "grouping retired",
+        )];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(r.passed(), "declared removal should pass: {:?}", r.fails);
+        assert!(r
+            .warns
+            .iter()
+            .any(|w| w.contains("2: declared removal") && w.contains("grouping retired")));
+    }
+
+    #[test]
+    fn declared_axis_removal_covers_its_sub_axes() {
+        let mut sb = base_state(18, 830);
+        sb["tracked"] = json!([508, 624, 830]);
+        let before = doc(sb, &[18], "");
+        let mut sc = base_state(19, 836);
+        sc["tracked"] = json!([508, 624, 830]);
+        sc.as_object_mut().expect("object").remove("clusters");
+        let cand = doc(sc, &[18, 19], "");
+
+        let declared = [removal(None, Some("clusters"), "axis retired")];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(
+            r.passed(),
+            "declared axis removal should pass: {:?}",
+            r.fails
+        );
+        assert!(r
+            .warns
+            .iter()
+            .any(|w| w.contains("3b: declared removal -> axis 'clusters.scratch-isolation'")));
+    }
+
+    #[test]
+    fn declared_axis_removal_does_not_excuse_dropped_issues() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let mut sc = base_state(19, 836);
+        sc.as_object_mut().expect("object").remove("clusters");
+        let cand = doc(sc, &[18, 19], "");
+
+        let declared = [removal(None, Some("clusters"), "axis retired")];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(r
+            .fails
+            .iter()
+            .any(|f| f.contains("3: 3 tracked issue(s) dropped from state")));
+    }
+
+    #[test]
+    fn a_removal_without_a_why_or_a_single_target_is_a_config_error() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cases = [
+            r#"{"removals":[{"axis":"iso25010"}]}"#,
+            r#"{"removals":[{"why":"no target"}]}"#,
+            r###"{"removals":[{"axis":"a","heading":"## b","why":"both"}]}"###,
+        ];
+        for body in cases {
+            let p = dir.path().join("v.json");
+            fs::write(&p, body).expect("write config");
+            assert!(
+                load_declared(dir.path(), "x", Some(&p)).is_err(),
+                "should reject {body}"
+            );
+        }
+        let p = dir.path().join("v.json");
+        fs::write(&p, r#"{"removals":[{"axis":"iso25010","why":"retired"}]}"#)
+            .expect("write config");
+        let (renames, removals) = load_declared(dir.path(), "x", Some(&p)).expect("valid config");
+        assert!(renames.is_empty());
+        assert_eq!(removals.len(), 1);
+    }
+
+    #[test]
+    fn a_declared_removal_the_board_never_carried_warns_as_stale() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(base_state(19, 836), &[18, 19], "");
+        let declared = [
+            removal(Some("## Gone"), None, "retired"),
+            removal(None, Some("iso25010"), "retired"),
+        ];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(r.passed(), "stale entries warn, never fail: {:?}", r.fails);
+        assert!(r
+            .warns
+            .iter()
+            .any(|w| w.contains("2: stale declared removal")));
+        assert!(r
+            .warns
+            .iter()
+            .any(|w| w.contains("3b: stale declared removal")));
+    }
+
+    #[test]
+    fn a_declared_heading_still_in_the_candidate_warns() {
+        let before = doc(base_state(18, 830), &[18], "## Kept\n");
+        let cand = doc(base_state(19, 836), &[18, 19], "## Kept\n");
+        let declared = [removal(Some("## Kept"), None, "retired")];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(r.passed(), "{:?}", r.fails);
+        assert!(r
+            .warns
+            .iter()
+            .any(|w| w.contains("still present in candidate")));
+    }
+
+    #[test]
+    fn a_string_valued_key_counts_as_carried() {
+        let mut sb = base_state(18, 830);
+        sb["taxonomy_group"] = json!("ISO/IEC 25010:2023");
+        let before = doc(sb, &[18], "");
+        let cand = doc(base_state(19, 836), &[18, 19], "");
+        let declared = [removal(None, Some("taxonomy_group"), "retired")];
+        let r = evaluate(&before, &cand, &[], &declared).expect("gate runs");
+        assert!(r.passed(), "{:?}", r.fails);
+        assert!(
+            r.warns.iter().all(|w| !w.contains("stale")),
+            "{:?}",
+            r.warns
+        );
     }
 }
