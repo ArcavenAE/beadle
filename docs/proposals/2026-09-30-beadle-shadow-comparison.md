@@ -8,8 +8,8 @@ own sentinel. The cheapest wins are in the store, the gate and the sync path,
 not the renderer.
 
 Measured at ArcavenAE/beadle main `bc8c1c5`, 2026-09-30, from kinu. Every count
-below comes from a command run in the shadow workspace; the raw outputs sit
-beside this file. This extends the method in `aae-orc-5buzr` and
+below comes from a command run in the shadow workspace; the raw outputs stay in
+that local workspace and are not published. This extends the method in `aae-orc-5buzr` and
 `docs/proposals/binary-skill-convergence.md` (first run 2026-09-18) from one
 board to five.
 
@@ -135,6 +135,10 @@ board to five.
    evidence, keeping it an observation.
 5. **Name the self-count rule.** Decide whether the dashboard issue counts as
    open and apply it in `enum`; two of five boards count it and three do not.
+6. **Refuse intent YAML the line parser cannot read.** A flow-sequence
+   `maintainers` loads as an empty list without error (see "State sources");
+   fail loudly on flow forms, as a flow-map `target` already does, or use a YAML
+   parser.
 
 ### Skills
 
@@ -198,3 +202,17 @@ Per board, this report therefore used:
 Repo-only intents carry no maintainer list, so `sync` counted every event on
 those four boards as "other"; their maintainer and measured splits are not
 comparable and are not reported.
+
+This run routed around the intent parser's limits rather than hitting them:
+every intent it loaded was block-form YAML (`vsdd-factory.intent.yaml` from the
+repo, and the four repo-only intents written for the shadow). Errand's source
+reading reports that 2 of its 5 run-1 intents write `target: {repo: ...}` as a
+flow map, that a client board's `repo` has no owner, and that some write
+maintainers as flow sequences. Tested against the binary at `bc8c1c5`:
+
+- A flow-map `target` fails loudly: `no repo: scalar`.
+- An ownerless `repo` loads without complaint and fails only later, at the
+  GitHub call.
+- A flow-sequence `maintainers: [a, b]` loads and yields an empty list without
+  a word: `sequence()` (`intent.rs:313-338`) only starts at a key line ending in
+  `:`. Every maintainer event would then count as "other". This one is silent.
