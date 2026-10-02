@@ -147,7 +147,7 @@ fn round_trip() {
         e.performative
     );
     assert!(matches!(
-        e.authority.strength,
+        e.effective_authority().strength,
         DirectorEnvelopeAuthorityStrength::Direct
     ));
     assert!(matches!(e.content.type_, DirectorEnvelopeContentType::Task));
@@ -252,15 +252,17 @@ fn effective_authority_returns_a_present_block_unchanged() {
 /// sender.instance (marvel#447) is a ULID, optional and nullable.
 #[test]
 fn sender_instance_is_accepted_and_decoded() {
-    for name in ["valid-sender-instance.json", "valid-sender-instance-null.json"] {
+    for name in [
+        "valid-sender-instance.json",
+        "valid-sender-instance-null.json",
+    ] {
         let data = fs::read(contracts_dir().join("testdata").join(name)).expect("read fixture");
         validate(&data).unwrap_or_else(|e| panic!("{name}: expected valid, got: {e}"));
     }
     let e = fixture_envelope("valid-sender-instance.json");
-    assert_eq!(
-        e.sender.instance.as_deref(),
-        Some("01K6H8Z4QW3M5N7P9R2S4T6V8X")
-    );
+    let instance = serde_json::to_value(e.sender.instance.as_ref().expect("instance present"))
+        .expect("serialize instance");
+    assert_eq!(instance, "01K6H8Z4QW3M5N7P9R2S4T6V8X");
     assert!(fixture_envelope("valid-sender-instance-null.json")
         .sender
         .instance
