@@ -1,4 +1,4 @@
-# finding-025: two inputs beadle drops without a word: sync past 500 issues, and flow-sequence maintainers
+# finding-026: two inputs beadle drops without a word: sync past 500 issues, and flow-sequence maintainers
 
 Date: 2026-09-30 (measured), filed 2026-10-02
 Status: observed during the shadow comparison (beadle#94, draft), each tested
