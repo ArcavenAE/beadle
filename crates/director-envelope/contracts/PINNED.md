@@ -11,14 +11,19 @@ refresh is always an explicit commit that names the upstream revision.
 ## What is pinned
 
 - **Canonical:** `contracts/schema/director-envelope.schema.json` in
-  `github.com/ArcavenAE/marvel`, frozen at PR #248 head `415d65e` (branch
-  `feat/b69n-contracts`); fixtures from PR #249 head `9a52282` (branch
-  `feat/b69n-codegen`), which adds three invalid cases to the same schema.
+  `github.com/ArcavenAE/marvel`, at `7177ca2` (marvel#449, authority optional,
+  absent means strength `none`; director#197), which includes marvel#447
+  (`sender.instance`, merged as `ceb4e78`). Fixtures from the same revision:
+  `contracts/schema/testdata/*.json` at the top level, 19 files. The nested
+  `testdata/event/` fixtures belong to the event schema and are not vendored.
 - **`$id`:** `https://schema.arcaven.com/director/envelope/v1`
 - **`director-envelope.schema.json` sha256:**
-  `101ce10196f156243a20d8a5e22b07433869286b08a993a3726d9ed06ae127ad`
-- **`testdata/` (11 fixtures) sha256:** see `PINNED.sha256`, one line per file,
+  `ba74a00d26d8ac6d839c29b9e0c09a2a1bb39918c8a35290a79434c76d55666f`
+- **`testdata/` (19 fixtures) sha256:** see `PINNED.sha256`, one line per file,
   checked by the same test.
+- **Reading an absent authority:** the schema makes `authority` optional, and
+  `Envelope::effective_authority()` (in `src/lib.rs`) reads an absent block as
+  strength `none` with no seat. Use it instead of reading `authority` directly.
 
 ## Refreshing the pin
 
