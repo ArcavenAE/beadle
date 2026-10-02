@@ -64,12 +64,12 @@ fn vendored_contract_matches_pin() {
         checked += 1;
     }
     assert_eq!(
-        checked, 20,
-        "PINNED.sha256 should list the schema plus 19 fixtures"
+        checked, 26,
+        "PINNED.sha256 should list the schema plus 25 fixtures"
     );
     assert_eq!(
         sha256_hex(SCHEMA_JSON.as_bytes()),
-        "ba74a00d26d8ac6d839c29b9e0c09a2a1bb39918c8a35290a79434c76d55666f",
+        "5b6332d3438ed38e1d42ef172a589254fe0d977dffb18ebec6bc56e2d7a20c2c",
         "the schema the validator embeds is not the pinned one"
     );
 }
