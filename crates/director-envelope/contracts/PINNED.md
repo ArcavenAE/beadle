@@ -11,15 +11,17 @@ refresh is always an explicit commit that names the upstream revision.
 ## What is pinned
 
 - **Canonical:** `contracts/schema/director-envelope.schema.json` in
-  `github.com/ArcavenAE/marvel`, at `7177ca2` (marvel#449, authority optional,
-  absent means strength `none`; director#197), which includes marvel#447
-  (`sender.instance`, merged as `ceb4e78`). Fixtures from the same revision:
-  `contracts/schema/testdata/*.json` at the top level, 19 files. The nested
+  `github.com/ArcavenAE/marvel`, at `768788a` (marvel#464, which adds the
+  global tier's `global://director` and `global://{cluster}/supervisor`
+  recipient forms, marvel#457). It carries marvel#449 (authority optional,
+  absent means strength `none`; director#197) and marvel#447
+  (`sender.instance`). Fixtures from the same revision:
+  `contracts/schema/testdata/*.json` at the top level, 25 files. The nested
   `testdata/event/` fixtures belong to the event schema and are not vendored.
 - **`$id`:** `https://schema.arcaven.com/director/envelope/v1`
 - **`director-envelope.schema.json` sha256:**
-  `ba74a00d26d8ac6d839c29b9e0c09a2a1bb39918c8a35290a79434c76d55666f`
-- **`testdata/` (19 fixtures) sha256:** see `PINNED.sha256`, one line per file,
+  `5b6332d3438ed38e1d42ef172a589254fe0d977dffb18ebec6bc56e2d7a20c2c`
+- **`testdata/` (25 fixtures) sha256:** see `PINNED.sha256`, one line per file,
   checked by the same test.
 - **Reading an absent authority:** the schema makes `authority` optional, and
   `Envelope::effective_authority()` (in `src/lib.rs`) reads an absent block as

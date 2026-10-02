@@ -489,13 +489,13 @@ impl ::std::str::FromStr for DirectorEnvelopeRecipientAddress {
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
         {
             ::regress::Regex::new(
-                    "^(agent://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|role://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|broadcast://[a-z0-9][a-z0-9-]{0,31}(/[a-z0-9][a-z0-9-]{0,31})?)$",
+                    "^(agent://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|role://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|broadcast://[a-z0-9][a-z0-9-]{0,31}(/[a-z0-9][a-z0-9-]{0,31})?|global://director|global://[a-z0-9][a-z0-9-]{0,31}/supervisor)$",
                 )
                 .unwrap()
         });
         if PATTERN.find(value).is_none() {
             return Err(
-                "doesn't match pattern \"^(agent://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|role://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|broadcast://[a-z0-9][a-z0-9-]{0,31}(/[a-z0-9][a-z0-9-]{0,31})?)$\""
+                "doesn't match pattern \"^(agent://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|role://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|broadcast://[a-z0-9][a-z0-9-]{0,31}(/[a-z0-9][a-z0-9-]{0,31})?|global://director|global://[a-z0-9][a-z0-9-]{0,31}/supervisor)$\""
                     .into(),
             );
         }
