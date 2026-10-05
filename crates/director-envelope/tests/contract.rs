@@ -64,12 +64,12 @@ fn vendored_contract_matches_pin() {
         checked += 1;
     }
     assert_eq!(
-        checked, 12,
-        "PINNED.sha256 should list the schema plus 11 fixtures"
+        checked, 26,
+        "PINNED.sha256 should list the schema plus 25 fixtures"
     );
     assert_eq!(
         sha256_hex(SCHEMA_JSON.as_bytes()),
-        "101ce10196f156243a20d8a5e22b07433869286b08a993a3726d9ed06ae127ad",
+        "5b6332d3438ed38e1d42ef172a589254fe0d977dffb18ebec6bc56e2d7a20c2c",
         "the schema the validator embeds is not the pinned one"
     );
 }
@@ -147,7 +147,7 @@ fn round_trip() {
         e.performative
     );
     assert!(matches!(
-        e.authority.strength,
+        e.effective_authority().strength,
         DirectorEnvelopeAuthorityStrength::Direct
     ));
     assert!(matches!(e.content.type_, DirectorEnvelopeContentType::Task));
@@ -206,4 +206,65 @@ fn valid_fixtures_decode_and_round_trip() {
             panic!("{name}: re-validate after round-trip: {err}");
         }
     }
+}
+
+fn fixture_envelope(name: &str) -> Envelope {
+    let data = fs::read(contracts_dir().join("testdata").join(name)).expect("read fixture");
+    serde_json::from_slice(&data).unwrap_or_else(|e| panic!("{name}: decode: {e}"))
+}
+
+/// Authority is optional since director#197 and an absent block means strength
+/// none with no seat. The envelope validates without it, decodes, and reads as
+/// none through `effective_authority`, the counterpart of marvel's
+/// `EffectiveAuthority`.
+#[test]
+fn absent_authority_is_accepted_and_reads_as_none() {
+    let data = fs::read(contracts_dir().join("testdata/valid-authority-absent.json"))
+        .expect("read fixture");
+    validate(&data).expect("an envelope with no authority is valid");
+    let e = fixture_envelope("valid-authority-absent.json");
+    let a = e.effective_authority();
+    assert!(
+        matches!(a.strength, DirectorEnvelopeAuthorityStrength::None),
+        "absent authority should read as none, got {:?}",
+        a.strength
+    );
+    assert!(a.seat.is_none(), "absent authority carries no seat");
+}
+
+/// A present block is returned as written, and an absent block stays absent on
+/// reserialize (it is not rewritten into an invalid empty strength).
+#[test]
+fn effective_authority_returns_a_present_block_unchanged() {
+    let e = fixture_envelope("valid-principal-null.json");
+    assert!(matches!(
+        e.effective_authority().strength,
+        DirectorEnvelopeAuthorityStrength::Direct
+    ));
+    let absent = fixture_envelope("valid-authority-absent.json");
+    let out = serde_json::to_value(&absent).expect("serialize");
+    assert!(
+        out.get("authority").is_none(),
+        "absent authority must not reserialize as a block: {out}"
+    );
+}
+
+/// sender.instance (marvel#447) is a ULID, optional and nullable.
+#[test]
+fn sender_instance_is_accepted_and_decoded() {
+    for name in [
+        "valid-sender-instance.json",
+        "valid-sender-instance-null.json",
+    ] {
+        let data = fs::read(contracts_dir().join("testdata").join(name)).expect("read fixture");
+        validate(&data).unwrap_or_else(|e| panic!("{name}: expected valid, got: {e}"));
+    }
+    let e = fixture_envelope("valid-sender-instance.json");
+    let instance = serde_json::to_value(e.sender.instance.as_ref().expect("instance present"))
+        .expect("serialize instance");
+    assert_eq!(instance, "01K6H8Z4QW3M5N7P9R2S4T6V8X");
+    assert!(fixture_envelope("valid-sender-instance-null.json")
+        .sender
+        .instance
+        .is_none());
 }

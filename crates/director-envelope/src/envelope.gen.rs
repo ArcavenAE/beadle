@@ -5,7 +5,8 @@
 #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DirectorEnvelope {
-    pub authority: DirectorEnvelopeAuthority,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub authority: ::std::option::Option<DirectorEnvelopeAuthority>,
     pub content: DirectorEnvelopeContent,
     ///Reply chain. On the first message of a chain it equals message_id.
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
@@ -33,7 +34,7 @@ pub struct DirectorEnvelope {
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub trace: ::std::option::Option<DirectorEnvelopeTrace>,
 }
-///`DirectorEnvelopeAuthority`
+///Optional. An absent block means {"strength": "none"} with no seat: no authority (operator ruling, director#197). When present, strength is required and seat keeps its shape.
 #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DirectorEnvelopeAuthority {
@@ -488,13 +489,13 @@ impl ::std::str::FromStr for DirectorEnvelopeRecipientAddress {
         static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
         {
             ::regress::Regex::new(
-                    "^(agent://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|role://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|broadcast://[a-z0-9][a-z0-9-]{0,31}(/[a-z0-9][a-z0-9-]{0,31})?)$",
+                    "^(agent://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|role://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|broadcast://[a-z0-9][a-z0-9-]{0,31}(/[a-z0-9][a-z0-9-]{0,31})?|global://director|global://[a-z0-9][a-z0-9-]{0,31}/supervisor)$",
                 )
                 .unwrap()
         });
         if PATTERN.find(value).is_none() {
             return Err(
-                "doesn't match pattern \"^(agent://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|role://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|broadcast://[a-z0-9][a-z0-9-]{0,31}(/[a-z0-9][a-z0-9-]{0,31})?)$\""
+                "doesn't match pattern \"^(agent://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|role://[a-z0-9][a-z0-9-]{0,31}/[a-z0-9][a-z0-9-]{0,31}|broadcast://[a-z0-9][a-z0-9-]{0,31}(/[a-z0-9][a-z0-9-]{0,31})?|global://director|global://[a-z0-9][a-z0-9-]{0,31}/supervisor)$\""
                     .into(),
             );
         }
@@ -592,6 +593,9 @@ impl<'de> ::serde::Deserialize<'de> for DirectorEnvelopeRecipientTeam {
 pub struct DirectorEnvelopeSender {
     ///The roster address, stable across restarts. Closed character class (R-76): no dot, star, angle bracket, or space, because it is interpolated into a NATS subject (director#3).
     pub agent_id: DirectorEnvelopeSenderAgentId,
+    ///The sending shim process's instance id, a ULID minted at shim start. It is the suffix of that process's durable, mcp_<agent>_<instance>. One harness session can span several instances (a shim restart) and one agent can run several at once. Informational: self-asserted by the sender, never a routing or authorization input (as role, R-71, R-82).
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub instance: ::std::option::Option<DirectorEnvelopeSenderInstance>,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub principal: ::std::option::Option<::serde_json::Value>,
     ///Current role. Informational only, never a routing or authorization input (R-71, R-82).
@@ -647,6 +651,62 @@ impl ::std::convert::TryFrom<::std::string::String> for DirectorEnvelopeSenderAg
     }
 }
 impl<'de> ::serde::Deserialize<'de> for DirectorEnvelopeSenderAgentId {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+///The sending shim process's instance id, a ULID minted at shim start. It is the suffix of that process's durable, mcp_<agent>_<instance>. One harness session can span several instances (a shim restart) and one agent can run several at once. Informational: self-asserted by the sender, never a routing or authorization input (as role, R-71, R-82).
+#[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct DirectorEnvelopeSenderInstance(::std::string::String);
+impl ::std::ops::Deref for DirectorEnvelopeSenderInstance {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<DirectorEnvelopeSenderInstance> for ::std::string::String {
+    fn from(value: DirectorEnvelopeSenderInstance) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for DirectorEnvelopeSenderInstance {
+    type Err = self::error::ConversionError;
+    fn from_str(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(||
+        { ::regress::Regex::new("^[0-7][0-9A-HJKMNP-TV-Z]{25}$").unwrap() });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[0-7][0-9A-HJKMNP-TV-Z]{25}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for DirectorEnvelopeSenderInstance {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: &str,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for DirectorEnvelopeSenderInstance {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DirectorEnvelopeSenderInstance {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,

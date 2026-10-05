@@ -25,6 +25,20 @@ pub use envelope_gen::*;
 /// alias is the one hand-written type name here; everything else is generated.
 pub type Envelope = DirectorEnvelope;
 
+impl Envelope {
+    /// The envelope's authority, reading an absent block as strength `none`
+    /// with no seat. Authority is optional and its absence carries no authority
+    /// (operator ruling, director#197); the schema states that default in prose
+    /// because the generated field is an `Option`, and this is where Rust
+    /// readers apply it. The counterpart of marvel's `Envelope.EffectiveAuthority`.
+    pub fn effective_authority(&self) -> DirectorEnvelopeAuthority {
+        self.authority.clone().unwrap_or(DirectorEnvelopeAuthority {
+            seat: None,
+            strength: DirectorEnvelopeAuthorityStrength::None,
+        })
+    }
+}
+
 /// The envelope JSON Schema, embedded so the validator needs no filesystem at
 /// runtime. This is the vendored copy of the canonical schema; the pin guard
 /// test keeps it honest.
