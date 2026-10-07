@@ -14,13 +14,13 @@ serde_json = { workspace = true }
 # chrono and uuid carry the date-time and uuid formats the schema annotates.
 chrono = { version = "0.4", default-features = false, features = ["serde", "std"] }
 uuid = { version = "1", features = ["serde"] }
-regress = "0.10"
-jsonschema = { version = "0.56", default-features = false }
+regress = "0.12"
+jsonschema = { version = "0.58", default-features = false }
 
 [dev-dependencies]
 # The generator and its drift guard only; nothing here ships in the binary.
 typify = { version = "0.8", default-features = false }
-schemars = "0.8"
-prettyplease = "0.2"
+schemars = "0.9"
+prettyplease = "0.3"
 syn = { version = "2", features = ["full"] }
 sha2 = { workspace = true }
