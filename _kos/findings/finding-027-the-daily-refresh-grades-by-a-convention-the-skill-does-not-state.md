@@ -2,7 +2,23 @@
 
 Date: 2026-10-05 (from the 2026-10-01 to 2026-10-05 scheduled refreshes)
 Scope: skills/beadle-triage step 3 (classify), as practiced by the daily skills-method refresh of five boards
-Status: observed over five runs; the convention is unratified
+Status: ratified 2026-10-08 (operator, Decision Desk); the rules and the P0a/P0b definitions are now in skills/beadle-triage step 3
+
+## Ruling (2026-10-08)
+
+The operator ratified four rules and the open calls, and asked for the rules and the
+P0a/P0b definitions to be written into the skill. Step 3 of skills/beadle-triage now
+carries them under "Starting grade and lane overrides":
+
+1. A filer's priority label sets the starting grade (low P3, medium P2, high P1), and
+   evidence still moves it either way.
+2. A lane definition overrides the starting grade (P0a, P0b).
+3. Features stay P3 unless they are a security or deploy gate.
+4. A fix-ask issue is graded P2 as the remedy, while its defect keeps its own grade.
+
+Open calls, now ratified: director #192 P0b, director #222 P0a, director #220 P1,
+director #173 P2, marvel #523 P0b. Two calls from the same list need no ruling any
+more: marvel #559 and #586 have closed.
 
 ## What I saw
 

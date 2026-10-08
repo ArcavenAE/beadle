@@ -39,6 +39,30 @@ Re-classify on every axis; **don't trust the body's self-label.** The model is a
 superset of research-grounded axes (finding-005) + beadle-original axes. Default
 priority low, escalate on evidence.
 
+**Starting grade and lane overrides (ratified 2026-10-08).** These rules refine the
+two lines above: a filer's priority label sets where grading starts (with no label,
+start low), and the evidence and lane definitions decide where it ends, so the
+label is never trusted on its own. The four rules, as practiced by the daily
+refresh (finding-027):
+
+1. A filer's priority label sets the starting grade: low is P3, medium is P2, high
+   is P1. Evidence still moves it either way.
+2. A lane definition overrides the starting grade. The two lanes that do this are:
+   - **P0a, silent data loss:** irreplaceable state destroyed or stranded with no
+     signal.
+   - **P0b, source-of-truth integrity:** the tool reports a state that is not true.
+     It gates every functional verdict on the same substrate, convergence included
+     (finding-004, below).
+
+   The wording comes from the P0a and P0b lane headings in
+   `docs/fixtures/vsdd-factory-312-curated-run19.md`; the P0a/P0b split is the one
+   the refresh command requires in `.claude/commands/dashboard-refresh.md`. Where an
+   item matches a known P0a or P0b by mechanism but no definition fits it exactly,
+   grade by analogy and record the analogy as the reason.
+3. Features stay P3 unless they are a security gate or a deploy gate.
+4. A fix-ask issue (one that asks for the remedy to a defect filed elsewhere) is
+   graded P2 as the remedy, while the defect keeps its own grade.
+
 **Research-grounded axes** (deep-research `we6yrrcba`; "defect" is the industry
 term — IEEE 1044 / ODC):
 - **report-type** — the surface form. Primary carrier: GitHub **Issue Types**
