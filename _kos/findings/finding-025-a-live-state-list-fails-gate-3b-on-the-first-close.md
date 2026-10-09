@@ -30,7 +30,9 @@ Check 3b treats every list in the sentinel as cumulative unless its key is in th
 hardcoded `PER_RUN` set (`new_this_run`, `quick_wins_new`, `keystone_new`,
 `prior_run_burst`, `degraded_new`). A board has no way to declare a new per-run or live
 axis. A note inside the sentinel (`axis_semantics`) is prose, and the gate does not read
-it. So any list whose meaning is "what is true now" passes while it only grows, and fails
+it. The gate's `DECLARED_REMOVALS["axes"]` (tools/dashboard-gate.py:74-90 at 94d9f15) is
+not that route either: by its own comment it excuses only an axis vanishing, and the
+axis's issue numbers must still survive, so it does not cover a live list that shrinks. So any list whose meaning is "what is true now" passes while it only grows, and fails
 on the first close or merge.
 
 Client board B had three such lists and four closures pending in the same run. It would

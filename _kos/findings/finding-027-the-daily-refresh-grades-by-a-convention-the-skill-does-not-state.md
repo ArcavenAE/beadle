@@ -31,8 +31,12 @@ also used a narrower working rule, written nowhere but in its own run scripts:
    P2 and high to P1 as the starting grade.
 2. A lane definition overrides that starting grade. Two lanes did this across the five
    runs: P0a (silent data loss: state destroyed or stranded with no signal) and P0b
-   (the tool reports a state that is not true). Both definitions come from the board
-   fixtures, not from the skill.
+   (the tool reports a state that is not true). The skill already states the class
+   both lanes belong to: step 3's "Silent integrity / source-of-truth corruption"
+   paragraph (SKILL.md:78 at 46cd294) ranks it top severity, always escalated
+   (finding-004), and `vocabulary.json` lists `P0a` and `P0b` as values. What the
+   skill lacked was the split: no text said which sub-lane an item belongs to. The
+   two sub-lane definitions came from the board fixtures.
 3. Where an item resembled a known P0b by mechanism but no lane definition fit it
    exactly, the grader graded by analogy and wrote that down as its reason.
 
@@ -49,13 +53,15 @@ the grades the rule produced; the 2026-10-04 harvest listed five of them as open
 - A second grader, or the same seat after a respawn, would not find the rule or the
   reasons, and could regrade the same items differently from run to run. That churn
   would show on public boards as unexplained priority moves.
-- The lane definitions that override everything else (P0a, P0b) are defined only in a
-  fixture document. A grader learns them by example.
+- The skill states the integrity class (SKILL.md:78 at 46cd294), but the split of
+  that class into P0a and P0b, the two lanes that override everything else, was
+  defined only in a fixture document. A grader learned the split by example. The
+  2026-10-08 ratification writes the split into step 3 (see Ruling above).
 
 ## What would settle it
 
-A ruling on point 1 (adopt it into step 3, or drop it), and a home for the P0a and P0b
-definitions in the skill itself. Until then, the grading reasons stay private by design
+A ruling on point 1 (adopt it into step 3, or drop it), and a home in the skill for the
+P0a and P0b sub-lanes under the existing integrity class. Until then, the grading reasons stay private by design
 (some boards are for private repositories), so a successor depends on that host's notes.
 
 ## Evidence

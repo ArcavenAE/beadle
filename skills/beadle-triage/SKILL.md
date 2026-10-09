@@ -47,7 +47,9 @@ refresh (finding-027):
 
 1. A filer's priority label sets the starting grade: low is P3, medium is P2, high
    is P1. Evidence still moves it either way.
-2. A lane definition overrides the starting grade. The two lanes that do this are:
+2. A lane definition overrides the starting grade. The two lanes that do this are
+   the two sub-lanes of the "Silent integrity / source-of-truth corruption" class
+   below, not a new class; `vocabulary.json` already lists both values:
    - **P0a, silent data loss:** irreplaceable state destroyed or stranded with no
      signal.
    - **P0b, source-of-truth integrity:** the tool reports a state that is not true.
