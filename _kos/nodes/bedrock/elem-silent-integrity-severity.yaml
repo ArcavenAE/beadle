@@ -47,6 +47,14 @@ content: |
 
   Manifests ground the classifier via integrity_anchors (systems-of-record by
   recoverability tier) — see elem-defect-classification-superset and the F1 schema node.
+
+  HARVEST 2026-10-09 (finding-026): beadle's own inputs show this class.
+  `sync` reads at most 500 open issues and says nothing (`--limit 500` in
+  `crates/beadle/src/sync.rs`); one repository had 519, so 19 issues'
+  comments were skipped on every sync. `enum` has a guard for the same class
+  (beadle#83); `sync` is the remainder. A flow-sequence `maintainers: [a, b]`
+  in an intent loads as an empty list, so every maintainer event counts as
+  "other". Both turn a wrong board into a plausible one. Neither fix is built.
 edges:
   - target: elem-defect-classification-superset
     type: supports
