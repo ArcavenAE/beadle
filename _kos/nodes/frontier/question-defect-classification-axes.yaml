@@ -49,6 +49,22 @@ content: |
      surfaced FMEA (RPN = severity × occurrence × detectability). Adopt it as the
      reference for finding-004's visibility×compounding axis, or keep that axis
      beadle-original?
+
+  HARVEST 2026-10-09 (finding-027): the daily refresh graded by a working
+  convention the skill did not state. RULED 2026-10-08 (operator; recorded in
+  the finding's Ruling section and written into skills/beadle-triage step 3,
+  "Starting grade and lane overrides"):
+  1. a filer's priority label sets the starting grade (low P3, medium P2,
+     high P1), and evidence still moves it either way;
+  2. a lane definition overrides the starting grade (P0a, P0b);
+  3. features stay P3 unless they are a security or deploy gate;
+  4. a fix-ask issue is graded P2 as the remedy, while its defect keeps its
+     own grade.
+  The P0a (silent data loss) and P0b (the tool reports a state that is not
+  true) split of the integrity class is now in step 3, not only in a fixture.
+  OPEN: the reasons behind each grade stay in private per-run notes by design
+  (some boards cover private repositories), so a successor grader depends on
+  those notes.
 edges:
   - target: question-intent-manifest-schema
     type: supports

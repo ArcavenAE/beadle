@@ -1,0 +1,44 @@
+id: question-gate-live-axis-declaration
+type: question
+confidence: frontier
+title: "How does a board declare a live or per-run list to the regression gate, so a list that shrinks on a close is not read as lost issues?"
+tags:
+  - dashboard
+  - gate
+  - state
+content: |
+  finding-025: gate check 3b (`tools/dashboard-gate.py`) treats every list
+  in the sentinel as cumulative unless its key is in the hardcoded `PER_RUN`
+  set. A board has no way to declare a new per-run or live axis; a prose
+  note in the sentinel is not read, and `DECLARED_REMOVALS["axes"]` excuses
+  only an axis vanishing. So a "live now" list passes while it only grows
+  and fails 3b on the first close or merge. Reproduced at beadle main
+  94d9f15.
+
+  WORKAROUND IN USE (finding-025): on two boards the live lists stay
+  cumulative and live state moved into a map keyed by issue number with a
+  status string, the shape the director board already used. Nothing
+  tracked was dropped and the gate code was not changed. The cost: list
+  names such as `open_prs_now` now mislead.
+
+  PROPOSED, NOT BUILT: beadle#94's shadow comparison recommends a gate class
+  for per-run headings and cumulative axes (its Skills 2 and 3). finding-025
+  is the observed failure that recommendation predicts.
+
+  OPEN:
+  - Where does the declaration live: in the sentinel, in the intent, or in
+    the gate's own table?
+  - Once a declared live class exists, are the workaround maps retired, and
+    the misleading list names renamed?
+edges:
+  - target: elem-state-out-of-band
+    type: derives
+    note: "the sentinel carries a digest of out-of-band state; the gate reads it to refuse lost issues"
+  - target: question-renderer-editorial-boundary
+    type: derives
+    note: "the gate guards the renderer's derived output between runs"
+provenance:
+  created_by: agent
+  session: architect-2026-10-09-harvest
+  created_at: "2026-10-09"
+  discovered_from: finding-025-a-live-state-list-fails-gate-3b-on-the-first-close

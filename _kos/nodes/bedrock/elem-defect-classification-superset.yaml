@@ -148,6 +148,10 @@ content: |
   the source tree together in CI but cannot see a stale artifact in `target/`;
   the finding records a rebuild as the fix and a startup hash check against the
   on-disk `vocabulary.json` as the open detection gap.
+
+  HARVEST 2026-10-09 (finding-027): skills/beadle-triage step 3 now carries
+  the starting-grade rule and the P0a and P0b sub-lanes of the integrity
+  class, ratified 2026-10-08. See question-defect-classification-axes.
 edges:
   - target: elem-intent-alignment-whitespace
     type: derives
