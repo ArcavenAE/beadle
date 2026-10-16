@@ -395,10 +395,10 @@ the interpretation (`question-renderer-editorial-boundary` sub-question A).
 
 **Opening layout: a short visible head, one closed fold.** A reader who stops early
 should have the state, so the opening of the published body is laid out this way:
-1. *Visible:* the literal `**Direction verdict: <glyph> <LABEL>**` in bold, then one
-   summary line of about 120 characters:
-   `<glyph> <LABEL> · run <N> · <what changed, at most three ids> · next: <the Next
-   decisive move>`, with "next" last. A board with no Next decisive move row falls back
+1. *Visible:* the literal `**Direction verdict: <glyph> <LABEL>**` in bold, then, on the
+   same line, a summary that continues it, so the line is about 120 characters in all:
+   `· run <N> · <what changed, at most three ids> · next: <the Next decisive move>`,
+   with "next" last. A board with no Next decisive move row falls back
    to its Needs human reading ids.
 2. *Visible:* the At a glance table with only its label and Result columns.
 3. *Folded:* everything else in the opening goes inside one closed
