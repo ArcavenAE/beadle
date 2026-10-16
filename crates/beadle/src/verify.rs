@@ -1055,6 +1055,42 @@ mod tests {
         ));
     }
 
+    /// The opening layout the dashboard uses: the verdict line and the At a
+    /// glance table (label and Result only) stay visible, and the rest of the
+    /// opening sits in one closed fold. `history` is the fold's history block.
+    fn folded_opening(history: &str) -> String {
+        format!(
+            "**Direction verdict: \u{1f7e1} COLD START** \u{b7} run 19 \u{b7} 0 new, 2 closed (#173 #282) \u{b7} next: #63 #70\n\n\
+             | At a glance | Result |\n| --- | --- |\n| Open issues | **49** |\n| Needs human reading | **2** |\n\n\
+             <details><summary>Why this verdict</summary>\n\n\
+             The verdict paragraph.\n\n{history}\n\n_Updated 2026-10-16_\n\n> A note.\n\n</details>\n\n"
+        )
+    }
+
+    #[test]
+    fn a_folded_opening_passes_the_gate_with_its_history_as_a_list() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let folded = folded_opening("- Open issues: run 19: 0 new\n- Needs human reading: #63 #70");
+        let cand = doc(base_state(19, 836), &[18, 19], "")
+            .replace("**Direction verdict:** steady.\n\n", &folded);
+        let r = gate(&before, &cand);
+        assert!(r.passed(), "a folded opening must pass: {:?}", r.fails);
+        assert!(r.warns.is_empty(), "no warning expected: {:?}", r.warns);
+    }
+
+    #[test]
+    fn a_history_table_inside_the_opening_fold_still_fails_5d() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let folded =
+            folded_opening("| row | history |\n| --- | --- |\n| Open issues | run 19: 0 new |");
+        let cand = doc(base_state(19, 836), &[18, 19], "")
+            .replace("**Direction verdict:** steady.\n\n", &folded);
+        assert!(gate(&before, &cand)
+            .fails
+            .iter()
+            .any(|f| f.contains("pipe-table row inside <details>")));
+    }
+
     #[test]
     fn a_table_hugging_a_blockquote_is_a_new_violation() {
         let before = doc(base_state(18, 830), &[18], "");
