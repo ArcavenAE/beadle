@@ -148,7 +148,10 @@ and the fixture canon by eye as well. ALL checks must pass:
 
 1. **Section presence** — every one of these exists (heading match, order per canon):
    - `<!-- beadle-state:v1` sentinel with parseable JSON (run = N+1, watermark > W)
-   - Direction verdict paragraph (top, bolded verdict line)
+   - Direction verdict (top): the literal bold `**Direction verdict: <glyph> <LABEL>**`
+     plus one summary line, the At a glance table with its label and Result columns,
+     and one closed `<details><summary>Why this verdict</summary>` fold holding the
+     rest of the opening, with its history as a list (SKILL step 7, opening layout)
    - `## Baseline`
    - `## 👤 Needs human reading` (attn lane — first section after Baseline)
    - `## Action plan` with `### 🔴 P0a`, `### 🔴 P0b`, at least one `### 🟠 P1`,

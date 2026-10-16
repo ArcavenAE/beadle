@@ -393,6 +393,25 @@ editor still owns the free-text paragraph above the table — it goes in the
 regens. Whole-section ownership: renderer owns the numbers/table, editor owns
 the interpretation (`question-renderer-editorial-boundary` sub-question A).
 
+**Opening layout: a short visible head, one closed fold.** A reader who stops early
+should have the state, so the opening of the published body is laid out this way:
+1. *Visible:* the literal `**Direction verdict: <glyph> <LABEL>**` in bold, then one
+   summary line of about 120 characters:
+   `<glyph> <LABEL> · run <N> · <what changed, at most three ids> · next: <the Next
+   decisive move>`, with "next" last. A board with no Next decisive move row falls back
+   to its Needs human reading ids.
+2. *Visible:* the At a glance table with only its label and Result columns.
+3. *Folded:* everything else in the opening goes inside one closed
+   `<details><summary>Why this verdict</summary>`, with a blank line after the
+   `<summary>` line and a blank line before `</details>`: the verdict paragraph, the
+   second paragraph (including the editor's free-text paragraph above), the Detail
+   history, the Updated line and the blockquotes. Write the Detail history as a list,
+   one item per row label, not as a table: gate check 5d flags any pipe-table row
+   inside `<details>`.
+Bold stays on the verdict label and the Result cells. Keep the verdict literal above
+the fold and the fold label plain text: both gates look for `**Direction verdict:`
+near the top of the body, and bold inside `<summary>` does not render.
+
 Then rewrite the whole body from the store — Header (direction verdict, per
 finding-017), Progress (stats + trend deltas, every count
 paired with an outcome), **Needs human reading** (the `attn.*` lane, first
