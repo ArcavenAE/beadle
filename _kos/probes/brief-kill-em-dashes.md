@@ -58,7 +58,8 @@ twelfth literal is a test assertion. Where the 7 land:
 - 780: the H1 (`compose`).
 - 245: `warmup` of the provisional run, serialized into the `beadle-state`
   sentinel (`build_sentinel`, render.rs:803), so it sits in the body inside an
-  HTML comment. Not persisted: push writes `warmup: None` (push.rs:351).
+  HTML comment. It reaches a board only through the binary path, which the
+  curated refresh does not use (`dashboard-refresh.md:202`).
 - 430: the Decay cell of the Clusters table (`decay_display`).
 - 617, 623: Baseline table, Provenance column (617 only when a state is unreadable).
 - 660: Top commenters list items.
@@ -181,14 +182,16 @@ literals, and every em dash in SKILL.md, it still passes.
 The fixtures run11 to run19 are not edited. Nothing in the suite compares
 rendered output to a curated fixture.
 
-**What does fail is the gate, on the first dash-free run.** Measured: run18 as
-before, run19 with every em dash replaced as candidate. Both `beadle verify` and
+**What does fail is the gate, on the first dash-free run.** Measured on the
+run18 to run19 pair only: run18 as before, run19 with every em dash replaced as
+candidate. Both `beadle verify` and
 `tools/dashboard-gate.py` fail with 24 `2: HEADING LOST` lines and nothing else.
 Sentinel, coverage, render-integrity and attn checks all pass. Heading check 2
 is exact-line (verify.rs:594-616, dashboard-gate.py:105-114). The 24 include the
 declared rename `### Run-18 index (NEW)`, whose `to` carries a dash in
 `targets/vsdd-factory.verify.json` and `DECLARED_RENAMES`. The run 22 refresh
-would hit the same wall against the run 21 body (inferred, same mechanism).
+would hit the same wall against the run 21 body. That is inferred from the
+same mechanism; run 21 to run 22 was not measured, since run 22 does not exist.
 
 Options:
 
@@ -215,14 +218,25 @@ Structural, so they may gate (ADR-007 and the diagnostic-not-gate rule: they
 ask "is this artifact well-formed against a written rule", not "is the project
 healthy"):
 
-- `render::tests::rendered_body_has_no_em_dash`: renders a store that exercises
-  every emitting branch (a stale cluster, an unreadable issue state, one
-  commenter, a zero trailing mean for filing density) and asserts no U+2014 in
-  the body. Positive control, measured: a prototype failed with the dash put
-  back in the H1, naming body line 0.
+- `tests/no_em_dash.rs::sources_have_no_raw_em_dash`, the guard that reaches
+  every literal: no raw U+2014 character in any `.rs` file under `crates/`,
+  code, comments and tests alike. Behavioral tests cannot reach all of them:
+  the 13 v2 literals in `direction.rs` are on mutually exclusive branches, and
+  the 4 stderr literals and render.rs 245 never reach a rendered body in the
+  suite. A source scan reaches each one regardless of branch. Test inputs that
+  must carry a dash, such as the old checked boxes in controls.rs:119 and 126
+  and push.rs:298, spell it as the escape `\u{2014}`, which the scan does not
+  match and the compiler turns into the same character. Positive control: the
+  scan fails on main, where render.rs alone has 31.
+- `render::tests::rendered_body_has_no_em_dash`, the behavioral check on the
+  body: renders a store that reaches the body branches (a stale cluster, an
+  unreadable issue state, one commenter, a zero trailing mean for filing
+  density, the provisional run's `warmup` in the sentinel, line 245) and asserts
+  no U+2014 in the body. A second case calls `render_derived` on a store with
+  no classifications, to reach line 714, which `run()` cannot (render.rs:103-109).
+  Positive control, measured: a prototype failed with the dash put back in the
+  H1, naming body line 0.
 - `controls::tests::board_controls_block_has_no_em_dash`.
-- `tests/direction_v2.rs::direction_outcome_has_no_em_dash`: the serialized
-  `beadle direction` outcome, v1 and v2 manifests.
 - `tests/no_em_dash.rs::body_shaping_text_has_no_em_dash`: SKILL.md,
   `.claude/commands/dashboard-refresh.md`, `docs/dashboard-schema.md`,
   `docs/example-dashboard.md`, `prompts/create-dashboard.md`. Exempt by name:
@@ -231,8 +245,9 @@ healthy"):
   the dash to match). Doc text that names the old title writes "an em dash
   (U+2014)" in words instead of the character.
 
-The guard covers U+2014 only, matching the ruling. Rust test code and comments
-are not guarded; test inputs need dash-bearing strings.
+The guards cover U+2014 only, matching the ruling. Rust test code and comments
+are covered by the source scan; a test input that needs the character writes
+it as the `\u{2014}` escape.
 
 ## 6. The replacement fixture and #115
 
@@ -263,19 +278,27 @@ after the builder PR merges.
 
 Red first; each test is run and seen failing before its fix.
 
-1. **Red, renderer guards:** `rendered_body_has_no_em_dash`,
-   `board_controls_block_has_no_em_dash`, `direction_outcome_has_no_em_dash`.
+1. **Red, source and renderer guards:** `sources_have_no_raw_em_dash`,
+   `rendered_body_has_no_em_dash` (both cases), `board_controls_block_has_no_em_dash`.
+   The direction and stderr literals are covered by the source scan, not by a
+   behavioral test.
 2. **Red, text guard:** `tests/no_em_dash.rs::body_shaping_text_has_no_em_dash`.
 3. **Red, gate:** verify.rs unit tests `retired_em_dash_heading_warns_instead_of_failing`
    and `declared_rename_target_matches_after_retirement`; verify_gate.rs
    `the_first_dash_free_run_passes_with_retirement_warnings` (run18 before;
    run19 mutated in the test, headings by P4, prose by P1, in the house style of
-   its other controls) and `a_heading_retired_with_a_semicolon_is_still_lost`;
-   Python `test_em_dash_retirement_warns_and_passes` and
-   `test_heading_retired_with_another_mark_fails`.
+   its other controls); Python `test_em_dash_retirement_warns_and_passes`.
+   Two regression pins go with them and pass on main, so they are not reds:
+   `a_heading_retired_with_a_semicolon_is_still_lost` and Python
+   `test_heading_retired_with_another_mark_fails`. They are kept so the fold
+   cannot widen past colon-space without a test failing.
 4. **Green, renderer:** render.rs 11 source literals, controls.rs 2,
    direction.rs 14, by section 3. Keep `advisory only` lowercase. Retire the
-   comment dashes in the same files too; nothing guards them.
+   comment dashes across `crates/` too, since the source scan covers them, and
+   spell any dash a test input needs as `\u{2014}`. At c1f95a5 five test files
+   hold raw dashes: classification_fidelity.rs (2), direction_v2.rs (9),
+   run_ordering.rs (1), verify_gate.rs (4) and vocabulary_contract.rs (3)
+   (`git grep -c` for U+2014).
 5. **Green, gates:** the fold in `verify.rs` check 2 and `tools/dashboard-gate.py`
    check 2, with the rename-`to` case. `verify.json` and `DECLARED_RENAMES`
    unchanged.
@@ -292,10 +315,14 @@ since the fixture PR finishes it.
 
 ## Open questions
 
-- **En dashes.** 18 on the live board, 8 in SKILL.md, 1 in direction.rs, all
+The design assumes both of these as written below until director rules. Both
+are carded and not ruled.
+
+
+- **En dashes (assumed: they stay).** 18 on the live board, 8 in SKILL.md, 1 in direction.rs, all
   number ranges. The ruling names em dashes. Writing "#410 to #417" is a
   one-line skill rule if the operator wants it; until then the guard ignores them.
-- **P6 separator.** Middle dot, matching the live board, or colon, matching
+- **P6 separator (assumed: the middle dot).** Middle dot, matching the live board, or colon, matching
   the five-mark list. This brief recommends the middle dot.
 
 This recommendation is valid until 2026-10-26 or the next vsdd-factory refresh,
