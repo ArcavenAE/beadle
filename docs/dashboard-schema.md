@@ -21,46 +21,47 @@ The dashboard is **mainly consumed by LLM/agent sessions** (other Claude Code ru
 orienting on the target) and **secondarily by humans**. These two audiences have
 *inverted visibility*, so one document serves both via three channels:
 
-- **Human channel — the rendered surface.** Humans will not hover, will not expand
+- **Human channel; the rendered surface.** Humans will not hover, will not expand
   `<details>`, will not read HTML comments. So the visible render must be scannable:
-  **short human title first** (a few words — *what the issue is*), then minimal chips.
-- **Agent channel — folded / embedded, free to the LLM.** An agent reads the **raw
+  **short human title first** (a few words; *what the issue is*), then minimal chips.
+- **Agent channel; folded / embedded, free to the LLM.** An agent reads the **raw
   markdown source**, so collapsed `<details>`, link titles, and HTML-comment payloads
-  are *instantly visible at zero cost* — folding is not hiding for an agent. This
+  are *instantly visible at zero cost*; folding is not hiding for an agent. This
   channel carries the **beadle-computed judgments that exist nowhere else**: the axis
   vector (report-type, defect-nature, reproducibility, leverage, alignment, priority),
   the verdict rationale with citations, and the integrity flags. Put it in a per-issue
   `<details>` block or a structured comment payload so it's out of the human's way but
   one parse away for the agent.
-- **Reference channel — links the LLM follows.** Issue numbers, PR refs, and commit
+- **Reference channel; links the LLM follows.** Issue numbers, PR refs, and commit
   shas are **fetchable resources**: an agent can follow `#314` and read the full body
-  on demand. So the dashboard **never replicates issue detail** — that would violate
+  on demand. So the dashboard **never replicates issue detail**; that would violate
   B1 (the body is a projection, not a replica) and waste the 65 k budget. Anything
   recoverable by following a reference stays a reference; the dashboard carries only
   the *differentiating* payload an agent needs to decide whether to follow it.
 
 The rule: **surface short titles for humans; embed/fold the axis vector + rationale
 for agents; link (never copy) anything an agent can fetch.** Each audience gets its
-ideal view from the same artifact — not a compromise between them.
+ideal view from the same artifact; not a compromise between them.
 
 ## Discovery & idempotency
 
-Discovery is **sentinel-first, title-second** — keep both, but the machine-stable
+Discovery is **sentinel-first, title-second**; keep both, but the machine-stable
 key wins. The goal is one dashboard per target repo, never a duplicate:
 
-- **Primary key — the `<!-- beadle-state -->` sentinel.** Search open issues by the
+- **Primary key; the `<!-- beadle-state -->` sentinel.** Search open issues by the
   beadle identity for a body containing the `beadle-state` sentinel block (and,
   inside its JSON, a matching target). This survives a hand-edited title, which the
   bare title does not.
-- **Secondary key — exact title.** `📋 beadle — Triage Dashboard` (the bare string;
+- **Secondary key: exact title.** `📋 beadle · Triage Dashboard` (the bare string;
   the `· owner/name` suffix lives only in the body H1, never the issue title).
   Used to find a dashboard whose body sentinel was wiped, and as the create-time
-  title.
+  title. An older board may carry this title with an em dash (U+2014) in place of the
+  middle dot; discovery accepts that spelling as well until no open dashboard carries it.
 - **Candidate set = union of both, filtered to the beadle identity.** Then:
   - **exactly one** authored by the beadle identity → rewrite it in place;
   - **>1** → **STOP, report all candidates, request human consolidation.** Never
-    pick one silently; never create another. (Drift has already happened — a
-    second dashboard exists — and only a human should collapse them.)
+    pick one silently; never create another. (Drift has already happened; a
+    second dashboard exists: and only a human should collapse them.)
   - **one, wrong author** → STOP (do not edit another author's issue, do not fork);
   - **none** → **re-check immediately before** `gh issue create` (narrows the
     create race), then create + pin it (`pinIssue`, ≤3/repo).
@@ -70,7 +71,7 @@ key wins. The goal is one dashboard per target repo, never a duplicate:
   a miss.
 - **Concurrency caveat:** re-check-before-create narrows but does not close the
   TOCTOU window. Two concurrent runs against one target can still both create. A
-  real guarantee needs a serialized chokepoint (INC-003 class) — frontier
+  real guarantee needs a serialized chokepoint (INC-003 class); frontier
   (`question-dashboard-discovery-robustness`), relevant at Phase 1 (scheduled
   gh-aw) and Phase 2 (marvel single-writer orchestrator), not Phase 0.
 - **Rewrite the whole body each run**; never append comments. History is the
@@ -93,38 +94,38 @@ beadle-state -->
 
 The real records (issues, classifications, alignment verdicts, maintainer-event
 log, historical stats) live in the store. Phase 0: append-only JSONL in the repo
-or a gist. Phase 2: Dolt (versioned SQL — diffable, branchable, auditable;
+or a gist. Phase 2: Dolt (versioned SQL; diffable, branchable, auditable;
 frontier F2).
 
 ## Body sections (rendered top-to-bottom)
 
-1. **Header** — last updated, watermark, run count, target intent version, a
+1. **Header**: last updated, watermark, run count, target intent version, a
    one-line **direction verdict**. The verdict is **gated on warm-up state**
    (ADR-005): until a baseline exists (≥1 completed maintainer triage cycle, or a
-   configured threshold) it is **`COLD START / BASELINE`**, never `DRIFTING` —
+   configured threshold) it is **`COLD START / BASELINE`**, never `DRIFTING`;
    an average rate over a pre-engagement window is initialization bias, not drift.
    After the process has turned, the verdict becomes `on-course` / `watch` /
    `drifting`.
-2. **Progress** — open/closed by author (arcavenai vs maintainers vs others), by
+2. **Progress**: open/closed by author (arcavenai vs maintainers vs others), by
    type, by priority, by validation verdict; **trend deltas** since last run;
    net-flow (intake − close); filed-vs-acted ratio; backlog age distribution.
    Every count paired with an outcome signal (no vanity metrics).
-2a. **Needs human reading** (the direct-attention lane) — **the first group after
+2a. **Needs human reading** (the direct-attention lane); **the first group after
     Progress, before the Action plan.** The human's entry point: the few items to
-    read in full come before the many items to scan. A small group —
-    single digits by construction — of issues whose **special nature benefits
+    read in full come before the many items to scan. A small group;
+    single digits by construction: of issues whose **special nature benefits
     from the human maintainer reading them directly and in full**: their value
     is in the prose and cannot survive summarization into chips. The facet is
-    `attn.*` (SKILL.md step 3b), **orthogonal to priority** — an item can be
+    `attn.*` (SKILL.md step 3b), **orthogonal to priority**; an item can be
     P2 on impact yet first in the reading queue. Initial subtypes, grown from
     observed instances (codify a new one only on its second instance):
-    - `attn.governance` — relationship/consent/policy between parties
+    - `attn.governance`: relationship/consent/policy between parties
       (contribution flows, disclosure, provenance commitments); often a
       counterparty is waiting on the answer. Exemplar: vsdd-factory#510.
-    - `attn.direction` — strategic/architectural direction at the conceptual
+    - `attn.direction`: strategic/architectural direction at the conceptual
       terminus of defect-nature; one reading re-frames dozens of downstream
       issues. Exemplar: the #410–#417 platform-envelope family.
-    - `attn.evidence-brief` — external empirical evidence offered for
+    - `attn.evidence-brief`: external empirical evidence offered for
       adoption that the maintainer cannot re-derive from this repo.
       Exemplar: #463 (4,602-dispatch cross-corpus study).
     Rows are ordered by the human's reading priority: **reply-needed**
@@ -134,45 +135,45 @@ frontier F2).
     Hard rules: never quick-win-eligible; never folded into a cluster
     rollup; may cross-reference a P0/P1/P2 row (`also P1`) but never
     substitutes for it. If the section exceeds ~7 rows, the bar is too low.
-3. **Action plan** — P0/P1/P2 tables. **Each row leads with a short human title**
-   (a few words — *what the issue is*), then `#NN` (the agent's fetch reference), then
+3. **Action plan**: P0/P1/P2 tables. **Each row leads with a short human title**
+   (a few words; *what the issue is*), then `#NN` (the agent's fetch reference), then
    recommended action + owner, with type / reproducibility / **alignment-verdict as
    trailing chips** (finding-005). The verdict is *status* (drill-in detail), never the
-   row headline — a human scans for what an issue is and will not hover over a bare
+   row headline: a human scans for what an issue is and will not hover over a bare
    number. Top actionable items only. **Agent channel:** the per-row verdict *rationale*
    (cited reason the action is recommended, integrity flags) rides in a folded
-   `<details>` under the row — instantly visible to an LLM, out of the human's way —
+   `<details>` under the row; instantly visible to an LLM, out of the human's way;
    and never restates the issue body, which the agent fetches via `#NN`.
-3b. **Quick wins — safe to act on** (the low-caution lane). A grouping
+3b. **Quick wins; safe to act on** (the low-caution lane). A grouping
     **orthogonal to the impact ordering**, not a fourth priority tier: the
     *obviously-broken, easy-fix, low-blast-radius* issues a maintainer can use to
     **exercise their process** without the caution the P0/P1 items demand. Reward the
     safe + obvious, not only the critical. Eligibility is **derived from the existing
     axes**, never a hand-curated "easy" label:
     - mechanical end of **defect-nature** (typo / wrong-variable / docs / one-line
-      config / a bounded agent-prompt warning) — *not* design/spec/directional;
+      config / a bounded agent-prompt warning); *not* design/spec/directional;
     - **Bohrbug reproducibility** (consistent, isolatable) or a pure docs/wording change;
     - **bounded blast radius** + **high fix-confidence** (the fix is cited and obvious);
     - **alignment ≠ drifts** (don't fast-track something that shouldn't be built).
     **Hard exclusion (finding-004):** an issue touching a system-of-record
-    `integrity_anchor` is **never** eligible, *no matter how small the trigger looks* —
+    `integrity_anchor` is **never** eligible, *no matter how small the trigger looks*;
     "a one-line diff must never mask a silent-integrity defect." The easy lane is
     exactly the trap finding-004 warns about; integrity-gated items stay in P0.
-    **No-Goodhart:** this is a *surfacing* device, not a scored metric — never count
+    **No-Goodhart:** this is a *surfacing* device, not a scored metric; never count
     "quick wins closed" as success (that rewards trivial churn). Same row format as the
     action plan (title leads, `#NN`, trailing chips); a folded agent-channel
     `<details>` may carry the one-line fix sketch. Cold-start note (ADR-005): this lane
-    is the **cheapest first maintainer pass** — resolving one here is a low-risk way to
+    is the **cheapest first maintainer pass**; resolving one here is a low-risk way to
     turn the process and begin the baseline.
-4. **Direction health** (the differentiator) — minutiae ratio, scope-drift
+4. **Direction health** (the differentiator); minutiae ratio, scope-drift
    candidates, issues contradicting declared intent, over-engineering smells
    (premature abstraction, speculative config, build-what-you-might-need),
    self-referential-spiral flags, and the maintainer-engagement-vs-volume gap.
    **In cold-start (ADR-005), this panel reports structure to make the first pass
    cheap (high-leverage items, cluster candidates) and explicitly marks
-   rate/drift signals as "not yet measurable — process not turned," never as a
+   rate/drift signals as "not yet measurable; process not turned," never as a
    drift indictment.** Rate-based drift appears only once a baseline exists.
-5. **Classification index** — human-readable table of all tracked issues. **Each
+5. **Classification index**: human-readable table of all tracked issues. **Each
    row leads with the short human title**, then `#NN`, then classification chips:
    **report-type** (Issue Type / kind/*) · **defect-nature** (mechanical→conceptual,
    IEEE 1044 / ODC) · **reproducibility** (Bohr/Mandel/Heisen badge) · priority ·
@@ -181,25 +182,25 @@ frontier F2).
    **Agent channel:** the full axis vector for each issue (every scored axis, not just
    the charted facets) lives in the folded `beadle-state` digest / store reference, so
    an agent reading raw body has the complete classification without fetching, while the
-   human table stays scannable. The index is an *index* (B1) — it points, it does not
+   human table stays scannable. The index is an *index* (B1); it points, it does not
    replicate the issue.
-6. **Maintainer progress** — outcome-paired progress, **not a leaderboard**
+6. **Maintainer progress**: outcome-paired progress, **not a leaderboard**
    (`question-maintainer-progress-gamification`). Make resolution against
    beadle-discovered defects visible and rewarding, but reward the **verified
    fix-outcome** (flagged → fixed → validates), never close-rate / time-to-triage /
    volume (B3 + no-Goodhart). E.g. "N integrity defects closed with a load-bearing
-   fix," "longest-standing P0 resolved," "cycles since last drift" — each count
+   fix," "longest-standing P0 resolved," "cycles since last drift"; each count
    paired with its outcome. No gameable per-human ranking. Cold-start (ADR-005):
    show structure, withhold streak/rate claims until the process has turned.
-7. **Controls** — checkbox lines the next run reads, acts on, and resets. **Two
+7. **Controls**: checkbox lines the next run reads, acts on, and resets. **Two
    tiers** (F5 + `question-maintenance-request-controls`):
    ```
-   # Tier 1 — per-issue verbs (bounded to one artifact)
+   # Tier 1: per-issue verbs (bounded to one artifact)
    - [ ] <!-- verb=fast-track;id=#NN --> Fast-track #NN
    - [ ] <!-- verb=investigate;id=#NN --> Deep-investigate #NN
    - [ ] <!-- verb=accept-deferral;id=#NN --> Accept deferral of #NN
 
-   # Tier 2 — board-level maintenance requests (whole-corpus, expensive, on-demand)
+   # Tier 2: board-level maintenance requests (whole-corpus, expensive, on-demand)
    - [ ] <!-- verb=reprioritize;id=board --> Re-rank the action plan
    - [ ] <!-- verb=full-refresh;id=board --> Re-enumerate & re-triage every open issue
    - [ ] <!-- verb=revalidate;id=board --> Re-run validate across the whole corpus
@@ -213,28 +214,28 @@ frontier F2).
    Tier 2 is the **maintainer-triggered maintenance-request** surface: a human checks
    a box to pull an expensive routine forward without waiting for the next full
    scheduled run. Resetting the box on dispatch is the de-bounce (a box left checked
-   across passes must not re-run). Tier-2 routines are read/analyze/regenerate only —
+   across passes must not re-run). Tier-2 routines are read/analyze/regenerate only;
    an irreversible public action (close / resolve / free-text comment) still escalates
    per B2, never a checkbox. A **cheap-poll pass** (Phase 1, gh-aw cron) can fetch only
    this body and parse Tier-2 boxes to decide whether any costly routine was requested,
    escalating to the expensive act pass only on a hit. Frontier F5 + the maintenance-
    request question.
-8. **Legend & references** (one collapsed `<details>` at the foot — *light touch*).
+8. **Legend & references** (one collapsed `<details>` at the foot; *light touch*).
    The chips in §3–§5 stay terse precisely because the vocabulary is decoded **once**
    here, not per row. The goal is concision, not annotation: **do not** scatter
-   footnote marks, superscripts, or `[1]`-style callouts through the rows — that makes
+   footnote marks, superscripts, or `[1]`-style callouts through the rows; that makes
    the board harder to read, not easier. Instead:
    - **A short legend** mapping the chip glyphs/words used *in this render* to a
-     one-line meaning (only the ones actually present — don't pad it): e.g.
+     one-line meaning (only the ones actually present; don't pad it): e.g.
      `🟢 advances · 🟡 neutral · 🔴 drifts` for the alignment verdict; the repro badge
      `Bohr` (consistent) / `Mandel` (intermittent) / `Heisen` (observation-sensitive);
      `🛑 integrity` for the source-of-truth-integrity gate.
    - **A references line** linking the **major industry standards** the model rests on
-     so a maintainer *can* read more if they want — kept to the few that are
+     so a maintainer *can* read more if they want; kept to the few that are
      load-bearing, as plain inline links, no inline citation marks in the rows:
      defect-nature → IEEE 1044 [@ieee1044] / ODC [@odc]; reproducibility →
      Grottke–Trivedi [@grottke]; severity-vs-priority [@severitypriority]. Link the
-     term once, in the footer — never repeat the citation on every row that uses it.
+     term once, in the footer; never repeat the citation on every row that uses it.
    Render the whole section collapsed (`<details><summary>Legend & references</summary>`)
    so it is out of the human's way but one click (and, for an agent reading raw markdown,
    zero cost) away. Omit any legend row whose chip didn't appear this run.
@@ -244,7 +245,7 @@ frontier F2).
 - Runs **as the `arcavenai` identity** (Phase 1+: a GitHub App for a clean audit
   trail, 15k/hr limits, and to break the `GITHUB_TOKEN` re-trigger guard) [@ghaw].
 - Driven by a **schedule** (cron is UTC; avoid the top of the hour). No internal
-  timers — heartbeat-via-cron, the multiclaude pattern.
+  timers: heartbeat-via-cron, the multiclaude pattern.
 - **Throttle below GitHub secondary rate limits**; cap comments per issue / per
   run with backoff on 403/429 [@ghacceptableuse].
 - A wiped or vandalized body is non-fatal: regenerate from the store.
@@ -254,5 +255,5 @@ frontier F2).
 A single rewritten Markdown issue is the right human-readable surface with
 interactive checkbox controls (Projects v2 can't do checkbox-as-control in a
 body). Projects v2 is a *complement* for structured cross-repo rollups via
-GraphQL custom fields — reach for it only when that need is concrete (gradual
+GraphQL custom fields: reach for it only when that need is concrete (gradual
 elaboration), never as the interactive surface.

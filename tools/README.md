@@ -30,6 +30,17 @@ A run that retires a heading or a cumulative sentinel axis declares it in
 instead of failing checks 2 and 3b, and never excuses an issue number that
 leaves state entirely. Tests: `python3 -m unittest tools/test_dashboard_gate.py`.
 
+### Em dashes (check 9) and `--titles`
+
+Check 9 fails the gate for any em dash (U+2014) in the candidate body, with its
+line number. The before-snapshot is not checked, since history keeps its dashes.
+A stored issue or PR title is quoted as written, so a dash inside one whole title
+is exempt: pass `--titles FILE` (one title per line, written by
+`beadle titles <target>`). Without the file nothing is exempt. Check 2 also folds
+a heading whose spaced em dashes became a colon and a space, so the first dash-free
+run warns ("em dash retired") and is not refused for the headings that lost their
+dash. `beadle verify` reads the titles from the target's store itself.
+
 ### Ported to `beadle verify`
 
 `beadle verify <target> --before <snapshot> --candidate <file>` is the Rust
