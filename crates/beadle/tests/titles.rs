@@ -1,7 +1,7 @@
 //! `beadle titles <target>`: the stored issue titles, one per line, for the
 //! Python gate's `--titles FILE`. It only reads the store.
 
-use std::{fs, os::unix::fs::MetadataExt, path::Path, process::Command};
+use std::{fs, path::Path, process::Command};
 
 use serde_json::{json, Value};
 use tempfile::TempDir;
