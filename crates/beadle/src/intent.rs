@@ -1,7 +1,7 @@
 //! Minimal `targets/<name>.intent.yaml` reader.
 //!
-//! We need a handful of top-level scalars, two YAML sequences, and — for
-//! instrument v2 (SKILL §6b) — the `maintainer_capacity:` block with its
+//! We need a handful of top-level scalars, two YAML sequences, and, for
+//! instrument v2 (SKILL §6b), the `maintainer_capacity:` block with its
 //! nested `observed:` sub-block. Rather than pull a full YAML parser, we grep
 //! for `key: value`, for sequence-under-key blocks, and walk indent-delimited
 //! sub-blocks. When the manifest structure grows past this shape, swap in
@@ -17,7 +17,7 @@ pub struct Intent {
     pub version: Option<String>,
     pub maintainers: Vec<String>,
     pub measured_contributors: Vec<String>,
-    /// `maintainer_capacity:` — present from manifest schema v0.4. Its
+    /// `maintainer_capacity:`: present from manifest schema v0.4. Its
     /// presence is what switches a direction verdict from instrument v1 to
     /// v2; absent, the crate computes v1 and says so out loud (SKILL §6b).
     pub maintainer_capacity: Option<MaintainerCapacity>,
@@ -28,18 +28,18 @@ pub struct Intent {
 pub struct MaintainerCapacity {
     pub class: String,
     pub team_size: Option<u32>,
-    /// The unit an attention window is measured in — `action-day` today.
+    /// The unit an attention window is measured in: `action-day` today.
     pub attention_window: String,
     /// Window dates the run observed, including maintainer actions the store
     /// never sees (merges and commits on their own PRs). Refreshed each run.
     pub observed_windows: Vec<String>,
-    /// `observed.pr_acceptance` — the store holds no PR records, so the
+    /// `observed.pr_acceptance`: the store holds no PR records, so the
     /// acceptance band has no store-side input.
     pub pr_acceptance: Option<PrAcceptance>,
-    /// `observed.measured_prs` — measured-side PRs with their readiness
+    /// `observed.measured_prs`: measured-side PRs with their readiness
     /// dates. Feeds the merge-latency band and §6b rule 4(b).
     pub measured_prs: Vec<MeasuredPr>,
-    /// `observed.acted_with_diff` — §6b rule 3's cost covariate: the share of
+    /// `observed.acted_with_diff`: §6b rule 3's cost covariate: the share of
     /// acted-on items that arrived with a mergeable diff.
     pub acted_with_diff: Option<ActedWithDiff>,
 }
@@ -57,7 +57,7 @@ pub struct MeasuredPr {
     pub ready: String,
     /// `YYYY-MM-DD` it merged, when it has.
     pub merged: Option<String>,
-    /// Issue numbers this PR actually repairs — what §6b rule 4(b) tests
+    /// Issue numbers this PR actually repairs: what §6b rule 4(b) tests
     /// against the silent lane.
     pub fixes: Vec<u32>,
 }
@@ -70,7 +70,7 @@ pub struct ActedWithDiff {
 
 impl Intent {
     /// Classify an author login: "maintainer", "measured", or "other".
-    /// This is the axis the delta-sweep needs — everything else is analysis.
+    /// This is the axis the delta-sweep needs: everything else is analysis.
     pub fn actor_role(&self, login: &str) -> &'static str {
         if self.maintainers.iter().any(|m| m == login) {
             "maintainer"
@@ -85,7 +85,199 @@ impl Intent {
 pub fn load(root: &Path, target: &str) -> Result<Intent> {
     let path = root.join(format!("targets/{target}.intent.yaml"));
     let text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    // This reader is not a YAML parser. A line it would read one way and a real
+    // parser another is refused here, so a manifest edit cannot change meaning
+    // silently (the loader fails closed).
+    if let Some((n, what)) = colon_space_hazards(&text).into_iter().next() {
+        return Err(anyhow!("{}:{n}: {what}", path.display()));
+    }
     parse(&text).ok_or_else(|| anyhow!("no `repo:` scalar in {}", path.display()))
+}
+
+/// Lines this reader accepts but a real YAML parser would read differently.
+/// Returns (line, reason). Each is a way a manifest edit could change meaning
+/// without this reader noticing:
+///
+/// - an unquoted scalar holding a colon-space (a map key, to a parser);
+/// - text after the closing quote of a quoted scalar (a parse error);
+/// - a quoted scalar left open at the end of the text;
+/// - a list item that reads as a one-key map among plain items. `- path: x`
+///   in a list of such items is a map list and is fine; one such item among
+///   prose items is what a colon-space edit of a prose item produces.
+///
+/// Comments, quoted scalars (also across lines), flow collections and block
+/// scalars are skipped otherwise.
+pub(crate) fn colon_space_hazards(text: &str) -> Vec<(usize, String)> {
+    struct Block {
+        indent: usize,
+        maps: Vec<usize>,
+        plain: usize,
+    }
+    fn flush(b: Block, out: &mut Vec<(usize, String)>) {
+        if b.plain > 0 {
+            for n in b.maps {
+                out.push((
+                    n,
+                    "list item reads as a map among plain items; \
+                     a colon-space in prose makes a key"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+    // Index just past the closing quote of `s`, which starts with quote `q`.
+    fn close_at(s: &str, q: char) -> Option<usize> {
+        let mut it = s.char_indices().skip(1).peekable();
+        while let Some((i, c)) = it.next() {
+            if q == '"' && c == '\\' {
+                it.next();
+            } else if c == q {
+                if q == '\'' && matches!(it.peek(), Some((_, '\''))) {
+                    it.next();
+                } else {
+                    return Some(i + c.len_utf8());
+                }
+            }
+        }
+        None
+    }
+    // Open minus close brackets on a line, outside quotes.
+    fn bracket_delta(s: &str) -> i32 {
+        let (mut d, mut q) = (0, None);
+        for c in s.split(" #").next().unwrap_or(s).chars() {
+            match (q, c) {
+                (None, '"' | '\'') => q = Some(c),
+                (Some(x), c) if c == x => q = None,
+                (None, '[' | '{') => d += 1,
+                (None, ']' | '}') => d -= 1,
+                _ => {}
+            }
+        }
+        d
+    }
+    let strip_comment = |s: &str| -> String {
+        s.split(" #").next().unwrap_or(s).trim().to_string()
+    };
+
+    let mut out = Vec::new();
+    let mut blocks: Vec<Block> = Vec::new();
+    let mut open_quote: Option<(usize, char)> = None;
+    let mut block_indent: Option<usize> = None;
+    let mut flow_depth: i32 = 0;
+    let bare_key = |k: &str| {
+        let mut c = k.chars();
+        matches!(c.next(), Some(f) if f.is_ascii_alphabetic() || f == '_')
+            && k.chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    };
+    for (i, line) in text.lines().enumerate() {
+        let n = i + 1;
+        let indent = line.len() - line.trim_start().len();
+        if let Some((_, q)) = open_quote {
+            if let Some(at) = line.find(q) {
+                open_quote = None;
+                let rest = strip_comment(&line[at + q.len_utf8()..]);
+                if !rest.is_empty() {
+                    out.push((n, format!("text after a closing quote: {rest}")));
+                }
+            }
+            continue;
+        }
+        if flow_depth > 0 {
+            flow_depth += bracket_delta(line);
+            continue;
+        }
+        if let Some(b) = block_indent {
+            if line.trim().is_empty() || indent > b {
+                continue;
+            }
+            block_indent = None;
+        }
+        let t = line.trim_start();
+        if t.is_empty() || t.starts_with('#') {
+            continue;
+        }
+        let item = t.strip_prefix("- ");
+        // Close the lists this line ends.
+        while let Some(b) = blocks.last() {
+            let ends = if item.is_some() {
+                b.indent > indent
+            } else {
+                b.indent >= indent
+            };
+            if !ends {
+                break;
+            }
+            if let Some(b) = blocks.pop() {
+                flush(b, &mut out);
+            }
+        }
+        if item.is_some() && blocks.last().is_none_or(|b| b.indent != indent) {
+            blocks.push(Block {
+                indent,
+                maps: Vec::new(),
+                plain: 0,
+            });
+        }
+
+        let body = item.unwrap_or(t);
+        // The scalar to judge, and whether this item reads as a map.
+        let mut map_item = false;
+        let scalar: &str = match body.split_once(": ") {
+            Some((k, v)) if bare_key(k.trim()) => {
+                map_item = item.is_some();
+                v
+            }
+            Some((k, _)) if item.is_some() && matches!(k.chars().next(), Some('"' | '\'')) => {
+                body
+            }
+            Some(_) if item.is_some() => body,
+            Some((_, v)) => v,
+            None => body.trim_end_matches(':'),
+        };
+        let scalar = strip_comment(scalar);
+        let scalar = scalar.as_str();
+        if scalar.starts_with(['[', '{']) {
+            flow_depth = bracket_delta(scalar).max(0);
+        }
+        if scalar.starts_with('|') || scalar.starts_with('>') {
+            block_indent = Some(indent);
+            continue;
+        }
+        if let Some(q) = scalar.chars().next().filter(|c| matches!(c, '"' | '\'')) {
+            match close_at(scalar, q) {
+                None => open_quote = Some((n, q)),
+                Some(end) => {
+                    let rest = scalar[end..].trim();
+                    if rest.starts_with(':') && item.is_some() && !map_item {
+                        // `- "key": value` is a map item.
+                        map_item = true;
+                    } else if !rest.is_empty() {
+                        out.push((n, format!("text after a closing quote: {rest}")));
+                    }
+                }
+            }
+        } else if !scalar.starts_with(['[', '{']) && scalar.contains(": ") {
+            out.push((n, format!("unquoted value holds a colon-space: {scalar}")));
+        }
+        if item.is_some() {
+            if let Some(b) = blocks.last_mut() {
+                if map_item {
+                    b.maps.push(n);
+                } else {
+                    b.plain += 1;
+                }
+            }
+        }
+    }
+    while let Some(b) = blocks.pop() {
+        flush(b, &mut out);
+    }
+    if let Some((n, _)) = open_quote {
+        out.push((n, "quoted value is never closed".to_string()));
+    }
+    out.sort();
+    out
 }
 
 /// Parse manifest text. Separated from `load` so the capacity block is
@@ -186,7 +378,7 @@ fn scalar(text: &str, key: &str) -> Option<String> {
     None
 }
 
-/// Return the indented body under a bare `key:` header line — every following
+/// Return the indented body under a bare `key:` header line; every following
 /// line indented deeper than the header, up to the first that is not. Blank
 /// lines pass through; relative indentation is preserved so the result can be
 /// fed back into `block`, `scalar` and `list`.
@@ -345,6 +537,145 @@ mod tests {
     use super::*;
 
     #[test]
+    fn intent_files_parse_after_retirement() {
+        // Every shipped manifest loads, and no unquoted value gained a `: `
+        // (a colon-space would end the scalar). A regression pin: the files
+        // parse on main too, and this guards the dash replacement step.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut seen = 0;
+        for e in std::fs::read_dir(root.join("targets")).unwrap().flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let Some(target) = name.strip_suffix(".intent.yaml") else {
+                continue;
+            };
+            let text = std::fs::read_to_string(e.path()).unwrap();
+            seen += 1;
+            if !target.starts_with('_') {
+                let i = load(&root, target).unwrap_or_else(|err| panic!("{name}: {err}"));
+                assert!(!i.repo.is_empty(), "{name}: empty repo");
+            }
+            assert_eq!(
+                colon_space_hazards(&text),
+                vec![],
+                "{name}: unquoted value holds a colon-space"
+            );
+        }
+        assert!(seen >= 3, "expected the intent files, saw {seen}");
+    }
+
+    #[test]
+    fn colon_space_in_a_list_item_is_a_hazard() {
+        // A parser reads `- build output (re-run: cheapest)` as a one-key map.
+        let yaml = "tier:\n  - generated code / build output (re-run: cheapest)\n";
+        let h = colon_space_hazards(yaml);
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert_eq!(h[0].0, 2);
+        // Controls: a semicolon is fine, and so are one-key map items, quoted
+        // items and comments.
+        for ok in [
+            "tier:\n  - generated code (re-run; cheapest)\n",
+            "tier:\n  - path: README.md\n  - source: git-history\n",
+            "tier:\n  - \"quoted (re-run: cheapest)\"\n",
+            "tier:\n  - fine # a comment: with a colon\n",
+            "# a comment: with a colon\nkey: value\n",
+        ] {
+            assert_eq!(colon_space_hazards(ok), vec![], "{ok:?}");
+        }
+    }
+
+    #[test]
+    fn colon_space_in_a_value_is_a_hazard() {
+        let h = colon_space_hazards("repo: acme/widget\nnote: canonical principle: no defer\n");
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert_eq!(h[0].0, 2);
+        assert_eq!(
+            colon_space_hazards("note: canonical principle; no defer\n"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_quoted_value_may_span_lines_but_must_close() {
+        let ok = "x:\n  - \"first line (e.g. a: b)\n    second line: still quoted\"\n";
+        assert_eq!(colon_space_hazards(ok), vec![]);
+        let open = "x:\n  - \"never closed\n";
+        let h = colon_space_hazards(open);
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert!(h[0].1.contains("never closed"));
+    }
+
+    #[test]
+    fn load_fails_closed_on_a_line_it_would_misread() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("targets")).unwrap();
+        let p = dir.path().join("targets/t.intent.yaml");
+        std::fs::write(&p, "repo: acme/widget\ntier:\n  - a thing (see: this)\n").unwrap();
+        let err = match load(dir.path(), "t") {
+            Err(e) => e.to_string(),
+            Ok(_) => panic!("a misread line must not load"),
+        };
+        assert!(err.contains(":3:") && err.contains("colon-space"), "{err}");
+        // Control: the same manifest with a semicolon loads.
+        std::fs::write(&p, "repo: acme/widget\ntier:\n  - a thing (see; this)\n").unwrap();
+        assert_eq!(
+            load(dir.path(), "t").ok().map(|i| i.repo),
+            Some("acme/widget".to_string())
+        );
+    }
+
+    #[test]
+    fn a_bare_word_lead_among_plain_items_is_a_hazard() {
+        // The shape a colon-space retirement of a prose item produces: a parser
+        // reads `- Paper-fixes: rename` as a map among prose items.
+        let yaml = "non_goals:\n  - MVP deferrals\n  - Paper-fixes: rename or doc-comment only\n  - Scope expansion\n";
+        let h = colon_space_hazards(yaml);
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert_eq!(h[0].0, 3);
+        assert!(h[0].1.contains("reads as a map"), "{h:?}");
+        // A lowercase single word is the same shape.
+        assert_eq!(
+            colon_space_hazards("g:\n  - one\n  - fixes: two\n").len(),
+            1
+        );
+        // Controls: a list that is all map items is a map list, a lone map
+        // item is too, and the semicolon form is plain.
+        for ok in [
+            "t:\n  - path: README.md\n  - glob: docs/**\n  - source: git-history\n",
+            "t:\n  - source: git-history\n",
+            "non_goals:\n  - MVP deferrals\n  - Paper-fixes; rename or doc-comment only\n",
+            "a:\n  - x\nb:\n  - k: v\n",
+        ] {
+            assert_eq!(colon_space_hazards(ok), vec![], "{ok:?}");
+        }
+    }
+
+    #[test]
+    fn text_after_a_closing_quote_is_a_hazard() {
+        // A parser rejects all of these.
+        for bad in [
+            "note: \"abc\": def\n",
+            "note: \"abc\" def\n",
+            "note: 'abc' def\n",
+            "t:\n  - \"abc\" def\n",
+            "t:\n  - \"first\n    second\" tail\n",
+        ] {
+            let h = colon_space_hazards(bad);
+            assert_eq!(h.len(), 1, "{bad:?} -> {h:?}");
+            assert!(h[0].1.contains("after a closing quote"), "{h:?}");
+        }
+        // Controls: a trailing comment, an escaped quote, a doubled single
+        // quote and a closed multi-line value are fine.
+        for ok in [
+            "note: \"abc\" # a comment: here\n",
+            "note: \"a \\\" b: c\"\n",
+            "note: 'it''s: fine'\n",
+            "t:\n  - \"first\n    second\"\n",
+        ] {
+            assert_eq!(colon_space_hazards(ok), vec![], "{ok:?}");
+        }
+    }
+
+    #[test]
     fn parses_sequence() {
         let yaml = "maintainers:\n  - drbothen\n  - Zious11\nother_key: hello\n";
         assert_eq!(
@@ -465,7 +796,7 @@ goals:
     #[test]
     fn success_bands_nested_scalar_does_not_leak_into_observed() {
         // `success_bands.pr_acceptance.green` must not be read as the
-        // observed pr_acceptance — the observed block is scoped separately.
+        // observed pr_acceptance: the observed block is scoped separately.
         let cap = parse_capacity(CAPACITY_YAML).expect("capacity block present");
         assert_eq!(cap.pr_acceptance.map(|p| p.decided), Some(31));
     }

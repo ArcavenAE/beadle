@@ -57,14 +57,18 @@ def body(state, extra_headings=()):
     return "\n\n".join([sentinel, "**Direction verdict:** steady."] + heads) + "\n"
 
 
-def run_gate(before, cand):
+def run_gate(before, cand, titles=None):
+    """Run the gate. `titles` is a list written to a --titles file, or None."""
     with tempfile.TemporaryDirectory() as d:
         b, c = pathlib.Path(d, "before.md"), pathlib.Path(d, "cand.md")
         b.write_text(before)
         c.write_text(cand)
-        p = subprocess.run(
-            [sys.executable, str(GATE), str(b), str(c)], capture_output=True, text=True
-        )
+        cmd = [sys.executable, str(GATE), str(b), str(c)]
+        if titles is not None:
+            t = pathlib.Path(d, "titles.txt")
+            t.write_text("".join(x + "\n" for x in titles))
+            cmd += ["--titles", str(t)]
+        p = subprocess.run(cmd, capture_output=True, text=True)
         return p.returncode, p.stdout + p.stderr
 
 
@@ -205,6 +209,103 @@ class Transition25010(unittest.TestCase):
         rc, out = run_gate(body(self.s, [old]), body(self.c, [new]))
         line = next(l for l in out.splitlines() if l.startswith("WARN 2: declared rename"))
         self.assertNotIn("run-18", line)
+
+
+# The em dash is built at run time so this file carries no raw character.
+D = chr(0x2013 + 1)
+
+
+def dashed(s):
+    return s.replace("{D}", D)
+
+
+class EmDashRetirement(unittest.TestCase):
+    """Check 2's one-way retirement fold and check 9 (beadle-1dkpg)."""
+
+    def setUp(self):
+        self.s = {"run": 1, "watermark": 10, "tracked": [5]}
+        self.c = {**self.s, "run": 2, "watermark": 11}
+
+    def nine(self, out):
+        return [l for l in out.splitlines() if "9: em dash in candidate" in l]
+
+    def test_em_dash_retirement_warns_and_passes(self):
+        rc, out = run_gate(
+            body(self.s, [dashed("## Extras {D} safe to act on")]),
+            body(self.c, ["## Extras: safe to act on"]),
+        )
+        self.assertEqual(rc, 0, out)
+        self.assertIn("WARN 2: em dash retired -> ", out)
+
+    def test_heading_retired_with_another_mark_fails(self):
+        # Regression pin: the fold admits colon-space and nothing else.
+        rc, out = run_gate(
+            body(self.s, [dashed("## Extras {D} safe to act on")]),
+            body(self.c, ["## Extras; safe to act on"]),
+        )
+        self.assertEqual(rc, 1, out)
+        self.assertIn("2: HEADING LOST -> ## Extras", out)
+
+    def test_declared_rename_target_matches_after_retirement(self):
+        rc, out = run_gate(
+            body(self.s, ["### Run-18 index (NEW)"]),
+            body(self.c, ["### Run-18 index (carried forward: folded)"]),
+        )
+        self.assertEqual(rc, 0, out)
+        self.assertIn("WARN 2: declared rename", out)
+
+    def test_candidate_with_em_dash_is_refused(self):
+        rc, out = run_gate(body(self.s), body(self.c) + dashed("Some prose {D} here\n"))
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(len(self.nine(out)), 1, out)
+
+    def test_candidate_without_em_dash_passes(self):
+        rc, out = run_gate(body(self.s), body(self.c) + "Some prose; here\n")
+        self.assertEqual(rc, 0, out)
+
+    def test_quoted_title_with_em_dash_is_exempt(self):
+        title = dashed("Fix parser {D} handle eof")
+        cand = body(self.c) + "- #12 " + title + "\n"
+        rc, out = run_gate(body(self.s), cand, [title])
+        self.assertEqual(rc, 0, out)
+        # Control: the same body without the title is refused.
+        rc, out = run_gate(body(self.s), cand, [])
+        self.assertEqual(rc, 1, out)
+
+    def test_titles_file_absent_exempts_nothing(self):
+        title = dashed("Fix parser {D} handle eof")
+        cand = body(self.c) + "- #12 " + title + "\n"
+        rc, out = run_gate(body(self.s), cand)
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(len(self.nine(out)), 1, out)
+
+    def test_dash_beside_quoted_title_is_refused(self):
+        title = dashed("Fix parser {D} handle eof")
+        cand = body(self.c) + "- #12 " + title + dashed(" {D} more\n")
+        rc, out = run_gate(body(self.s), cand, [title])
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(len(self.nine(out)), 1, out)
+
+    def test_degenerate_titles_exempt_nothing(self):
+        strings = [dashed(x) for x in ("{D}", " {D} ", "abcd {D} efgh", "x {D} y {D} z !!")]
+        cand = body(self.c) + "".join(x + "\n" for x in strings)
+        rc, out = run_gate(body(self.s), cand, strings + [""])
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(len(self.nine(out)), 5, out)
+
+    def test_dash_between_two_titles_is_refused(self):
+        a, b = dashed("first {D} title one"), dashed("second {D} title two")
+        cand = body(self.c) + a + dashed(" {D} ") + b + "\n"
+        rc, out = run_gate(body(self.s), cand, [a, b])
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(len(self.nine(out)), 1, out)
+
+    def test_overlapping_title_occurrences_do_not_chain(self):
+        title = dashed("ab {D} ab {D} ab")
+        cand = body(self.c) + dashed("ab {D} ab {D} ab {D} ab\n")
+        rc, out = run_gate(body(self.s), cand, [title])
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(len(self.nine(out)), 1, out)
 
 
 if __name__ == "__main__":

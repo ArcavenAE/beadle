@@ -1,10 +1,10 @@
-//! `beadle direction <target>` — compute the run's direction verdict.
+//! `beadle direction <target>`: compute the run's direction verdict.
 //!
 //! Phase-4 signals per `question-direction-verdict-escalation`:
-//!   A.  filing-density derivative        — computable from run records
-//!   B.  integrity-density derivative     — needs classification records
-//!   C.  silent-data-loss share           — needs classification records
-//!   A4. silent-data-loss zero-engagement — joins ClassificationRecord ×
+//!   A.  filing-density derivative: computable from run records
+//!   B.  integrity-density derivative: needs classification records
+//!   C.  silent-data-loss share: needs classification records
+//!   A4. silent-data-loss zero-engagement: joins ClassificationRecord ×
 //!                                          CommentEventRecord across runs
 //!
 //! B, C, and A4 consume `ClassificationRecord` rows; A4 also joins against
@@ -13,7 +13,7 @@
 //! whichever signals are live (drift on any axis is drift; pending signals
 //! never dominate). Emitted to stdout as JSON and optionally appended to
 //! the store as a `note` row (topic=`direction-verdict`) so the audit
-//! trail exists — the editor slot still owns the free-text paragraph per
+//! trail exists: the editor slot still owns the free-text paragraph per
 //! `question-renderer-editorial-boundary`.
 //!
 //! # Two instruments
@@ -21,7 +21,7 @@
 //! The four signals above are **instrument v1**: run-denominated streaks and
 //! an ungated `max`-across-signals headline. SKILL §6b defines **instrument
 //! v2 (capacity-adjusted)** on top of them, conditioned on the target
-//! manifest's `maintainer_capacity:` block — attention-window denominators,
+//! manifest's `maintainer_capacity:` block: attention-window denominators,
 //! baseline-anchored success bands, a descriptive selection depth, and a
 //! two-condition gate on the red headline. A target with no capacity block
 //! is scored under v1 and the output says so.
@@ -47,23 +47,23 @@ use time::{
 
 use crate::intent::{self, MaintainerCapacity};
 
-/// Filing-density-derivative thresholds (frontier candidates — recalibrate
+/// Filing-density-derivative thresholds (frontier candidates; recalibrate
 /// once ≥ 2 targets have ≥ 3 runs of real data).
 const WATCH_RATE_RISE_PCT: f64 = 25.0;
 const DRIFTING_RATE_RISE_PCT: f64 = 50.0;
 const WATCH_ABSOLUTE_MULTIPLIER: f64 = 2.0;
 
-/// Integrity-density-derivative thresholds — share of new-in-run issues that
+/// Integrity-density-derivative thresholds: share of new-in-run issues that
 /// carry `integrity=true`. Sourced from `question-direction-verdict-escalation`.
 const INTEGRITY_WATCH_PCT: f64 = 15.0;
 const INTEGRITY_DRIFTING_PCT: f64 = 30.0;
 
-/// Silent-data-loss share thresholds — count of `operational_impact=silent-data-loss`
+/// Silent-data-loss share thresholds: count of `operational_impact=silent-data-loss`
 /// as a fraction of the current run's classified issues.
 const SDL_WATCH_PCT: f64 = 5.0;
 const SDL_DRIFTING_PCT: f64 = 10.0;
 
-/// Silent-data-loss zero-engagement alarm thresholds — consecutive-run streaks
+/// Silent-data-loss zero-engagement alarm thresholds; consecutive-run streaks
 /// (including the current run) with an SDL classification and zero maintainer
 /// engagement across all observed runs of the issue. The frontier question
 /// names "3+ runs" as the harshest escalation.
@@ -161,7 +161,7 @@ pub struct PendingSignal {
     pub reason: String,
 }
 
-/// Compute the direction report from a set of store records. Pure —
+/// Compute the direction report from a set of store records. Pure;
 /// called by both `run()` (which prints + optionally writes a note) and
 /// `render::render_dashboard` (which surfaces the verdict in the derived
 /// zone). Extracting the computation is the render→direction bridge.
@@ -261,7 +261,7 @@ pub fn run(root: &Path, target: &str, write_note: bool) -> Result<()> {
             target: target.to_string(),
             run: latest_run,
             topic: "direction-verdict".to_string(),
-            // The instrument travels with the verdict (§6b) — a stored
+            // The instrument travels with the verdict (§6b): a stored
             // verdict with no instrument cannot be read back safely.
             text: format!(
                 "instrument={} verdict={} top_signal={}",
@@ -317,7 +317,7 @@ fn filing_density_signal(runs: &[RunRecord]) -> FilingDensity {
                 None,
                 "watch",
                 format!(
-                    "trailing-3 mean is 0 but current run has {} new — insufficient signal, watch",
+                    "trailing-3 mean is 0 but current run has {} new; insufficient signal, watch",
                     current_new
                 ),
             )
@@ -420,13 +420,13 @@ fn silent_data_loss_signal(classifications: &[ClassificationRecord], run: u32) -
 /// One SDL issue's zero-engagement streak, in the run-number space v1 uses.
 /// Shared by the v1 signal and the v2 attention-window re-denomination so the
 /// two instruments can never disagree about *which* issues are in the alarm
-/// set — only about how the silence is denominated.
+/// set: only about how the silence is denominated.
 #[derive(Debug, Clone)]
 struct SdlStreak {
     number: u32,
     /// Contiguous run streak ending at `latest_run`.
     runs: u32,
-    /// Timestamp of the classification effective at the streak's first run —
+    /// Timestamp of the classification effective at the streak's first run;
     /// when this issue's current run of silence began.
     onset_ts: String,
     /// How the record earns its place in the SDL class. Members do not all
@@ -435,7 +435,7 @@ struct SdlStreak {
 }
 
 /// Why a classification counts as silent-data-loss. `flag-only` records carry
-/// the safety flag while their liveness axis says something else — legitimate
+/// the safety flag while their liveness axis says something else; legitimate
 /// under the finding-009 split, and also where a mis-flag hides.
 fn sdl_basis(c: &ClassificationRecord) -> String {
     match c.operational_impact.as_deref() {
@@ -512,7 +512,7 @@ fn sdl_streaks(
         }
 
         // The run the current streak opened at, and the classification that
-        // was effective there — its ts is when this silence began.
+        // was effective there: its ts is when this silence began.
         let onset_run = latest_run.saturating_sub(streak - 1);
         let onset_class = class_history
             .iter()
@@ -531,14 +531,14 @@ fn sdl_streaks(
     (sdl_issues, streaks)
 }
 
-/// A4 — silent-data-loss zero-engagement alarm.
+/// A4: silent-data-loss zero-engagement alarm.
 ///
 /// Joins `ClassificationRecord` × `CommentEventRecord` across all runs in the
 /// store:
 ///
 /// - Consider every issue that has EVER been classified with
 ///   `operational_impact = "silent-data-loss"`. (Once flagged SDL, the risk
-///   persists even if a later reclassification softens it — the alarm is
+///   persists even if a later reclassification softens it; the alarm is
 ///   about *the run of silence*, not about whether SDL is the current top
 ///   label.)
 /// - For each such issue, walk the runs it was classified SDL in, in order,
@@ -689,7 +689,7 @@ fn top_signal(
     let sdl_zero_v = live_verdict_zero(sdl_zero);
     let target = overall;
 
-    // Prefer the SDL zero-engagement alarm when it matches the target — it's the
+    // Prefer the SDL zero-engagement alarm when it matches the target; it's the
     // signal that measures silence itself, exactly what beadle exists to catch.
     if sdl_zero_v == target {
         if let ZeroEngagementOrPending::Live(s) = sdl_zero {
@@ -716,13 +716,13 @@ fn top_signal(
 }
 
 // ========================================================================
-// Instrument v2 — capacity-adjusted calibration (SKILL §6b)
+// Instrument v2: capacity-adjusted calibration (SKILL §6b)
 // ========================================================================
 
 /// What `beadle direction` says when the target declares no capacity model.
 /// Two commands giving two verdicts with neither naming its instrument is the
 /// trap this removes (ArcavenAE/beadle#46).
-const V1_DISCLOSURE: &str = "instrument v1 — run-denominated streaks, ungated headline. \
+const V1_DISCLOSURE: &str = "instrument v1: run-denominated streaks, ungated headline. \
 This is NOT the capacity-adjusted verdict the board publishes: the target manifest declares \
 no `maintainer_capacity:` block, so SKILL §6b cannot be applied.";
 
@@ -774,7 +774,7 @@ pub struct CapacityReport {
     pub a4_windows: Vec<A4Windows>,
     pub selection_depth: SelectionDepth,
     pub red_gate: RedGate,
-    /// Recorded prediction evaluations, carried verbatim — never re-scored.
+    /// Recorded prediction evaluations, carried verbatim; never re-scored.
     pub predictions: Vec<PredictionRecord>,
 }
 
@@ -784,7 +784,7 @@ pub struct CapacityReport {
 pub struct WindowSet {
     pub unit: String,
     pub total: u32,
-    /// Windows the store can see on its own — maintainer comment/merge events
+    /// Windows the store can see on its own: maintainer comment/merge events
     /// on corpus issues. A lower bound: actions on the maintainers' own PRs
     /// never reach the store.
     pub from_store: u32,
@@ -792,7 +792,7 @@ pub struct WindowSet {
     pub from_manifest: u32,
     pub first: Option<String>,
     pub latest: Option<String>,
-    /// Observation horizon — the latest run's date. Windows after it are not
+    /// Observation horizon: the latest run's date. Windows after it are not
     /// yet observed and are excluded.
     pub observed_through: String,
     /// Tail of the window list, for eyeballing without printing all of it.
@@ -834,7 +834,7 @@ pub struct A4Windows {
     pub number: u32,
     /// Primary denominator (rule 1).
     pub attention_windows: u32,
-    /// Shadow — the v1 denominator.
+    /// Shadow: the v1 denominator.
     pub runs: u32,
     /// Shadow.
     pub calendar_days: i32,
@@ -842,7 +842,7 @@ pub struct A4Windows {
     pub basis: String,
 }
 
-/// Rule 3 — the acted-on severity ceiling, reported as selection depth with
+/// Rule 3: the acted-on severity ceiling, reported as selection depth with
 /// its cost covariate. Descriptive: it carries no verdict and cannot move the
 /// headline. Cost-ranked triage under scarcity is rational, not misalignment.
 #[derive(Debug, Serialize)]
@@ -854,18 +854,18 @@ pub struct SelectionDepth {
     pub rationale: String,
 }
 
-/// Rule 4 — the two-condition gate on a red headline.
+/// Rule 4: the two-condition gate on a red headline.
 #[derive(Debug, Serialize)]
 pub struct RedGate {
     pub rule: &'static str,
-    /// What the signals say on their own — what v1 would have published.
+    /// What the signals say on their own: what v1 would have published.
     pub signal_verdict: &'static str,
     pub condition_a_red_band: bool,
     pub red_bands: Vec<String>,
     pub condition_b_cost_explanation_falsified: bool,
     pub condition_b_rationale: String,
     /// Where the evidence for (b) came from. The store holds no PR records,
-    /// so (b) is judged against manifest-declared data — a hand-maintained
+    /// so (b) is judged against manifest-declared data; a hand-maintained
     /// input with a drift surface. Saying so in the output is the only thing
     /// standing between a stale `fixes:` line and an unearned red headline.
     pub condition_b_evidence: &'static str,
@@ -887,7 +887,7 @@ pub struct PredictionRecord {
 }
 
 /// Compute a stamped direction outcome. With no capacity block this is v1
-/// plus the disclosure; with one it is v2 — window-denominated streaks,
+/// plus the disclosure; with one it is v2; window-denominated streaks,
 /// scored bands, and a rule-4-gated headline.
 pub fn compute_outcome(
     target: &str,
@@ -937,7 +937,7 @@ fn days_between(from: &str, to: &str) -> i32 {
     }
 }
 
-/// Severity rung, deepest first — the pre-registered ordering
+/// Severity rung, deepest first; the pre-registered ordering
 /// (P2 < P1 < P0b < P0a) extended over the whole priority vocabulary.
 fn rung(priority: &str) -> u8 {
     match priority {
@@ -1027,9 +1027,9 @@ fn apply_v2(
         &observed_through,
     );
 
-    // Rule 1 — the A4 row reports windows first, runs and calendar as shadow.
+    // Rule 1: the A4 row reports windows first, runs and calendar as shadow.
     redenominate_a4(report, &a4_windows);
-    // Rule 4 — the headline is gated; the signal row keeps its own verdict.
+    // Rule 4: the headline is gated; the signal row keeps its own verdict.
     report.verdict = red_gate.headline;
 
     CapacityReport {
@@ -1092,7 +1092,7 @@ fn pr_acceptance_band(cap: &MaintainerCapacity) -> Band {
     let Some(pr) = cap.pr_acceptance else {
         return Band::pending(
             "no PR records in the store and no `maintainer_capacity.observed.pr_acceptance` \
-             in the manifest — the acceptance band has no input",
+             in the manifest; the acceptance band has no input",
         );
     };
     if pr.decided == 0 {
@@ -1168,7 +1168,7 @@ fn merge_latency_band(
     if cap.measured_prs.is_empty() {
         return Band::pending(
             "no PR records in the store and no `maintainer_capacity.observed.measured_prs` \
-             in the manifest — the merge-latency band has no input",
+             in the manifest; the merge-latency band has no input",
         );
     }
     let yellow_ceiling = MERGE_LATENCY_GREEN_WINDOWS * MERGE_LATENCY_YELLOW_MULTIPLE;
@@ -1200,7 +1200,7 @@ fn merge_latency_band(
     };
     Band {
         band,
-        raw: format!("{} attention window(s) — worst: {}", latency, note),
+        raw: format!("{} attention window(s); worst: {}", latency, note),
         rationale: format!(
             "green ≤ {} windows of readiness (manifest); yellow to {}× that, red beyond",
             MERGE_LATENCY_GREEN_WINDOWS, MERGE_LATENCY_YELLOW_MULTIPLE
@@ -1227,7 +1227,7 @@ fn selection_depth(
             c.acted,
             f64::from(c.with_diff) / f64::from(c.acted) * 100.0
         ),
-        _ => "pending — not derivable from the store (no PR↔issue linkage); declare \
+        _ => "pending: not derivable from the store (no PR↔issue linkage); declare \
               `maintainer_capacity.observed.acted_with_diff`"
             .to_string(),
     };
@@ -1238,7 +1238,7 @@ fn selection_depth(
             hard_ceiling: None,
             acted_this_window: 0,
             cost_covariate,
-            rationale: "no maintainer action on a corpus item in this run's window — depth \
+            rationale: "no maintainer action on a corpus item in this run's window; depth \
                         is undefined, not shallow; nothing was selected either way"
                 .to_string(),
         };
@@ -1270,7 +1270,7 @@ fn selection_depth(
     SelectionDepth {
         depth,
         rationale: format!(
-            "{} corpus item(s) acted on this window; deepest rung {} — descriptive only \
+            "{} corpus item(s) acted on this window; deepest rung {}; descriptive only \
              (§6b rule 3), cost-ranked triage under scarcity is rational",
             acted.len(),
             ceiling.as_deref().unwrap_or("unclassified")
@@ -1281,7 +1281,7 @@ fn selection_depth(
     }
 }
 
-/// Rule 4 — a red headline on a capacity-limited target requires BOTH a red
+/// Rule 4: a red headline on a capacity-limited target requires BOTH a red
 /// capacity-adjusted band AND a falsified fix-delivery-cost explanation.
 /// Signal-level `drifting` stays in its own row and in `top_signal`.
 fn red_gate(
@@ -1338,7 +1338,7 @@ fn red_gate(
 
     let condition_b_rationale = if condition_b {
         format!(
-            "falsified — {}: a ready SDL-lane fix sat ≥ {} attention windows, so cost of \
+            "falsified ({}): a ready SDL-lane fix sat ≥ {} attention windows, so cost of \
              delivery no longer explains the silence",
             falsifying.join("; "),
             COST_FALSIFYING_WINDOWS
@@ -1362,7 +1362,7 @@ fn red_gate(
             })
             .collect();
         format!(
-            "intact — no measured-side fix PR against the silent lane ({}); measured PRs on \
+            "intact: no measured-side fix PR against the silent lane ({}); measured PRs on \
              record: {}. §6b rule 7 puts the A4 discharge path on the measured side, and it \
              has not been walked",
             if lane.is_empty() {
@@ -1386,7 +1386,7 @@ fn red_gate(
     };
 
     RedGate {
-        rule: "SKILL §6b rule 4 — red requires a red capacity-adjusted band AND a falsified \
+        rule: "SKILL §6b rule 4: red requires a red capacity-adjusted band AND a falsified \
                fix-delivery-cost explanation",
         signal_verdict,
         condition_a_red_band: condition_a,
@@ -1394,10 +1394,10 @@ fn red_gate(
         condition_b_cost_explanation_falsified: condition_b,
         condition_b_rationale,
         condition_b_evidence: if cap.measured_prs.is_empty() {
-            "none — no PR records in the store and none declared in the manifest; (b) cannot \
+            "none: no PR records in the store and none declared in the manifest; (b) cannot \
              be satisfied, so the headline can only be capped, never released"
         } else {
-            "manifest-declared (`maintainer_capacity.observed.measured_prs`) — the store holds \
+            "manifest-declared (`maintainer_capacity.observed.measured_prs`): the store holds \
              no PR records, so this is an operator-maintained input, not an observation"
         },
         headline_capped: headline != signal_verdict,
@@ -1405,7 +1405,7 @@ fn red_gate(
     }
 }
 
-/// Rule 1 — restate the A4 row with attention windows first and the run /
+/// Rule 1: restate the A4 row with attention windows first and the run /
 /// calendar denominators as shadow. Same alarm set, same signal verdict; only
 /// the units change, and the units were the overstatement.
 fn redenominate_a4(report: &mut DirectionReport, a4: &[A4Windows]) {
@@ -1428,7 +1428,7 @@ fn redenominate_a4(report: &mut DirectionReport, a4: &[A4Windows]) {
         .collect();
 
     sig.rationale = format!(
-        "{} SDL issue(s), zero maintainer engagement — longest silence {} attention windows \
+        "{} SDL issue(s), zero maintainer engagement; longest silence {} attention windows \
          ({} runs · {} calendar days shadow); per issue: {}",
         alarm.len(),
         longest,
@@ -1551,7 +1551,7 @@ mod tests {
                 None
             },
             operational_impact: if sdl {
-                // Legacy pre-finding-009 encoding — deliberately kept so the
+                // Legacy pre-finding-009 encoding: deliberately kept so the
                 // is_silent_data_loss() compat arm stays covered.
                 Some("silent-data-loss".into())
             } else {
@@ -1790,7 +1790,7 @@ mod tests {
     #[test]
     fn sdl_zero_engagement_user_comment_does_not_bypass_alarm() {
         // A non-maintainer comment (user, arcavenai, bot) must NOT drop the
-        // issue from the alarm set — only actor_role="maintainer" is the
+        // issue from the alarm set: only actor_role="maintainer" is the
         // escape hatch (invariant B3: maintainer engagement is the compass).
         let classes = vec![
             mk_class_at(1, 1, true),
@@ -1810,7 +1810,7 @@ mod tests {
     #[test]
     fn sdl_zero_engagement_streak_is_contiguous_ending_at_latest_run() {
         // Issue SDL at run 1 and 3, but softened at run 2. The latest streak
-        // ending at run 3 is 1 (not 2 — the run-2 non-SDL breaks contiguity).
+        // ending at run 3 is 1 (not 2: the run-2 non-SDL breaks contiguity).
         let classes = vec![
             mk_class_at(1, 1, true),
             mk_class_at(1, 2, false), // softened
@@ -1840,7 +1840,7 @@ mod tests {
     }
 
     // ================================================================
-    // Instrument v2 — SKILL §6b
+    // Instrument v2: SKILL §6b
     // ================================================================
 
     use crate::intent::{ActedWithDiff, MeasuredPr, PrAcceptance};
@@ -1918,7 +1918,7 @@ mod tests {
     #[test]
     fn windows_are_counted_strictly_after_onset() {
         let w = run19_windows();
-        // #523/#588 were first classified SDL on 2026-07-13 — the window
+        // #523/#588 were first classified SDL on 2026-07-13; the window
         // that day does not count against them; everything after does.
         assert_eq!(windows_between(&w, "2026-07-13", "2026-09-18"), 30);
         // #635 was first classified SDL on 2026-07-20.
@@ -2033,7 +2033,7 @@ mod tests {
         assert_eq!(gate.headline, "watch");
         assert_eq!(
             gate.signal_verdict, "drifting",
-            "the signal keeps its own verdict — only the headline is gated"
+            "the signal keeps its own verdict; only the headline is gated"
         );
     }
 
@@ -2105,7 +2105,7 @@ mod tests {
 
     #[test]
     fn sdl_streaks_capture_the_onset_of_the_current_silence() {
-        // #7 classified SDL at run 2 and still SDL at run 4 — the streak
+        // #7 classified SDL at run 2 and still SDL at run 4; the streak
         // opens at run 2, so the onset is the run-2 record's timestamp.
         let mut early = mk_class_at(7, 2, true);
         early.ts = "2026-07-13T00:00:00Z".into();
@@ -2124,7 +2124,7 @@ mod tests {
         assert_eq!(sdl_basis(&impact), "impact=data_loss");
 
         // #479's shape: the safety flag is set while the liveness axis says
-        // `degraded`. Legitimate under the finding-009 split — and also
+        // `degraded`. Legitimate under the finding-009 split; and also
         // exactly where a mis-flag hides, so it is reported, not silently
         // folded in with the rest.
         let mut flag_only = mk_class_at(2, 1, false);
@@ -2257,7 +2257,7 @@ mod tests {
             c.operational_impact = Some(impact.into());
             out.push(Record::Classification(Box::new(c)));
         }
-        // Maintainer activity on OTHER issues — the store-side window source.
+        // Maintainer activity on OTHER issues: the store-side window source.
         for (n, day) in [(100u32, "2026-07-13"), (101, "2026-08-16")] {
             out.push(Record::CommentEvent(CommentEventRecord {
                 ts: format!("{}T00:00:00Z", day),

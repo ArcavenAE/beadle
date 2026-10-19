@@ -1,4 +1,4 @@
-//! `beadle verify` — the `/dashboard-refresh` §3 regression gate, as a verb.
+//! `beadle verify`: the `/dashboard-refresh` §3 regression gate, as a verb.
 //!
 //! Ported from `tools/dashboard-gate.py` (run-19), which is the reference
 //! implementation. Pure mechanism, no judgment: it compares a candidate
@@ -6,7 +6,7 @@
 //! the post when the candidate lost something the snapshot carried.
 //!
 //! Four semantics are load-bearing and were each learned the hard way in
-//! run-19 — do not "simplify" them back out:
+//! run-19: do not "simplify" them back out:
 //!
 //! 1. **Per-axis preservation, not union.** The command doc's original check 3
 //!    compares the UNION of tracked issue numbers across the whole sentinel, so
@@ -14,7 +14,7 @@
 //!    appear under another axis. Run-19 dropped 11 members from
 //!    `operational_impact.degraded_new` and the union check passed it.
 //! 2. **Per-run axes must roll forward.** An axis named `*_new` is *expected*
-//!    to reset each run, so it is exempt from (1) — but its previous members
+//!    to reset each run, so it is exempt from (1); but its previous members
 //!    must reappear in a `*_prior` counterpart or the classification was
 //!    silently discarded.
 //! 3. **Render-integrity checks are REGRESSION-RELATIVE.** A violation already
@@ -27,7 +27,7 @@
 //!
 //! One parsing trap is worth naming: the sentinel is a single ~9 000-char JSON
 //! line. Dict INT VALUES in it are counters (`a4_windows` window counts,
-//! `counts` totals) and must never be read as issue numbers — only list
+//! `counts` totals) and must never be read as issue numbers; only list
 //! elements and digit-string KEYS are.
 
 use std::{
@@ -37,8 +37,11 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
+use beadle_store::{latest_issue_observations, Record};
 use serde::Deserialize;
 use serde_json::{Map, Value};
+
+use crate::dash::EM_DASH;
 
 /// Axes that reset every run by design, and so are exempt from per-axis
 /// preservation. Matched on the *leaf* key, so `operational_impact.degraded_new`
@@ -143,7 +146,7 @@ fn load_declared(
         }
         if r.why.trim().is_empty() {
             bail!(
-                "{}: declared rename {:?} has no `why` — an allowlisted rename \
+                "{}: declared rename {:?} has no `why`; an allowlisted rename \
                  must carry a justification",
                 path.display(),
                 clip(&r.from, 60)
@@ -248,7 +251,7 @@ fn ints_in(list: &[Value]) -> BTreeSet<i64> {
 ///
 /// Only list ELEMENTS and digit-string KEYS count. Dict int VALUES are counters
 /// (`a4_windows` window counts, `counts` totals) and must never be read as
-/// issue numbers — that was a real bug in an earlier draft of the gate.
+/// issue numbers: that was a real bug in an earlier draft of the gate.
 fn nums(state: &Map<String, Value>) -> BTreeSet<i64> {
     let mut out = BTreeSet::new();
     for value in state.values() {
@@ -370,7 +373,7 @@ fn render_violations(text: &str) -> Vec<Violation> {
     let mut v = Vec::new();
     let lines: Vec<&str> = text.lines().collect();
 
-    // 5a — GFM lazy continuation swallows a table that hugs a blockquote.
+    // 5a: GFM lazy continuation swallows a table that hugs a blockquote.
     for i in 1..lines.len() {
         if lines[i].trim_start().starts_with('|') && lines[i - 1].trim_start().starts_with('>') {
             v.push(Violation {
@@ -381,7 +384,7 @@ fn render_violations(text: &str) -> Vec<Violation> {
         }
     }
 
-    // 5b — <details> needs blank lines around its markdown body.
+    // 5b: <details> needs blank lines around its markdown body.
     for (i, line) in lines.iter().enumerate() {
         if line.contains("<details>") && line.contains("<summary>") {
             if let Some(next) = lines.get(i + 1) {
@@ -403,7 +406,7 @@ fn render_violations(text: &str) -> Vec<Violation> {
         }
     }
 
-    // 5d — pipe tables do not render inside <details>.
+    // 5d: pipe tables do not render inside <details>.
     for block in details_blocks(text) {
         let body = strip_fences(block);
         for row in body.lines().filter(|l| is_table_row(l)) {
@@ -461,9 +464,9 @@ impl Report {
             s.push_str(&format!("WARN {w}\n"));
         }
         if self.fails.is_empty() {
-            s.push_str("GATE PASSED — all checks green\n");
+            s.push_str("GATE PASSED: all checks green\n");
         } else {
-            s.push_str(&format!("GATE FAILED — {} check(s):\n", self.fails.len()));
+            s.push_str(&format!("GATE FAILED: {} check(s):\n", self.fails.len()));
             for f in &self.fails {
                 s.push_str(&format!("  ✗ {f}\n"));
             }
@@ -476,11 +479,24 @@ impl Report {
 
 /// Run every check. Errors only when the gate itself cannot operate (a missing
 /// before-snapshot sentinel); everything else lands in the report.
+#[cfg(test)]
 pub fn evaluate(
     before: &str,
     candidate: &str,
     renames: &[Rename],
     removals: &[Removal],
+) -> Result<Report> {
+    evaluate_with_titles(before, candidate, renames, removals, &[])
+}
+
+/// `evaluate`, with the target's stored issue titles. A title is quoted as
+/// written, so an em dash inside one whole stored title is exempt from check 9.
+pub fn evaluate_with_titles(
+    before: &str,
+    candidate: &str,
+    renames: &[Rename],
+    removals: &[Removal],
+    titles: &[String],
 ) -> Result<Report> {
     let sb = sentinel(before)
         .ok_or_else(|| anyhow!("before-snapshot sentinel missing or unparseable"))?;
@@ -597,18 +613,31 @@ pub fn evaluate(
             continue;
         }
         match renames.iter().find(|r| r.from == *h) {
-            Some(r) if headings_cand.contains(r.to.as_str()) => rep.warns.push(format!(
-                "2: declared rename -> {:?} => {:?} ({})",
-                clip(h, 60),
-                clip(&r.to, 60),
-                r.why
-            )),
+            Some(r)
+                if headings_cand.contains(r.to.as_str())
+                    || headings_cand.contains(retire_dash(&r.to).as_str()) =>
+            {
+                rep.warns.push(format!(
+                    "2: declared rename -> {:?} => {:?} ({})",
+                    clip(h, 60),
+                    clip(&r.to, 60),
+                    r.why
+                ))
+            }
             _ => match removals.iter().find(|r| r.heading.as_deref() == Some(*h)) {
                 Some(r) => rep.warns.push(format!(
                     "2: declared removal -> {:?} ({})",
                     clip(h, 60),
                     r.why
                 )),
+                // One-way retirement: a before-heading whose every spaced em
+                // dash became a colon and a space is the same heading, retired.
+                None if retire_dash(h) != *h
+                    && headings_cand.contains(retire_dash(h).as_str()) =>
+                {
+                    rep.warns
+                        .push(format!("2: em dash retired -> {:?}", clip(h, 60)))
+                }
                 None => rep
                     .fails
                     .push(format!("2: HEADING LOST -> {}", clip(h, 95))),
@@ -702,7 +731,7 @@ pub fn evaluate(
                 budget.remove(i);
             }
             None => rep.fails.push(format!(
-                "{}: NEW render-integrity violation — {} :: {}",
+                "{}: NEW render-integrity violation: {} :: {}",
                 v.code, v.what, v.ctx
             )),
         }
@@ -746,7 +775,92 @@ pub fn evaluate(
         }
     }
 
+    // ---- 9. no em dash in the candidate ----------------------------------
+    // The before-snapshot is not checked, since history keeps its dashes. The
+    // curated body is what posts, so the guarantee sits here: carried-forward
+    // text and text taken from the shape canon are refused alongside new prose.
+    for line in em_dash_lines(candidate, titles) {
+        rep.fails
+            .push(format!("9: em dash in candidate, line {line}"));
+    }
+
     Ok(rep)
+}
+
+// ------------------------------------------------------------- text utils ---
+
+/// A heading with every spaced em dash replaced by a colon and a space (P4).
+fn retire_dash(h: &str) -> String {
+    h.replace(&format!(" {} ", EM_DASH), ": ")
+}
+
+/// A stored title is usable as a quote only when it is at least 12 characters
+/// long and holds at least 4 letters or digits. Characters, not bytes: the
+/// dash is one character and three bytes, so `len()` would let a short title in.
+fn usable_title(t: &str) -> bool {
+    t.chars().count() >= 12 && t.chars().filter(|c| c.is_alphanumeric()).count() >= 4
+}
+
+/// The 1-based line of every em dash in `candidate` that lies outside a quoted
+/// stored title. Each usable title is located in the candidate, non-overlapping
+/// and leftmost first (`match_indices`), and a dash is exempt only when it sits
+/// inside one such span. Spans are tested one at a time, never merged, so a
+/// dash in the gap between two quoted titles, or beside one, is refused.
+fn em_dash_lines(candidate: &str, titles: &[String]) -> Vec<usize> {
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+    for t in titles.iter().map(|t| t.trim()).filter(|t| usable_title(t)) {
+        spans.extend(
+            candidate
+                .match_indices(t)
+                .map(|(at, m)| (at, at + m.len())),
+        );
+    }
+    let mut lines = Vec::new();
+    for (at, c) in candidate.char_indices() {
+        if c != EM_DASH {
+            continue;
+        }
+        let end = at + c.len_utf8();
+        if spans.iter().any(|(s, e)| *s <= at && end <= *e) {
+            continue;
+        }
+        lines.push(candidate[..at].bytes().filter(|b| *b == b'\n').count() + 1);
+    }
+    lines
+}
+
+/// The latest stored title of every issue, trimmed, blank ones dropped, by
+/// issue number. Reads the store file directly and never creates anything.
+pub fn stored_titles(root: &Path, target: &str) -> Result<Vec<String>> {
+    let path = root.join("store").join(target).join("state.jsonl");
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let mut records = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let rec: Record = serde_json::from_str(line)
+            .with_context(|| format!("parse line {} of {}", i + 1, path.display()))?;
+        records.push(rec);
+    }
+    let mut issues = latest_issue_observations(&records);
+    issues.sort_by_key(|i| i.number);
+    Ok(issues
+        .into_iter()
+        .map(|i| i.title.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect())
+}
+
+/// `beadle titles <target>`: print the stored titles, one per line.
+pub fn titles(root: &Path, target: &str) -> Result<()> {
+    for t in stored_titles(root, target)? {
+        println!("{t}");
+    }
+    Ok(())
 }
 
 // ------------------------------------------------------------- text utils ---
@@ -796,7 +910,7 @@ fn section(text: &str, heading_prefix: &str) -> Option<String> {
     Some(out.join("\n"))
 }
 
-/// `#<n>` present with a word boundary after it — `#31` must not match `#312`.
+/// `#<n>` present with a word boundary after it: `#31` must not match `#312`.
 fn mentions_issue(text: &str, n: i64) -> bool {
     let needle = format!("#{n}");
     let mut pos = 0usize;
@@ -850,11 +964,17 @@ pub fn run(
         .with_context(|| format!("read candidate {}", candidate_path.display()))?;
     let (renames, removals) = load_declared(root, target, renames_path)?;
 
-    let report = evaluate(&before, &candidate, &renames, &removals)?;
+    // Titles are quoted as written and exempt from check 9. A store that cannot
+    // be read exempts nothing, so the check fails closed.
+    let titles = stored_titles(root, target).unwrap_or_else(|e| {
+        eprintln!("beadle verify: WARN no titles exempted: {e:#}");
+        Vec::new()
+    });
+    let report = evaluate_with_titles(&before, &candidate, &renames, &removals, &titles)?;
     print!("{}", report.render());
     if !report.passed() {
         bail!(
-            "gate failed — {} check(s); do NOT post this body",
+            "gate failed: {} check(s); do NOT post this body",
             report.fails.len()
         );
     }
@@ -908,6 +1028,188 @@ mod tests {
 
     fn gate(before: &str, cand: &str) -> Report {
         evaluate(before, cand, &[], &[]).expect("gate runs")
+    }
+
+    fn dashed(s: &str) -> String {
+        crate::testsupport::dashed(s)
+    }
+
+    fn gate_titles(before: &str, cand: &str, titles: &[&str]) -> Report {
+        let titles: Vec<String> = titles.iter().map(|t| dashed(t)).collect();
+        evaluate_with_titles(before, cand, &[], &[], &titles).expect("gate runs")
+    }
+
+    fn nine(r: &Report) -> Vec<&String> {
+        r.fails
+            .iter()
+            .filter(|f| f.starts_with("9: em dash in candidate"))
+            .collect()
+    }
+
+    #[test]
+    fn retired_em_dash_heading_warns_instead_of_failing() {
+        let before = doc(
+            base_state(18, 830),
+            &[18],
+            &dashed("## Extras {D} safe to act on\n\n"),
+        );
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            "## Extras: safe to act on\n\n",
+        );
+        let r = gate(&before, &cand);
+        assert!(r.passed(), "unexpected fails: {:?}", r.fails);
+        assert!(
+            r.warns
+                .iter()
+                .any(|w| w.starts_with("2: em dash retired -> ")),
+            "the retirement must be reported: {:?}",
+            r.warns
+        );
+    }
+
+    #[test]
+    fn a_heading_retired_with_a_semicolon_is_still_lost() {
+        // Regression pin: the fold admits colon-space and nothing else, so a
+        // candidate that retires a dash with another mark still fails.
+        let before = doc(
+            base_state(18, 830),
+            &[18],
+            &dashed("## Extras {D} safe to act on\n\n"),
+        );
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            "## Extras; safe to act on\n\n",
+        );
+        let r = gate(&before, &cand);
+        assert!(
+            r.fails
+                .iter()
+                .any(|f| f.starts_with("2: HEADING LOST -> ## Extras")),
+            "{:?}",
+            r.fails
+        );
+    }
+
+    #[test]
+    fn declared_rename_target_matches_after_retirement() {
+        let before = doc(base_state(18, 830), &[18], "### Old name\n\n");
+        let cand = doc(base_state(19, 836), &[18, 19], "### New name: folded\n\n");
+        let declared = [Rename {
+            from: "### Old name".into(),
+            to: dashed("### New name {D} folded"),
+            why: "test rename".into(),
+        }];
+        let r = evaluate(&before, &cand, &declared, &[]).expect("gate runs");
+        assert!(r.passed(), "unexpected fails: {:?}", r.fails);
+        assert!(
+            r.warns.iter().any(|w| w.starts_with("2: declared rename")),
+            "{:?}",
+            r.warns
+        );
+    }
+
+    #[test]
+    fn candidate_with_em_dash_is_refused() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("Some prose {D} here\n"),
+        );
+        let line = cand
+            .lines()
+            .position(|l| l.starts_with("Some prose"))
+            .unwrap()
+            + 1;
+        let r = gate(&before, &cand);
+        let f = nine(&r);
+        assert_eq!(f.len(), 1, "{:?}", r.fails);
+        assert!(f[0].contains(&format!("line {line}")), "{f:?}");
+    }
+
+    #[test]
+    fn candidate_without_em_dash_passes() {
+        // The positive control for the refusal above.
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(base_state(19, 836), &[18, 19], "Some prose; here\n");
+        let r = gate(&before, &cand);
+        assert!(r.passed(), "unexpected fails: {:?}", r.fails);
+    }
+
+    #[test]
+    fn quoted_title_with_em_dash_is_exempt() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("- #12 Fix parser {D} handle eof\n"),
+        );
+        let r = gate_titles(&before, &cand, &["Fix parser {D} handle eof"]);
+        assert!(r.passed(), "unexpected fails: {:?}", r.fails);
+        // Control: without the title the same body is refused.
+        let r = gate_titles(&before, &cand, &[]);
+        assert_eq!(nine(&r).len(), 1, "{:?}", r.fails);
+    }
+
+    #[test]
+    fn dash_beside_quoted_title_is_refused() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("- #12 Fix parser {D} handle eof {D} more\n"),
+        );
+        let r = gate_titles(&before, &cand, &["Fix parser {D} handle eof"]);
+        assert_eq!(nine(&r).len(), 1, "only the trailing dash: {:?}", r.fails);
+    }
+
+    #[test]
+    fn degenerate_titles_exempt_nothing() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let strings = ["{D}", " {D} ", "abcd {D} efgh", "x {D} y {D} z !!"];
+        let extra: String = strings.iter().map(|s| format!("{s}\n")).collect();
+        let cand = doc(base_state(19, 836), &[18, 19], &dashed(&extra));
+        // 1 + 1 + 1 + 2 dashes; the empty title is a pin (it covers nothing).
+        let mut titles: Vec<&str> = strings.to_vec();
+        titles.push("");
+        let r = gate_titles(&before, &cand, &titles);
+        assert_eq!(nine(&r).len(), 5, "{:?}", r.fails);
+    }
+
+    #[test]
+    fn dash_between_two_titles_is_refused() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("first {D} title one {D} second {D} title two\n"),
+        );
+        let r = gate_titles(
+            &before,
+            &cand,
+            &["first {D} title one", "second {D} title two"],
+        );
+        assert_eq!(nine(&r).len(), 1, "only the dash between: {:?}", r.fails);
+    }
+
+    #[test]
+    fn overlapping_title_occurrences_do_not_chain() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("ab {D} ab {D} ab {D} ab\n"),
+        );
+        let r = gate_titles(&before, &cand, &["ab {D} ab {D} ab"]);
+        assert_eq!(
+            nine(&r).len(),
+            1,
+            "the third dash is outside the one span: {:?}",
+            r.fails
+        );
     }
 
     #[test]
@@ -1051,7 +1353,7 @@ mod tests {
             format!("{debt}\n<details>\n<summary>more</summary>\n\n| c | d |\n\n</details>\n");
         let r2 = gate(&before, &doc(base_state(19, 836), &[18, 19], &worse));
         assert!(r2.fails.iter().any(
-            |f| f.contains("NEW render-integrity violation — pipe-table row inside <details>")
+            |f| f.contains("NEW render-integrity violation: pipe-table row inside <details>")
         ));
     }
 
@@ -1146,7 +1448,10 @@ mod tests {
 
     #[test]
     fn run_index_headings_are_extracted_by_number() {
-        let t = "### Run-18 index (carried forward — folded)\n### Run-19 index (NEW)\n### Run-20 notes\n";
+        let t = crate::testsupport::dashed(
+            "### Run-18 index (carried forward {D} folded)\n### Run-19 index (NEW)\n### Run-20 notes\n",
+        );
+        let t = t.as_str();
         assert_eq!(run_indexes(t), vec!["18".to_string(), "19".to_string()]);
     }
 

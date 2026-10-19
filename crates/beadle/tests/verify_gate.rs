@@ -2,7 +2,7 @@
 //!
 //! The acceptance contract for aae-orc-agwo8: the historical pair PASSES, the
 //! inherited `<details>` table WARNS rather than fails, and three named
-//! negative controls each FAIL — deleting a cluster member, resetting a `*_new`
+//! negative controls each FAIL: deleting a cluster member, resetting a `*_new`
 //! axis without roll-forward, and introducing a blockquote-adjacent table.
 //!
 //! The controls are produced by mutating the real run-19 body here rather than
@@ -15,6 +15,8 @@ use std::{
 };
 
 use serde_json::Value;
+
+mod support;
 
 const BEFORE: &str = "docs/fixtures/vsdd-factory-312-curated-run18.md";
 const CANDIDATE: &str = "docs/fixtures/vsdd-factory-312-curated-run19.md";
@@ -39,8 +41,35 @@ impl Outcome {
     }
 }
 
-/// Run the real binary over `before` and a candidate written to a temp file.
+/// The candidate as the first dash-free run would carry it: a spaced em dash
+/// in a heading becomes a colon and a space (P4), one elsewhere becomes a
+/// semicolon (P1), and any other em dash a semicolon. The shipped fixtures are
+/// history and keep their dashes, so the tests mutate them here, in the house
+/// style of the other controls.
+fn dash_free(body: &str) -> String {
+    let d = support::em_dash().to_string();
+    let spaced = format!(" {d} ");
+    body.split('\n')
+        .map(|l| {
+            let heading = l.starts_with("## ") || l.starts_with("### ");
+            let l = if heading {
+                l.replace(&spaced, ": ")
+            } else {
+                l.replace(&spaced, "; ")
+            };
+            l.replace(&d, ";")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Run the real binary over `before` and a dash-free form of the candidate.
 fn gate(before_rel: &str, candidate_body: &str) -> Outcome {
+    gate_raw(before_rel, &dash_free(candidate_body))
+}
+
+/// Run the real binary over `before` and the candidate exactly as given.
+fn gate_raw(before_rel: &str, candidate_body: &str) -> Outcome {
     let dir = tempfile::tempdir().expect("tempdir");
     let cand_path = dir.path().join("candidate.md");
     std::fs::write(&cand_path, candidate_body).expect("write candidate");
@@ -106,6 +135,76 @@ fn the_run18_to_run19_pair_passes() {
     assert!(r.says("GATE PASSED"), "{}", r.out);
     assert!(r.says("run 18 -> 19 | watermark 830 -> 836"), "{}", r.out);
     assert!(r.says("tracked issue numbers: 407 -> 411"), "{}", r.out);
+}
+
+#[test]
+fn the_first_dash_free_run_passes_with_retirement_warnings() {
+    // run19 mutated so headings lose their dash by P4 and prose by P1: the
+    // first dash-free run against a dash-bearing before-snapshot. Without the
+    // retirement fold every retired heading is HEADING LOST.
+    let r = gate(BEFORE, &read(CANDIDATE));
+    assert!(r.passed, "the dash-free run must pass:\n{}", r.out);
+    assert!(r.says("2: em dash retired -> "), "{}", r.out);
+    assert!(!r.says("HEADING LOST"), "{}", r.out);
+}
+
+#[test]
+fn a_candidate_that_keeps_the_old_dashes_is_refused() {
+    let r = gate_raw(BEFORE, &read(CANDIDATE));
+    assert!(!r.passed, "{}", r.out);
+    assert!(r.says("9: em dash in candidate"), "{}", r.out);
+}
+
+/// `beadle verify` over a scratch root whose store may hold one issue title.
+fn gate_with_store_title(title: Option<&str>, candidate: &str) -> Outcome {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("targets")).unwrap();
+    std::fs::copy(
+        repo_root().join("targets/vsdd-factory.verify.json"),
+        root.join("targets/vsdd-factory.verify.json"),
+    )
+    .unwrap();
+    if let Some(title) = title {
+        let store = root.join("store/vsdd-factory");
+        std::fs::create_dir_all(&store).unwrap();
+        let row = serde_json::json!({
+            "kind": "issue", "ts": "2026-09-09T00:00:00Z", "target": "vsdd-factory",
+            "number": 9, "observed_in_run": 19, "title": title, "author": "x",
+            "state": "open", "created_at": "2026-09-01T00:00:00Z",
+            "updated_at": "2026-09-02T00:00:00Z", "body_len": 1, "body_sha256": "s",
+        });
+        std::fs::write(store.join("state.jsonl"), format!("{row}\n")).unwrap();
+    }
+    let cand_path = root.join("candidate.md");
+    std::fs::write(&cand_path, candidate).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_beadle"))
+        .arg("--root")
+        .arg(root)
+        .args(["verify", "vsdd-factory", "--before"])
+        .arg(repo_root().join(BEFORE))
+        .arg("--candidate")
+        .arg(&cand_path)
+        .output()
+        .expect("run beadle verify");
+    let mut out = String::from_utf8_lossy(&output.stdout).into_owned();
+    out.push_str(&String::from_utf8_lossy(&output.stderr));
+    Outcome {
+        passed: output.status.success(),
+        out,
+    }
+}
+
+#[test]
+fn verify_exempts_a_title_held_in_the_store_and_only_that() {
+    let title = format!("Fix parser {} handle eof", support::em_dash());
+    let cand = format!("{}\n- #9 {title}\n", dash_free(&read(CANDIDATE)));
+    let with = gate_with_store_title(Some(&title), &cand);
+    assert!(with.passed, "a stored title is quoted as written:\n{}", with.out);
+    // Control: the same body with no such title in the store is refused.
+    let without = gate_with_store_title(None, &cand);
+    assert!(!without.passed, "{}", without.out);
+    assert!(without.says("9: em dash in candidate"), "{}", without.out);
 }
 
 #[test]
@@ -178,7 +277,7 @@ fn control_a2_a_loss_masked_by_another_axis_still_fails() {
     );
     assert!(
         !r.says("dropped from state"),
-        "the union check is blind here by construction — if it fired, the \
+        "the union check is blind here by construction; if it fired, the \
          control no longer proves per-axis is doing the work:\n{}",
         r.out
     );
@@ -228,7 +327,7 @@ fn control_b2_quick_wins_reset_without_roll_forward_fails() {
 
 #[test]
 fn control_c_introducing_a_blockquote_adjacent_table_fails() {
-    // GFM lazy continuation swallows a table that hugs a blockquote — the
+    // GFM lazy continuation swallows a table that hugs a blockquote; the
     // run-14→16 attn-lane regression.
     let bad = read(CANDIDATE).replace(
         "## Controls",
@@ -241,7 +340,7 @@ fn control_c_introducing_a_blockquote_adjacent_table_fails() {
         r.out
     );
     assert!(
-        r.says("5a: NEW render-integrity violation — table directly follows blockquote"),
+        r.says("5a: NEW render-integrity violation: table directly follows blockquote"),
         "{}",
         r.out
     );

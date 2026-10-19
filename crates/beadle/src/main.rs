@@ -1,4 +1,4 @@
-//! beadle — CLI entrypoint.
+//! beadle: CLI entrypoint.
 //!
 //! Phase 2 shape:
 //!   beadle enum   <target>   → fetch open issues via `gh`, append new observations
@@ -16,6 +16,7 @@ use clap::{Parser, Subcommand};
 
 mod classify;
 mod controls;
+mod dash;
 mod direction;
 mod enumerate;
 mod gh;
@@ -25,6 +26,8 @@ mod note;
 mod push;
 mod render;
 mod sync;
+#[cfg(test)]
+mod testsupport;
 mod verify;
 mod vocab;
 
@@ -88,8 +91,11 @@ enum Cmd {
         #[arg(long)]
         renames: Option<PathBuf>,
     },
+    /// Print the stored issue titles of a target, one per line, for the
+    /// Python gate's `--titles FILE`. Reads the store; changes nothing.
+    Titles { target: String },
     /// Append a note record to the store (perf ledger entries, audit trails,
-    /// operator remarks). Diagnostic only — nothing gates on notes.
+    /// operator remarks). Diagnostic only; nothing gates on notes.
     Note {
         target: String,
         /// Note topic (e.g. `perf`, `migration`).
@@ -156,6 +162,7 @@ fn main() -> Result<()> {
             candidate,
             renames,
         } => verify::run(&root, &target, &before, &candidate, renames.as_deref()),
+        Cmd::Titles { target } => verify::titles(&root, &target),
         Cmd::Note {
             target,
             topic,

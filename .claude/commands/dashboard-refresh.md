@@ -3,13 +3,13 @@ description: Backup → skills-based triage refresh → verify no section regres
 argument-hint: [target] (default vsdd-factory)
 ---
 
-# /dashboard-refresh — skills-based dashboard refresh with regression gate
+# /dashboard-refresh: skills-based dashboard refresh with regression gate
 
 Target: `$ARGUMENTS` (default `vsdd-factory`, dashboard issue `#312` on
-`BOHICA-LABS/vsdd-factory` — resolve other targets via `targets/<target>.intent.yaml`).
+`BOHICA-LABS/vsdd-factory`: resolve other targets via `targets/<target>.intent.yaml`).
 
-Distilled from the sessions of 2026-07-02 (run 10 — binary-render regression,
-skill restoration) and 2026-07-05 (run 11 — curated restoration + fail/restore
+Distilled from the sessions of 2026-07-02 (run 10; binary-render regression,
+skill restoration) and 2026-07-05 (run 11; curated restoration + fail/restore
 rule). This command exists because the `beadle` Rust binary's render path is
 **not load-bearing and currently unreliable**: it produces a flat unclassified
 table and strips the analysis (P0a/P0b/P1/P2 intent grouping, quick wins,
@@ -29,19 +29,19 @@ any point in this workflow.** The binary's `classify ingest` path is load-bearin
    and its `"run":N` / `"watermark":W` parse. Record N and W.
 4. If any of this fails: **STOP**. No refresh without a verified backup.
 
-## 2. Refresh — run the SKILL, not the binary
+## 2. Refresh: run the SKILL, not the binary
 
 **Build first, and name the artifact.** The classification vocabulary is embedded
 in the binary at build time, so a stale artifact silently enforces an old
 contract. Run `ax build beadle` (or `cargo build -p beadle`) before any
-`classify ingest`, and invoke the binary you just built by path — never whichever
+`classify ingest`, and invoke the binary you just built by path; never whichever
 `target/{debug,release}/beadle` happens to be lying around.
 
 Run-19 hit this: `target/release/beadle` was from 2026-07-01 and enforced a
 13-value `report_type` vocabulary against the manifest's 20, rejecting the
 canonical `process-gap`. Runs 17 and 18 had happened to use `target/debug`, so
 the correct behaviour had been reached by luck. **The error blames `payload item
-0`, not the binary** — so the natural fix is to edit the payload down to the
+0`, not the binary**; so the natural fix is to edit the payload down to the
 tokens the binary accepts, which silently re-creates the exact enum drift
 finding-020 F2 recorded and looks like a clean ingest. If `classify ingest`
 rejects a token that IS in `skills/beadle-triage/vocabulary.json`, the binary is
@@ -51,21 +51,24 @@ ArcavenAE/beadle#64.
 Follow `skills/beadle-triage/SKILL.md` (the load-bearing analysis discipline),
 with the **highest-numbered** committed fixture
 `docs/fixtures/<target>-312-curated-run<N>.md` as the **shape canon**
-(**run-19** as of 2026-09-18). Key operational notes from the sessions:
+(**run-19** as of 2026-09-18). The canon predates the dash rule and keeps its
+em dashes (U+2014) until a dash-free fixture replaces it; never copy one from it.
+SKILL step 7 states the rule, and the gate refuses any em dash in the candidate.
+Key operational notes from the sessions:
 
 - Enumerate open issues with number > W (the sentinel watermark).
 - Classify new issues in **batches of ~10–12 via parallel subagents dispatched
-  SYNCHRONOUSLY — never background**; each grader gets the intent manifest
+  SYNCHRONOUSLY: never background**; each grader gets the intent manifest
   (`targets/<target>.intent.yaml`) + the full issue bodies (orchestrator
   pre-builds the input file; graders Read input → Write output, no fetching),
   and returns per-issue axis records (report-type, defect-nature,
   reproducibility, triage-state, leverage, alignment + cited rationale,
   provenance, integrity, operational-impact, attn facet, quick-win flag).
-  - **Dispatch policy (run-14 evidence, 2026-07-20 — MITIGATION with a sunset,
+  - **Dispatch policy (run-14 evidence, 2026-07-20; MITIGATION with a sunset,
     not permanent lore):** background-dispatched graders starved ~10–20×
     slower than sync for identical work, then died to the session timeout
-    reaper (11/12 deaths in one cluster) — orc finding-083. Until that
-    harness fault is resolved (sunset anchor: bd `aae-orc-0nud` — when it
+    reaper (11/12 deaths in one cluster); orc finding-083. Until that
+    harness fault is resolved (sunset anchor: bd `aae-orc-0nud`; when it
     closes, re-test background dispatch and retire this rule), graders run
     sync-only, and each dispatch is sized so its expected wall clock sits
     well under the reaper: healthy grading measured ~26–50 s/issue, so a
@@ -76,12 +79,12 @@ with the **highest-numbered** committed fixture
     agents covering ONLY its missing issue numbers (run-14: 6/6 hedges
     succeeded, zero redundant tokens because hedges never race live work).
     Resume-from-transcript does NOT recover terminal API deaths (0/3,
-    run-14) — don't burn time on it. Every issue number in every batch must
+    run-14); don't burn time on it. Every issue number in every batch must
     appear in the returned records; merge keep-first.
-  - **Dispatch ledger (self-profiling — diagnostic, never a gate):** record
+  - **Dispatch ledger (self-profiling; diagnostic, never a gate):** record
     per dispatch: grader id, mode, batch size, issue numbers, spawn/end
     timestamps, outcome (ok / timeout / hedged), tokens if the harness
-    reports them — plus per-phase orchestrator timings (enumerate, merge,
+    reports them: plus per-phase orchestrator timings (enumerate, merge,
     compose, gate, recompose count). Publish the ledger in the run report,
     and append it to the store as `beadle note <target> --topic perf`
     records (one per dispatch + one per phase summary).
@@ -91,12 +94,12 @@ with the **highest-numbered** committed fixture
   issue observations, classification records (SKILL §6).
 - Regenerate the FULL body (SKILL §7): carry forward all prior curated
   content (prior-run classification indexes, unchanged P2 clusters, keystone
-  history); merge the new run's analysis into every section; bump
+  history), with every em dash (U+2014) in it retired by the SKILL step 7 rule; merge the new run's analysis into every section; bump
   `"run"` and `"watermark"` in the sentinel state JSON; refresh the digest.
 - Read controls from the prior body before regenerating (SKILL §8).
 - Direction Health carries the **falsification meter every run** (aae-orc#65):
   A4 SDL-engagement streak + the acted-on severity ceiling (hard/soft, per the
-  pre-registered criteria in `_kos/ideas/ramp-vs-drift-phase-qualifier.md`) —
+  pre-registered criteria in `_kos/ideas/ramp-vs-drift-phase-qualifier.md`);
   reported whichever way it points, never only when it flatters a hypothesis.
 - **Calibration is instrument v2 (SKILL §6b, capacity-adjusted):** verdicts,
   streaks, and latencies are conditioned on the manifest's
@@ -107,18 +110,24 @@ with the **highest-numbered** committed fixture
 - Write the candidate body to
   `tmp/dashboard-snapshots/<target>-312-candidate-<UTC ts>.md`. **Do not post yet.**
 
-## 3. Verify — the regression gate (fail = restore, from 2026-07-05)
+## 3. Verify: the regression gate (fail = restore, from 2026-07-05)
 
 The scheduled refresh runs the Python gate, from the repo's `tools/`:
 
 ```sh
+./target/debug/beadle titles <target> > tmp/dashboard-snapshots/<target>-312-titles-<ts>.txt
 python3 tools/dashboard-gate.py \
   tmp/dashboard-snapshots/<target>-312-before-<ts>.md \
-  tmp/dashboard-snapshots/<target>-312-candidate-<ts>.md
+  tmp/dashboard-snapshots/<target>-312-candidate-<ts>.md \
+  --titles tmp/dashboard-snapshots/<target>-312-titles-<ts>.txt
 ```
 
-Non-zero exit = do not post. The gate mechanizes checks 1, 2, 3, 5 and the
-`_unclassified_` half of 4. Its declared renames and declared removals (a
+Non-zero exit = do not post. The gate mechanizes checks 1, 2, 3, 5, 9 and the
+`_unclassified_` half of 4. Check 9 refuses any em dash (U+2014) in the candidate,
+except inside a whole stored issue or PR title from the `--titles` file; without
+that file nothing is exempt. Check 2 treats a before-heading whose spaced em dashes
+became a colon and a space as retired (a warning), so the first dash-free run is not
+refused for the headings that lost their dash. Its declared renames and declared removals (a
 retired heading or cumulative sentinel axis) are hardcoded in the script
 (`DECLARED_RENAMES`, `DECLARED_REMOVALS`), so a rename or removal the refresh
 relies on needs an entry there, with its reason.
@@ -146,14 +155,14 @@ GitHub state the gate does not have, and no mechanical check tells you the
 analysis is *good*. Compare the candidate against BOTH the before-snapshot
 and the fixture canon by eye as well. ALL checks must pass:
 
-1. **Section presence** — every one of these exists (heading match, order per canon):
+1. **Section presence**: every one of these exists (heading match, order per canon):
    - `<!-- beadle-state:v1` sentinel with parseable JSON (run = N+1, watermark > W)
    - Direction verdict (top): the literal bold `**Direction verdict: <glyph> <LABEL>**`
      plus one summary line, the At a glance table with its label and Result columns,
      and one closed `<details><summary>Why this verdict</summary>` fold holding the
      rest of the opening, with its history as a list (SKILL step 7, opening layout)
    - `## Baseline`
-   - `## 👤 Needs human reading` (attn lane — first section after Baseline)
+   - `## 👤 Needs human reading` (attn lane; first section after Baseline)
    - `## Action plan` with `### 🔴 P0a`, `### 🔴 P0b`, at least one `### 🟠 P1`,
      at least one `### 🟢 P2`
    - `## 🟦 Quick wins`
@@ -161,26 +170,26 @@ and the fixture canon by eye as well. ALL checks must pass:
    - `## Classification index` for the new run AND carried-forward prior index(es)
    - `## Maintainer progress`
    - `## Controls`
-2. **No section loss** — every `##`/`###` heading present in the before-snapshot
+2. **No section loss**: every `##`/`###` heading present in the before-snapshot
    is present in the candidate (renames must be justified in the run summary).
-3. **No coverage shrinkage — PER AXIS, not by union.** Every issue number
+3. **No coverage shrinkage; PER AXIS, not by union.** Every issue number
    referenced in the before-snapshot's state JSON (p0 lists, clusters, indexes)
    appears in the candidate state JSON unless it was closed on GitHub (verify
    closures). **Compare each axis on its own.** A union comparison is blind to
    any loss confined to a single axis, because the dropped numbers still appear
-   under some other key — run-19 lost 11 issues from
+   under some other key: run-19 lost 11 issues from
    `operational_impact.degraded_new` and a union check passed it clean. A
    manual per-axis diff caught it.
    Corollary: a per-run axis (`*_new`) is *expected* to reset, so it must roll
    its previous members into a `*_prior` counterpart (the board's existing
    `quick_wins_new` / `quick_wins_prior` idiom) or the classification is
    silently discarded.
-4. **Classification completeness** — no `_unclassified_` rows; every
+4. **Classification completeness**: no `_unclassified_` rows; every
    new-since-watermark issue appears in the new run's classification index.
 5. **Markdown render integrity** (SKILL §7d contract; added after the
-   run-14→16 attn-lane regression) — all mechanical, and all **relative to the
+   run-14→16 attn-lane regression); all mechanical, and all **relative to the
    before-snapshot**: a violation already present in the live body *warns*, a
-   newly introduced one *fails*. Absolute checks would block every future post —
+   newly introduced one *fails*. Absolute checks would block every future post;
    the live body carries an inherited violation from run-18 (one `<details>`
    holding one 30-row table), and a gate that refuses to post until historic
    debt is cleaned is a gate nobody can use:
@@ -200,7 +209,7 @@ if a bad body was ever posted, restore it with the before-snapshot via
 
 1. Present a before/after delta summary (sections, counts, new P0/P1 items).
 2. Update the dashboard: `gh issue edit 312 -R BOHICA-LABS/vsdd-factory --body-file <candidate>`
-   (allow-listed autonomous action per charter B2 — a bounded, reversible
+   (allow-listed autonomous action per charter B2; a bounded, reversible
    dashboard rewrite; free-text public comments stay propose-not-act).
 3. Save the pushed body as `tmp/dashboard-snapshots/<target>-312-after-<UTC ts>.md`.
 4. Commit the candidate as the new acceptance fixture
@@ -209,11 +218,11 @@ if a bad body was ever posted, restore it with the before-snapshot via
 5. Report: run number, watermark movement, issue deltas, verification results,
    snapshot paths, and the falsification meter (A4 streak + hard/soft
    acted-on severity ceiling).
-6. Append the run record (`kind: run`) to the store — the run-14 pass missed
+6. Append the run record (`kind: run`) to the store; the run-14 pass missed
    this; it is part of SKILL §6, not optional.
 7. **Prediction protocol:** any due pre-registered prediction (store record
    `kind: note, topic: prediction`) is evaluated against its registered
-   criteria exactly as written — report pass or fail in the run summary and
+   criteria exactly as written: report pass or fail in the run summary and
    on the board; do not defer, soften, or re-derive the criteria post-hoc.
    Evaluated results are permanent under the instrument that produced them
    (the run-16 ramp prediction FAILED under v1 and stays failed). NEW
@@ -221,7 +230,7 @@ if a bad body was ever posted, restore it with the before-snapshot via
    (default 4–6), single-window actions only; a horizon spanning < 2
    expected windows is invalid at registration.
 
-## Guardrails (charter/incidents — non-negotiable)
+## Guardrails (charter/incidents: non-negotiable)
 
 - State out-of-band (B1): the issue body is a projection; never parse it as
   machine state beyond the sentinel/controls contract.

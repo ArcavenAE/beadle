@@ -4,7 +4,7 @@
 //! `possibly_fixed` on the floor: `ClassificationRecord` did not declare them,
 //! serde ignored the unknowns, and ingest re-serialised the struct. The
 //! git-tracked rich fixture was the only durable carrier for the 👤 lane, the
-//! finding-005 title-led rows, and the fixed-but-open sweep — which inverts
+//! finding-005 title-led rows, and the fixed-but-open sweep, which inverts
 //! charter B1 and is issue-class #313 applied to beadle itself.
 //!
 //! This test drives the real binary over the real run-18 fixture and asserts
@@ -147,7 +147,7 @@ fn unknown_field_is_rejected_by_name() {
     let td = TempDir::new().unwrap();
     workspace(&td);
     let mut rec = run18().remove(0);
-    // `alignment_rationale` is a real key from the run-13/14 fixtures — exactly
+    // `alignment_rationale` is a real key from the run-13/14 fixtures; exactly
     // the kind of drift that used to vanish silently.
     rec["alignment_rationale"] = Value::from("advances because ...");
     let err = ingest(&td, &rec).expect_err("unknown field must be rejected");

@@ -1,4 +1,4 @@
-//! `beadle classify ingest` — accept a validated JSON ClassificationRecord
+//! `beadle classify ingest`: accept a validated JSON ClassificationRecord
 //! payload from an upstream classifier (the Phase-0 Claude Code skill or,
 //! eventually, a Phase-1 Go/Rust classifier) and append it to the store.
 //!
@@ -10,7 +10,7 @@
 //! Payload shape (JSON, one record or a JSON array of records):
 //!
 //! The payload key set is CLOSED: an unrecognized key is a hard error naming
-//! the offending field (beadle#66). Serde cannot carry that rule for us —
+//! the offending field (beadle#66). Serde cannot carry that rule for us;
 //! `#[serde(deny_unknown_fields)]` is not dependable on a variant of an
 //! internally-tagged enum, and the store struct must stay permissive so
 //! `Store::read_all` can still parse historical rows. So ingest validates the
@@ -58,7 +58,7 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use crate::{intent, vocab::vocab};
 
 /// Every key `classify ingest` recognizes on a classification payload item.
-/// Anything else is rejected by name — the schema-drift alarm beadle#66 asked
+/// Anything else is rejected by name: the schema-drift alarm beadle#66 asked
 /// for. `kind` is accepted (and must read `classification`) because the rich
 /// fixtures carry it; the remaining 24 are the `ClassificationRecord` fields.
 pub const KNOWN_FIELDS: &[&str] = &[
@@ -671,7 +671,7 @@ mod tests {
         }
     }
 
-    /// An explicit `null` is the absent case, not a parse error — every
+    /// An explicit `null` is the absent case, not a parse error; every
     /// run-18/19 fixture record spells the empty lane that way.
     #[test]
     fn explicit_nulls_are_the_absent_case() {
@@ -704,7 +704,7 @@ mod tests {
         assert!(format!("{:#}", err).contains("must not carry the `attn.` prefix"));
     }
 
-    /// A payload key the record does not model is a hard, named failure — the
+    /// A payload key the record does not model is a hard, named failure; the
     /// schema-drift alarm that was missing when the four fields went overboard.
     #[test]
     fn rejects_unknown_payload_field_by_name() {

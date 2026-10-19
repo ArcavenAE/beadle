@@ -1,9 +1,9 @@
-//! `beadle render <target>` — materialize the dashboard body from the store.
+//! `beadle render <target>`: materialize the dashboard body from the store.
 //!
 //! Design: renderer owns derived zones (sentinel, counts, compass, clusters,
 //! freshness). Editor owns marked slots preserved verbatim across regens.
-//! Sentinel carries two digests — `derived_digest` (this file's output) and
-//! `body_digest` (final merged body) — so a hand-edit to a derived zone is a
+//! Sentinel carries two digests: `derived_digest` (this file's output) and
+//! `body_digest` (final merged body): so a hand-edit to a derived zone is a
 //! first-class detectable event on the next run.
 //!
 //! See `_kos/nodes/frontier/question-renderer-editorial-boundary.yaml`.
@@ -31,7 +31,7 @@ use crate::{
 ///
 /// Measured, not documented. `BOHICA-LABS/vsdd-factory#312` carries an
 /// 87,232-byte (85,420-character) body that `gh issue edit` wrote and GitHub
-/// stores and serves intact — run 19 verified the stored body byte-for-byte
+/// stores and serves intact: run 19 verified the stored body byte-for-byte
 /// against what was sent. That live body contradicts both figures usually
 /// quoted as "the limit": the constant this replaces (55 KiB = 56,320 B) by
 /// 1.55x, and the 65,536-character figure GitHub's own docs cite by 1.30x.
@@ -40,7 +40,7 @@ use crate::{
 /// "past anything we have watched succeed," never "too big."
 const BODY_OBSERVED_ACCEPTED_BYTES: usize = 87_232;
 
-/// GitHub's true maximum issue-body size — once somebody measures it.
+/// GitHub's true maximum issue-body size: once somebody measures it.
 ///
 /// `None` means unmeasured, and **the rollup path stays blocked while it is
 /// `None`** (ArcavenAE/beadle#70, `aae-orc-veq8a`). Carrying editorial content
@@ -51,11 +51,11 @@ const BODY_OBSERVED_ACCEPTED_BYTES: usize = 87_232;
 const BODY_HARD_LIMIT_BYTES: Option<usize> = None;
 
 /// The observed-accepted floor may only ever rise, and only on new evidence:
-/// lowering it would re-create exactly the defect above — a body GitHub is
+/// lowering it would re-create exactly the defect above; a body GitHub is
 /// known to accept, reported as oversized.
 const _: () = assert!(BODY_OBSERVED_ACCEPTED_BYTES >= 87_232);
 
-/// Cluster decay thresholds — runs since last add.
+/// Cluster decay thresholds: runs since last add.
 const DECAY_WARMING: u32 = 3;
 const DECAY_ROLLUP: u32 = 5;
 const DECAY_ARCHIVED: u32 = 8;
@@ -80,8 +80,8 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
     // A pass OPENS when `enum` tags observations with the new run, and only
     // closes at push when the run record is written. Rendering against the last
     // finalized run means the whole pass renders the previous run's board while
-    // the fresh records sit ignored in the same store, and `direction` — which
-    // now derives the working run — would disagree with the body it is embedded
+    // the fresh records sit ignored in the same store, and `direction`, which
+    // now derives the working run, would disagree with the body it is embedded
     // in. Render against the open run.
     let working = working_run(&records);
     let latest_run = if working > last_finalized.run {
@@ -92,7 +92,7 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
 
     // Fail loud on a projection of nothing (finding-019, curated-board-restoration
     // item 1). A dashboard for a run whose classifier never produced records is
-    // the silent-success class this project exists to catch — every row would be
+    // the silent-success class this project exists to catch; every row would be
     // `_unclassified_` and the derived signals `pending`. Refuse to emit (nonzero
     // exit, nothing written to stdout); `beadle push` inherits the failure via `?`.
     let current_run = latest_run.run;
@@ -102,14 +102,14 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
         .count();
     if classifications_this_run == 0 {
         bail!(
-            "no classification records for run {current_run} — refusing to emit a dashboard body. \
+            "no classification records for run {current_run}; refusing to emit a dashboard body. \
              A projection of nothing must never look like a dashboard (finding-019). Run the \
              classifier skill and `beadle classify ingest <target>` before render/push."
         );
     }
 
     // A row that claims a known `kind` but fails its struct falls through to
-    // `Record::Other` and vanishes from every tally below — invisibly. Run 19's
+    // `Record::Other` and vanishes from every tally below, invisibly. Run 19's
     // store carries one: a hand-written `kind:"issue"` row closing #365, missing
     // four required fields, so the renderer still reads #365 from its run-9
     // `open` observation. Surface it; this renderer cannot fix the row, but it
@@ -155,7 +155,7 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
 }
 
 /// Rows that reached [`Record::Other`] while claiming a kind this renderer
-/// knows — i.e. malformed records silently excluded from every derived count.
+/// knows: i.e. malformed records silently excluded from every derived count.
 /// One line per affected kind, naming issue numbers where the row carries one.
 fn unparsed_row_report(records: &[Record]) -> Vec<String> {
     const KNOWN: [&str; 6] = [
@@ -187,7 +187,7 @@ fn unparsed_row_report(records: &[Record]) -> Vec<String> {
         .map(|(kind, who)| {
             format!(
                 "{} `{}` row(s) in the store failed to parse and are excluded from all counts \
-                 ({}) — malformed records, not missing ones",
+                 ({}); malformed records, not missing ones",
                 who.len(),
                 kind,
                 who.join(", ")
@@ -206,14 +206,14 @@ fn body_size_report(bytes: usize) -> String {
         if bytes > limit {
             return format!(
                 "beadle render: ERROR body {bytes} bytes exceeds the measured GitHub limit \
-                 of {limit} — the push will be rejected"
+                 of {limit}; the push will be rejected"
             );
         }
     }
     if bytes > BODY_OBSERVED_ACCEPTED_BYTES {
         format!(
             "beadle render: NOTE body {bytes} bytes is past the largest body GitHub is \
-             observed to have accepted ({BODY_OBSERVED_ACCEPTED_BYTES}) — advisory only; \
+             observed to have accepted ({BODY_OBSERVED_ACCEPTED_BYTES}); advisory only: \
              no limit is known to be exceeded and nothing is trimmed"
         )
     } else {
@@ -242,7 +242,7 @@ fn provisional_run(last: &RunRecord, run: u32) -> RunRecord {
         watermark_after: last.watermark_after,
         counts: Default::default(),
         digest: String::new(),
-        warmup: Some("provisional — run opened, not yet finalized".to_string()),
+        warmup: Some("provisional: run opened, not yet finalized".to_string()),
         intent_version: last.intent_version.clone(),
         new_this_run: vec![],
         notes: None,
@@ -299,7 +299,7 @@ struct IssueStates {
     open: usize,
     closed: usize,
     /// Latest observation carries a state this renderer does not recognise.
-    /// Never folded into `open` — an unreadable state is not evidence of one.
+    /// Never folded into `open`: an unreadable state is not evidence of one.
     unknown: usize,
 }
 
@@ -326,7 +326,7 @@ struct CommentStats {
     maintainer: u32,
     measured: u32,
     other: u32,
-    /// per-actor totals — sorted descending in the render.
+    /// per-actor totals: sorted descending in the render.
     per_actor: BTreeMap<String, u32>,
     /// issues touched by at least one comment.
     issues_with_comments: u32,
@@ -352,7 +352,7 @@ fn comment_stats(records: &[Record]) -> CommentStats {
 }
 
 /// For each issue number, the most-recent `ClassificationRecord`. Later
-/// classifications supersede earlier ones for the same issue — the skill is
+/// classifications supersede earlier ones for the same issue; the skill is
 /// allowed to reclassify as new evidence arrives.
 fn latest_classifications(records: &[Record]) -> HashMap<u32, ClassificationRecord> {
     let mut by_number: HashMap<u32, ClassificationRecord> = HashMap::new();
@@ -409,7 +409,7 @@ fn classification_summary(latest: &HashMap<u32, ClassificationRecord>) -> Classi
 ///
 /// `last_added_run` dates the last member add *as known when the record was
 /// written*. Read from a record that is itself N runs old, the gap to the
-/// current run measures how long ago cluster records stopped being written —
+/// current run measures how long ago cluster records stopped being written;
 /// not how long the cluster has been quiet. The two coincide only while
 /// something keeps writing them.
 fn cluster_record_is_current(cluster: &ClusterRecord, current_run: u32) -> bool {
@@ -422,12 +422,12 @@ fn cluster_record_is_current(cluster: &ClusterRecord, current_run: u32) -> bool 
 /// A record older than the current run gets no verdict at all. The store's 13
 /// cluster records are all from run 9 while the skill has maintained cluster
 /// state in the board's curated zones since, so every row used to read
-/// `archived (10 runs quiet)` about clusters that were being actively worked —
+/// `archived (10 runs quiet)` about clusters that were being actively worked;
 /// a confident wrong verdict, which is worse than none (ArcavenAE/beadle#68).
 fn decay_display(cluster: &ClusterRecord, current_run: u32) -> String {
     if !cluster_record_is_current(cluster, current_run) {
         return format!(
-            "unmaintained — no cluster record since run {} ({} run(s) stale; decay not computable)",
+            "unmaintained: no cluster record since run {} ({} run(s) stale; decay not computable)",
             cluster.run,
             current_run.saturating_sub(cluster.run),
         );
@@ -614,13 +614,13 @@ fn render_derived(
     ));
     if states.unknown > 0 {
         out.push_str(&format!(
-            "| Unreadable state | {} | latest observation is neither `open` nor `closed` — \
+            "| Unreadable state | {} | latest observation is neither `open` nor `closed`; \
              counted as neither |\n",
             states.unknown
         ));
     }
     out.push_str(&format!(
-        "| Comment events | {} | count(comment_event) — {} issues touched |\n",
+        "| Comment events | {} | count(comment_event); {} issues touched |\n",
         comments.total, comments.issues_with_comments
     ));
     out.push_str(&format!(
@@ -657,7 +657,7 @@ fn render_derived(
         out.push_str("_no comments observed_\n\n");
     } else {
         for (actor, count) in actor_pairs.iter().take(10) {
-            out.push_str(&format!("- `{}` — {}\n", actor, count));
+            out.push_str(&format!("- `{}`: {}\n", actor, count));
         }
         out.push('\n');
     }
@@ -711,7 +711,7 @@ fn render_derived(
 
     out.push_str("## Classification summary\n\n");
     if class_summary.total == 0 {
-        out.push_str("_no classifications in store — signals B/C emit `pending` until the classifier skill produces records for this run_\n\n");
+        out.push_str("_no classifications in store; signals B/C emit `pending` until the classifier skill produces records for this run_\n\n");
     } else {
         out.push_str(&format!(
             "| Metric | Value | Notes |\n|---|---|---|\n\
@@ -777,7 +777,7 @@ fn compose(
 ) -> String {
     let sentinel = build_sentinel(target, run, derived_digest);
     let mut out = String::new();
-    out.push_str(&format!("# 📋 beadle — Triage Dashboard · {}\n\n", repo));
+    out.push_str(&format!("# 📋 beadle · Triage Dashboard · {}\n\n", repo));
     out.push_str(&sentinel);
     out.push_str("\n\n");
     out.push_str(opening);
@@ -881,6 +881,51 @@ pub(crate) mod tests {
             &CommentStats::default(),
             &classification_summary(&empty),
         )
+    }
+
+    /// The first line of `body` that holds an em dash, as (line number, line).
+    fn first_dash(body: &str) -> Option<(usize, String)> {
+        let d = crate::testsupport::em_dash();
+        body.lines()
+            .enumerate()
+            .find(|(_, l)| l.contains(d))
+            .map(|(i, l)| (i, l.to_string()))
+    }
+
+    #[test]
+    fn rendered_body_has_no_em_dash() {
+        // A store that reaches the dash-bearing branches: a stale cluster
+        // (decay cell), an unreadable issue state (baseline provenance), one
+        // commenter (top commenters list), and the provisional run's warmup
+        // in the sentinel. compose() adds the H1.
+        let mut weird = mk_issue(7, "odd");
+        weird.state = "reopened-ish".into();
+        let stats = CommentStats {
+            total: 1,
+            per_actor: BTreeMap::from([("alice".to_string(), 1)]),
+            ..Default::default()
+        };
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        let run = provisional_run(&mk_run(18, 5), 19);
+        let derived = render_derived(
+            "t",
+            "acme/widget",
+            &run,
+            &[weird],
+            &[mk_cluster(9, 9)],
+            &stats,
+            &classification_summary(&empty),
+        );
+        let body = compose("t", "acme/widget", &run, "", &derived, "d");
+        assert_eq!(first_dash(&body), None, "the body must carry no em dash");
+    }
+
+    #[test]
+    fn rendered_body_with_no_classifications_has_no_em_dash() {
+        // run() bails before this branch, so reach it through render_derived.
+        let body = derive(&[], &[], &mk_run(19, 10));
+        assert!(body.contains("no classifications in store"));
+        assert_eq!(first_dash(&body), None, "the body must carry no em dash");
     }
 
     #[test]
@@ -1265,7 +1310,7 @@ pub(crate) mod tests {
     fn render_derived_has_no_flat_all_issues_table() {
         // The flat all-issues table is killed (curated-board-restoration item 2):
         // it violates B1 (projection, not replica) and was the sole emitter of
-        // `_unclassified_` rows. Issues present, none classified — the old table
+        // `_unclassified_` rows. Issues present, none classified; the old table
         // would have listed every row as `_unclassified_`.
         let issues = vec![mk_issue(10, "wobble"), mk_issue(11, "wibble")];
         let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
@@ -1301,7 +1346,7 @@ pub(crate) mod tests {
             "flat all-issues table must be removed"
         );
         assert!(
-            !body.contains("## Open issues —"),
+            !body.contains(&crate::testsupport::dashed("## Open issues {D}")),
             "flat all-issues section header must be removed"
         );
     }
@@ -1470,7 +1515,7 @@ pub(crate) mod tests {
         // Load-bearing invariant, not a style assertion: the board's job is to
         // carry editorial content forward, so nothing may evict it against a
         // guessed threshold. Whoever sets BODY_HARD_LIMIT_BYTES must derive it
-        // by measurement — this test failing is the prompt to prove that.
+        // by measurement: this test failing is the prompt to prove that.
         // (The observed-accepted floor is guarded at compile time beside the
         // constant; this covers the half that can only be checked at runtime.)
         assert!(
@@ -1546,7 +1591,7 @@ pub(crate) mod tests {
         ] {
             assert!(fold.contains(item), "fold lists {item}");
         }
-        assert!(!opening.contains('\u{2014}'), "no em dash in the opening");
+        assert!(!opening.contains(crate::testsupport::em_dash()), "no em dash in the opening");
     }
 
     #[test]

@@ -3,14 +3,14 @@
 A real Phase-0 dry run against `drbothen/vsdd-factory`, computed from live data on
 2026-06-27. This is the rendered issue body beadle would maintain. The verdict is
 **gated on warm-up state** (ADR-005): the process has not turned yet, so this is a
-**cold-start / baseline** dashboard — it establishes the baseline and makes the
+**cold-start / baseline** dashboard; it establishes the baseline and makes the
 maintainers' first pass cheap, and explicitly marks rate/drift signals as *not yet
 measurable*, never as a drift indictment.
 
 ---
 
 ```markdown
-# 📋 beadle — Triage Dashboard · drbothen/vsdd-factory
+# 📋 beadle · Triage Dashboard · drbothen/vsdd-factory
 
 <!-- beadle-state:v1
 {"schema":1,"last_run":"2026-06-27","watermark":306,"store":"jsonl",
@@ -18,7 +18,7 @@ measurable*, never as a drift indictment.
  "counts":{"open":107,"arcavenai_open":94,"maintainer_engaged":0,
  "arcavenai_closed_alltime":1}} beadle-state -->
 
-**Direction verdict: 🟡 COLD START (baseline).** The wheel hasn't turned yet — the
+**Direction verdict: 🟡 COLD START (baseline).** The wheel hasn't turned yet; the
 maintainers are busy and haven't begun their first triage pass. So the rate-style
 numbers below (resolution rate, maintainer engagement) are a **baseline, not a
 drift signal**: an average computed over a window before the process engaged is
@@ -27,20 +27,20 @@ establish that baseline and make the first pass cheap. Once the first maintainer
 triage cycle completes, beadle switches to trend/drift reporting. _Updated
 2026-06-27 · watermark #306 · intent vsdd-factory@0.1_
 
-## Baseline (counts — interpret as a starting line, not a rate)
+## Baseline (counts: interpret as a starting line, not a rate)
 
 | Metric | Value | Note |
 |---|---|---|
 | Open issues | 107 | arcavenai 94 · Zious11 6 · drbothen 6 · slabgorb 1 |
-| Filer concentration | arcavenai 88% | one prolific (AI) filer — expected at startup |
+| Filer concentration | arcavenai 88% | one prolific (AI) filer; expected at startup |
 | Reviewed by `arcaven` | 52 / 94 | review-identity passes (not a maintainer decision) |
 | Awaiting first read | 21 | zero comments yet |
-| Maintainer engagement | — | _not yet measurable (cold start)_ |
-| Resolution / net-flow | — | _not yet measurable (cold start)_ |
+| Maintainer engagement | n/a | _not yet measurable (cold start)_ |
+| Resolution / net-flow | n/a | _not yet measurable (cold start)_ |
 
 ## First-pass action plan (make the maintainers' first read cheap)
 
-High-leverage items worth a maintainer decision first — verified where noted:
+High-leverage items worth a maintainer decision first; verified where noted:
 
 | # | Issue | Verdict | Suggested first-pass action |
 |---|---|---|---|
@@ -50,7 +50,7 @@ High-leverage items worth a maintainer decision first — verified where noted:
 | #299 | cross-surface set-equality | advances | accept; prefer derive-over-duplicate |
 | #241/#242 | observability broken (Loki/resolver) | advances · verified | confirm fixed-pending-release vs open |
 
-## Structure (cluster candidates — group as tracking issues, don't close)
+## Structure (cluster candidates: group as tracking issues, don't close)
 
 Same-lever issues filed N times → fold into one tracking issue each, so the first
 pass reads 6 threads, not 40:
@@ -62,7 +62,7 @@ pass reads 6 threads, not 40:
 - 🧵 post-merge process-gaps (~5): #289 #290 #291 #292 #294
 - 🧵 scaffold-claude-md (2): #295 #302
 
-## Watch (revisit after the process turns — NOT drift yet)
+## Watch (revisit after the process turns: NOT drift yet)
 
 - Filer concentration + clustering are normal at startup; they become a drift
   signal only if they persist *after* maintainers begin engaging.
@@ -80,7 +80,7 @@ pass reads 6 threads, not 40:
 **Verdict:** 🟢 advances · 🟡 neutral · 🔴 drifts · 🛑 integrity (source-of-truth gate, ranks first).
 **Chips:** `verified` = checked against the code/spec · `systemic` = high-leverage · `hard-block` = blocks a dependent.
 
-Classification rests on: defect-nature — [IEEE 1044](https://standards.ieee.org/ieee/1044/4128/) / [ODC](https://www.chillarege.com/odc/); reproducibility — [Grottke–Trivedi (Bohr/Mandel/Heisenbug)](https://doi.org/10.1109/MC.2007.55); [severity vs priority](https://www.centizen.com/severity-vs-priority-a-crucial-distinction-in-software-testing/). Cold-start gating: ADR-005.
+Classification rests on: defect-nature: [IEEE 1044](https://standards.ieee.org/ieee/1044/4128/) / [ODC](https://www.chillarege.com/odc/); reproducibility: [Grottke–Trivedi (Bohr/Mandel/Heisenbug)](https://doi.org/10.1109/MC.2007.55); [severity vs priority](https://www.centizen.com/severity-vs-priority-a-crucial-distinction-in-software-testing/). Cold-start gating: ADR-005.
 
 </details>
 ```

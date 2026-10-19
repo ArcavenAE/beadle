@@ -2,7 +2,7 @@
 //!
 //! `beadle direction` published 🔴 drifting on the same store, at the same
 //! watermark, where the run-19 board published 🟡 WATCH. The crate computed
-//! **instrument v1** — run-denominated streaks and an ungated headline —
+//! **instrument v1**: run-denominated streaks and an ungated headline;
 //! while the board ran **instrument v2** (SKILL §6b), which the skill applied
 //! by hand every run. Two commands, two verdicts, neither naming its
 //! instrument.
@@ -56,7 +56,7 @@ maintainer_capacity:
         fixes: []
 "#;
 
-/// A manifest with no capacity model — the v1 path.
+/// A manifest with no capacity model: the v1 path.
 const INTENT_V1: &str = "schema_version: 0.3\nrepo: BOHICA-LABS/vsdd-factory\nmaintainers:\n  - drbothen\nmeasured_contributors:\n  - arcavenai\n";
 
 fn run_row(run: u32, day: &str) -> Value {
@@ -200,7 +200,7 @@ fn run19_yields_watch_under_v2_with_merge_latency_red() {
     let gate = &d["capacity"]["red_gate"];
     assert_eq!(
         gate["signal_verdict"], "drifting",
-        "the signals still say drifting — only the headline is gated"
+        "the signals still say drifting; only the headline is gated"
     );
     assert_eq!(gate["condition_a_red_band"], true);
     assert_eq!(gate["condition_b_cost_explanation_falsified"], false);
@@ -225,7 +225,7 @@ fn run19_yields_watch_under_v2_with_merge_latency_red() {
 
 /// Rule 1: A4 streaks are denominated in attention windows, with runs and
 /// calendar days as shadow. A run-denominated streak overstates the silence
-/// whenever beadle's cadence outpaces the maintainers' — it always does.
+/// whenever beadle's cadence outpaces the maintainers'; it always does.
 #[test]
 fn a4_streaks_report_attention_windows_first() {
     let td = workspace(INTENT);
@@ -257,7 +257,7 @@ fn a4_streaks_report_attention_windows_first() {
 }
 
 /// #479 carries `silent_data_loss: true` with `operational_impact: degraded`.
-/// So does #588, which the board *does* count — so the flag, not the impact
+/// So does #588, which the board *does* count; so the flag, not the impact
 /// axis, is what puts an issue in the class. The membership basis is reported
 /// per issue so a disagreement about a row is visible instead of silent.
 #[test]
@@ -295,7 +295,7 @@ fn the_run16_prediction_is_not_rescored_under_v2() {
 }
 
 /// Rule 3: the severity ceiling is descriptive. Run 19 had zero maintainer
-/// actions on the corpus, so depth is undefined — reported as absence, never
+/// actions on the corpus, so depth is undefined; reported as absence, never
 /// as a fall to shallow, and it carries no verdict either way.
 #[test]
 fn selection_depth_is_descriptive_and_undefined_without_actions() {
@@ -307,7 +307,7 @@ fn selection_depth_is_descriptive_and_undefined_without_actions() {
     assert!(depth.get("verdict").is_none(), "depth carries no verdict");
 }
 
-/// A target with no capacity model is still computable under v1 — and says
+/// A target with no capacity model is still computable under v1; and says
 /// so, so that two commands can never again give two answers with neither
 /// naming its instrument.
 #[test]
@@ -334,7 +334,7 @@ fn v1_remains_computable_and_declares_itself() {
 
 /// Rule 4(b) is judged against a hand-maintained manifest field, because the
 /// store holds no PR records. A stale `fixes:` line is therefore the one
-/// input that can manufacture a red headline — so the gate names its own
+/// input that can manufacture a red headline: so the gate names its own
 /// evidence source in the output rather than letting it pass as observation.
 #[test]
 fn the_red_gate_names_the_provenance_of_its_evidence() {
@@ -348,7 +348,7 @@ fn the_red_gate_names_the_provenance_of_its_evidence() {
 }
 
 /// With no `observed:` block the bands go `pending` and the headline is
-/// unchanged — the acceptance-critical numbers (the gated headline and the
+/// unchanged: the acceptance-critical numbers (the gated headline and the
 /// A4 window streaks) do not depend on the declared block at all.
 #[test]
 fn dropping_the_observed_block_changes_bands_but_not_the_headline() {

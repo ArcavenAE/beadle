@@ -1,8 +1,8 @@
-//! `beadle note` — append a NoteRecord to a target's store.
+//! `beadle note`: append a NoteRecord to a target's store.
 //!
 //! The Phase-0 path for durable run annotations that aren't classifications:
 //! per-dispatch perf ledger entries (`--topic perf`), migration audit trails,
-//! operator remarks. Notes are diagnostic — nothing gates on them (ADR-007
+//! operator remarks. Notes are diagnostic; nothing gates on them (ADR-007
 //! diagnostic-not-gate); a typed record kind (e.g. PerfRecord) arrives only
 //! when a consumer needs structure the JSON-in-text can't carry.
 

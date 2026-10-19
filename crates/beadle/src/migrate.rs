@@ -1,4 +1,4 @@
-//! `beadle classify migrate-impact` — re-map legacy (pre-finding-009)
+//! `beadle classify migrate-impact`: re-map legacy (pre-finding-009)
 //! `operational_impact` values in an existing store to the canonical liveness
 //! vocabulary, and backfill the `silent_data_loss` safety flag.
 //!
@@ -8,7 +8,7 @@
 //! map is ambiguous for `user-visible-error`, so ground truth comes from the
 //! rich classification fixtures (`docs/fixtures/*-classifications-rich.json`),
 //! keyed by issue number. Records that neither a fixture nor the unambiguous
-//! mechanical map can resolve FAIL the migration loudly — nothing is written
+//! mechanical map can resolve FAIL the migration loudly; nothing is written
 //! unless every legacy value resolves.
 //!
 //! The store is rewritten atomically with a timestamped backup beside it, and

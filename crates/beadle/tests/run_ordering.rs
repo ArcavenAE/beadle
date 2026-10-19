@@ -3,7 +3,7 @@
 //! `beadle enum` appends observations tagged with the NEW run immediately, but
 //! the store's `Run` record is only written later, at render/push. Anything
 //! keying on `Record::Run` therefore computes against the PREVIOUS run for the
-//! entire pass it is supposed to inform — observed in three consecutive
+//! entire pass it is supposed to inform: observed in three consecutive
 //! sessions (finding-019 root cause 4): during run-11 work, `direction`
 //! reported `run: 9` and "no classification records for run 9" while 66 fresh
 //! run-10 records sat in the same store.
