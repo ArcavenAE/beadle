@@ -248,10 +248,16 @@ construction makes moot.
   Tests that need the character get it from one helper,
   `tests/support/mod.rs::em_dash()`, which returns
   `char::from_u32(0x2013 + 1).unwrap()`. Each literal there is one off, so the
-  scan passes it. The helper is the only sanctioned construction, and review
-  checks for any other arithmetic that builds the dash. The scan is a tripwire
-  against accidental spellings, not proof against deliberate construction, and
-  the brief says so. The inputs that must carry a dash (the old checked boxes in
+  value rules pass it. The helper is the only sanctioned construction, and the
+  scan enforces that. Outside `tests/support/mod.rs` it refuses any call that
+  builds a char from an integer: `from_u32`, `from_u32_unchecked`, and
+  `char::try_from` or `char::from` applied to a `u32`, matched as text. That
+  costs nothing on main, which has no `from_u32` under `crates/` (`git grep`);
+  the `try_from` impls in `director-envelope` are not on `char` and do not match.
+  What remains is bytes built at run time and passed to `String::from_utf8`.
+  The scan cannot refuse `from_utf8`, since gh.rs:23 needs it, so that case
+  stays a review matter, and the brief says so. The scan is a tripwire against
+  accidental spellings, not proof against deliberate construction. The inputs that must carry a dash (the old checked boxes in
   controls.rs:119 and 126, push.rs:298, render.rs:1549) and the five test files
   that hold raw dashes today move to the helper, which needs `pub` access from
   unit tests; a `#[cfg(test)]` copy in `src/` is the fallback.
@@ -260,7 +266,7 @@ construction makes moot.
   above, including each named variant (leading zeros, upper case, an
   underscore in the escape, decimal, octal, binary, a suffix, the byte list).
   Each case must be refused, and the failure must name the form and the line.
-  Controls that must pass: `0x2013`, `8211`, `0x2015`, the helper's own
+  Controls that must pass: `&ndash;`, `&#8211;`, `&#x2013;`, `0x2013`, `8211`, `0x2015`, the helper's own
   expression, and the bytes `0xe2, 0x80, 0x93` (the en dash). The scan must
   also report at least one file read under each crate, so an empty walk fails
   instead of passing.
@@ -271,9 +277,40 @@ construction makes moot.
   body at render.rs:731-737; 0 dashes at c1f95a5) and every
   `targets/*.intent.yaml` (its `repo` becomes the H1 through render.rs:132 and
   :780, and the skill scores the manifest, so the curator may quote its
-  values). The intent files hold 31 at c1f95a5: `_template` 7 and `prism` 1,
-  all in comments, and `vsdd-factory` 23, of which 8 are in values. All go, by
-  section 3. The check reads each file as text, so comments count too.
+  values). The intent files hold 33 characters on 31 lines at c1f95a5:
+  `_template` 7 on 7 lines and `prism` 2 on 1, all in comments, and
+  `vsdd-factory` 24 on 23 lines, 8 of those lines values. All 33 are clause
+  breaks or asides; none is a range. The check reads each file as text, so
+  comments count too.
+  **YAML rule:** in these files only P1 (semicolon) or P5 (parentheses) may
+  replace a dash, never colon-space. A colon-space in an unquoted value breaks
+  the YAML: vsdd-factory.intent.yaml:124, `note: canonical principle \u{2014}
+  production-grade default, ...`, fails to parse with `: ` and parses with
+  `; ` (measured by the reviewer). After the replacement every intent file
+  must still load through the manifest loader (`intent.rs`, `serde_yaml`).
+  The test `intent_files_parse_after_retirement` loads each one, and that
+  test runs in the same red/green sequence.
+- **The candidate-body check, both gates:** the live path is the curated
+  body, not the renderer, so the guarantee has to sit where that body is
+  refused before it posts. `beadle verify` (verify.rs `evaluate`) and
+  `tools/dashboard-gate.py` each gain a check, `9: em dash in candidate`. It
+  fails the gate for any U+2014 in the candidate body, with a line number,
+  except inside a quoted title (below). The before-snapshot is not checked,
+  since history keeps its dashes. Tests: `candidate_with_em_dash_is_refused`
+  and `candidate_without_em_dash_passes` in verify.rs, the same pair in
+  `tools/test_dashboard_gate.py`, and `quoted_title_with_em_dash_is_exempt`.
+  This check, not the later fixture test, is what stops curator prose,
+  carry-forward text and canon text from posting with a dash.
+- **Quoted titles.** An issue or PR title is someone else's words. The
+  default rule: a title is quoted exactly as written and is exempt, but only
+  as an exact substring match against a title the store holds for that target
+  (`beadle-store` lib.rs:72, `title`). The exemption is mechanical and needs
+  no markup, so a dash the curator writes beside a title is still refused.
+  `beadle verify` reads the titles from the target's store. The Python gate
+  takes `--titles FILE`, one title per line, written by a new read-only
+  `beadle titles <target>`. Without the file it exempts nothing, so it fails
+  closed. The alternative, rewriting dashes inside quoted titles, changes
+  another author's words. It is listed for the operator under Open questions.
 - `render::tests::rendered_body_has_no_em_dash`, the behavioral check on the
   body: renders a store that reaches the body branches (a stale cluster, an
   unreadable issue state, one commenter, a zero trailing mean for filing
@@ -326,7 +363,7 @@ Red first; each test is run and seen failing before its fix.
 
 1. **Red, source, data and renderer guards:** `sources_have_no_em_dash_spelling`,
    `scan_catches_planted_spelling` (red until the scan function exists),
-   `body_data_has_no_em_dash`,
+   `body_data_has_no_em_dash`, `intent_files_parse_after_retirement`,
    `rendered_body_has_no_em_dash` (both cases), `board_controls_block_has_no_em_dash`.
    The direction and stderr literals are covered by the source scan, not by a
    behavioral test.
@@ -336,6 +373,10 @@ Red first; each test is run and seen failing before its fix.
    `the_first_dash_free_run_passes_with_retirement_warnings` (run18 before;
    run19 mutated in the test, headings by P4, prose by P1, in the house style of
    its other controls); Python `test_em_dash_retirement_warns_and_passes`.
+   The candidate-body check: `candidate_with_em_dash_is_refused`,
+   `candidate_without_em_dash_passes` (the positive control) and
+   `quoted_title_with_em_dash_is_exempt`, in verify.rs and in the Python tests,
+   with a Python case that `--titles` absent exempts nothing.
    Two regression pins go with them and pass on main, so they are not reds:
    `a_heading_retired_with_a_semicolon_is_still_lost` and Python
    `test_heading_retired_with_another_mark_fails`. They are kept so the fold
@@ -346,9 +387,11 @@ Red first; each test is run and seen failing before its fix.
    build any dash a test input needs with the `em_dash()` helper. At c1f95a5 five test files
    hold raw dashes: classification_fidelity.rs (2), direction_v2.rs (9),
    run_ordering.rs (1), verify_gate.rs (4) and vocabulary_contract.rs (3)
-   (`git grep -c` for U+2014). Also the 31 in `targets/*.intent.yaml`.
+   (`git grep -c` for U+2014). Also the 33 in `targets/*.intent.yaml`, by P1 or P5 only.
 5. **Green, gates:** the fold in `verify.rs` check 2 and `tools/dashboard-gate.py`
-   check 2, with the rename-`to` case. `verify.json` and `DECLARED_RENAMES`
+   check 2, with the rename-`to` case; check 9 (em dash in candidate) in both,
+   with the store-title exemption; `beadle titles <target>`, and
+   `dashboard-refresh.md` passing `--titles` to the Python gate. `verify.json` and `DECLARED_RENAMES`
    unchanged.
 6. **Green, text:** SKILL.md (132, plus the step 7 rule), dashboard-refresh.md
    (28, plus the canon and carry-forward pointer), dashboard-schema.md (52),
@@ -370,6 +413,9 @@ are carded and not ruled.
 - **En dashes (assumed: they stay).** 18 on the live board, 8 in SKILL.md, 1 in direction.rs, all
   number ranges. The ruling names em dashes. Writing "#410 to #417" is a
   one-line skill rule if the operator wants it; until then the guard ignores them.
+- **Quoted titles (assumed: quoted as written, exempt by exact store match).**
+  Rewriting them instead changes another author's words; that is the
+  alternative, and it is the operator's call.
 - **P6 separator (assumed: the middle dot).** Middle dot, matching the live board, or colon, matching
   the five-mark list. This brief recommends the middle dot.
 
