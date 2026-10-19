@@ -155,8 +155,8 @@ keeps the gate mechanical; inside headings it applies even to an aside
 
 P6 is the one place the replacement is not on the five-mark list. The middle
 dot is the board's own separator, and the live title and H1 already use it
-(measured), so a colon would change a heading the live board has settled. The
-operator may overrule; if so, a colon goes in all title and H1 sites at once.
+(measured), so a colon would change a heading the live board has settled. Ruled
+2026-10-19: the middle dot stays (Desk beadle-117-title-separator).
 
 One wording trap, measured: render.rs:1443 asserts `advisory only` with exact
 case. Writing render.rs:216 as `. Advisory only;` failed that test; `; advisory
@@ -404,20 +404,19 @@ The commit message and PR body carry no em dash, no banned vocabulary and no AI
 attribution; the builder sweeps them before pushing. The PR uses `Refs: #117`,
 since the fixture PR finishes it.
 
-## Open questions
+## Rulings and open questions
 
-The design assumes both of these as written below until director rules. Both
-are carded and not ruled.
+Two are ruled and one is open.
 
-
-- **En dashes (assumed: they stay).** 18 on the live board, 8 in SKILL.md, 1 in direction.rs, all
-  number ranges. The ruling names em dashes. Writing "#410 to #417" is a
-  one-line skill rule if the operator wants it; until then the guard ignores them.
-- **Quoted titles (assumed: quoted as written, exempt by exact store match).**
-  Rewriting them instead changes another author's words; that is the
-  alternative, and it is the operator's call.
-- **P6 separator (assumed: the middle dot).** Middle dot, matching the live board, or colon, matching
-  the five-mark list. This brief recommends the middle dot.
+- **En dashes stay.** Ruled 2026-10-19, Desk beadle-117-en-dashes (option a).
+  There are 18 on the live board, 8 in SKILL.md and 1 in direction.rs, all
+  number ranges. The guards cover U+2014 only.
+- **Quoted titles: open.** The design assumes they are quoted as written and
+  exempt by exact store match (section 5). The alternative, rewriting them,
+  changes another author's words. It is the operator's call, and the card goes
+  to the Desk.
+- **The title and H1 keep the middle dot (P6).** Ruled 2026-10-19, Desk
+  beadle-117-title-separator (option a).
 
 This recommendation is valid until 2026-10-26 or the next vsdd-factory refresh,
 whichever comes first; the architect role re-checks it then.
