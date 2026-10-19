@@ -1,7 +1,7 @@
 //! `beadle titles <target>`: the stored issue titles, one per line, for the
 //! Python gate's `--titles FILE`. It only reads the store.
 
-use std::{fs, path::Path, process::Command};
+use std::{fs, os::unix::fs::MetadataExt, path::Path, process::Command};
 
 use serde_json::{json, Value};
 use tempfile::TempDir;
@@ -32,29 +32,67 @@ fn workspace(rows: &[Value]) -> TempDir {
     td
 }
 
-/// name, inode, size, mtime and ctime of every file and directory under `dir`,
-/// sorted. A rewrite changes the mtime or the inode, a rename the inode.
+/// path, kind, inode, size, mtime and ctime (nanoseconds) of every file and
+/// directory under `dir`, sorted. A rewrite changes the mtime or ctime, a
+/// rename-over the inode, and a new directory adds a row.
 fn snapshot(dir: &Path) -> Vec<String> {
     let mut out = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
     while let Some(d) = stack.pop() {
         for e in fs::read_dir(&d).unwrap().flatten() {
             let p = e.path();
-            if p.is_dir() {
+            let m = fs::symlink_metadata(&p).unwrap();
+            let kind = if m.is_dir() { "dir" } else { "file" };
+            out.push(format!(
+                "{} {kind} ino={} size={} mtime={}.{} ctime={}.{}",
+                p.display(),
+                m.ino(),
+                m.len(),
+                m.mtime(),
+                m.mtime_nsec(),
+                m.ctime(),
+                m.ctime_nsec()
+            ));
+            if m.is_dir() {
                 stack.push(p);
-            } else {
-                let m = fs::metadata(&p).unwrap();
-                out.push(format!(
-                    "{} {} {:?}",
-                    p.display(),
-                    m.len(),
-                    m.modified().unwrap()
-                ));
             }
         }
     }
     out.sort();
     out
+}
+
+#[test]
+fn the_snapshot_sees_a_rename_over_with_the_same_size_and_mtime() {
+    let td = TempDir::new().unwrap();
+    let f = td.path().join("state.jsonl");
+    fs::write(&f, "same bytes\n").unwrap();
+    let mtime = fs::metadata(&f).unwrap().modified().unwrap();
+    let before = snapshot(td.path());
+    // Control: nothing changed, nothing differs.
+    assert_eq!(before, snapshot(td.path()));
+    // Replace the file with an identical copy: same path, size and mtime.
+    let tmp = td.path().join("state.tmp");
+    fs::write(&tmp, "same bytes\n").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&tmp)
+        .unwrap()
+        .set_modified(mtime)
+        .unwrap();
+    fs::rename(&tmp, &f).unwrap();
+    let m = fs::metadata(&f).unwrap();
+    assert_eq!((m.len(), m.modified().unwrap()), (11, mtime), "same size and mtime");
+    assert_ne!(before, snapshot(td.path()), "a rename-over must show");
+}
+
+#[test]
+fn the_snapshot_sees_a_new_empty_directory() {
+    let td = TempDir::new().unwrap();
+    fs::write(td.path().join("state.jsonl"), "x\n").unwrap();
+    let before = snapshot(td.path());
+    fs::create_dir(td.path().join("stray")).unwrap();
+    assert_ne!(before, snapshot(td.path()), "a new empty directory must show");
 }
 
 #[test]

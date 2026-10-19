@@ -94,18 +94,76 @@ pub fn load(root: &Path, target: &str) -> Result<Intent> {
     parse(&text).ok_or_else(|| anyhow!("no `repo:` scalar in {}", path.display()))
 }
 
-/// Lines this reader accepts but a real YAML parser would read differently:
-/// an unquoted scalar holding a colon-space (a map key, to a parser), and a
-/// quoted scalar left open at the end of the text. Returns (line, reason).
+/// Lines this reader accepts but a real YAML parser would read differently.
+/// Returns (line, reason). Each is a way a manifest edit could change meaning
+/// without this reader noticing:
 ///
-/// A `key: value` line is checked on its value; a list item is checked whole,
-/// unless it is a one-key map item (`- key: value`) with a bare key, in which
-/// case the value after the key is checked. Comments, quoted scalars (also
-/// across lines) and block scalars are not scalars of this kind.
+/// - an unquoted scalar holding a colon-space (a map key, to a parser);
+/// - text after the closing quote of a quoted scalar (a parse error);
+/// - a quoted scalar left open at the end of the text;
+/// - a list item that reads as a one-key map among plain items. `- path: x`
+///   in a list of such items is a map list and is fine; one such item among
+///   prose items is what a colon-space edit of a prose item produces.
+///
+/// Comments, quoted scalars (also across lines), flow collections and block
+/// scalars are skipped otherwise.
 pub(crate) fn colon_space_hazards(text: &str) -> Vec<(usize, String)> {
+    struct Block {
+        indent: usize,
+        maps: Vec<usize>,
+        plain: usize,
+    }
+    fn flush(b: Block, out: &mut Vec<(usize, String)>) {
+        if b.plain > 0 {
+            for n in b.maps {
+                out.push((
+                    n,
+                    "list item reads as a map among plain items; \
+                     a colon-space in prose makes a key"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+    // Index just past the closing quote of `s`, which starts with quote `q`.
+    fn close_at(s: &str, q: char) -> Option<usize> {
+        let mut it = s.char_indices().skip(1).peekable();
+        while let Some((i, c)) = it.next() {
+            if q == '"' && c == '\\' {
+                it.next();
+            } else if c == q {
+                if q == '\'' && matches!(it.peek(), Some((_, '\''))) {
+                    it.next();
+                } else {
+                    return Some(i + c.len_utf8());
+                }
+            }
+        }
+        None
+    }
+    // Open minus close brackets on a line, outside quotes.
+    fn bracket_delta(s: &str) -> i32 {
+        let (mut d, mut q) = (0, None);
+        for c in s.split(" #").next().unwrap_or(s).chars() {
+            match (q, c) {
+                (None, '"' | '\'') => q = Some(c),
+                (Some(x), c) if c == x => q = None,
+                (None, '[' | '{') => d += 1,
+                (None, ']' | '}') => d -= 1,
+                _ => {}
+            }
+        }
+        d
+    }
+    let strip_comment = |s: &str| -> String {
+        s.split(" #").next().unwrap_or(s).trim().to_string()
+    };
+
     let mut out = Vec::new();
+    let mut blocks: Vec<Block> = Vec::new();
     let mut open_quote: Option<(usize, char)> = None;
     let mut block_indent: Option<usize> = None;
+    let mut flow_depth: i32 = 0;
     let bare_key = |k: &str| {
         let mut c = k.chars();
         matches!(c.next(), Some(f) if f.is_ascii_alphabetic() || f == '_')
@@ -116,9 +174,17 @@ pub(crate) fn colon_space_hazards(text: &str) -> Vec<(usize, String)> {
         let n = i + 1;
         let indent = line.len() - line.trim_start().len();
         if let Some((_, q)) = open_quote {
-            if line.contains(q) {
+            if let Some(at) = line.find(q) {
                 open_quote = None;
+                let rest = strip_comment(&line[at + q.len_utf8()..]);
+                if !rest.is_empty() {
+                    out.push((n, format!("text after a closing quote: {rest}")));
+                }
             }
+            continue;
+        }
+        if flow_depth > 0 {
+            flow_depth += bracket_delta(line);
             continue;
         }
         if let Some(b) = block_indent {
@@ -131,36 +197,94 @@ pub(crate) fn colon_space_hazards(text: &str) -> Vec<(usize, String)> {
         if t.is_empty() || t.starts_with('#') {
             continue;
         }
-        // The scalar to judge: the value of `key: value`, or a whole list item.
         let item = t.strip_prefix("- ");
+        // Close the lists this line ends.
+        while let Some(b) = blocks.last() {
+            let ends = if item.is_some() {
+                b.indent > indent
+            } else {
+                b.indent >= indent
+            };
+            if !ends {
+                break;
+            }
+            if let Some(b) = blocks.pop() {
+                flush(b, &mut out);
+            }
+        }
+        if item.is_some() && blocks.last().is_none_or(|b| b.indent != indent) {
+            blocks.push(Block {
+                indent,
+                maps: Vec::new(),
+                plain: 0,
+            });
+        }
+
         let body = item.unwrap_or(t);
-        let scalar = match body.split_once(": ") {
-            Some((k, v)) if bare_key(k.trim()) => v,
+        // The scalar to judge, and whether this item reads as a map.
+        let mut map_item = false;
+        let scalar: &str = match body.split_once(": ") {
+            Some((k, v)) if bare_key(k.trim()) => {
+                map_item = item.is_some();
+                v
+            }
+            Some((k, _)) if item.is_some() && matches!(k.chars().next(), Some('"' | '\'')) => {
+                body
+            }
             Some(_) if item.is_some() => body,
             Some((_, v)) => v,
             None => body.trim_end_matches(':'),
         };
-        let scalar = scalar.split(" #").next().unwrap_or(scalar).trim();
+        let scalar = strip_comment(scalar);
+        let scalar = scalar.as_str();
+        if scalar.starts_with(['[', '{']) {
+            flow_depth = bracket_delta(scalar).max(0);
+        }
         if scalar.starts_with('|') || scalar.starts_with('>') {
             block_indent = Some(indent);
             continue;
         }
         if let Some(q) = scalar.chars().next().filter(|c| matches!(c, '"' | '\'')) {
-            if !scalar[1..].contains(q) {
-                open_quote = Some((n, q));
+            match close_at(scalar, q) {
+                None => open_quote = Some((n, q)),
+                Some(end) => {
+                    let rest = scalar[end..].trim();
+                    if rest.starts_with(':') && item.is_some() && !map_item {
+                        // `- "key": value` is a map item.
+                        map_item = true;
+                    } else if !rest.is_empty() {
+                        out.push((n, format!("text after a closing quote: {rest}")));
+                    }
+                }
             }
-            continue;
-        }
-        if scalar.starts_with('[') || scalar.starts_with('{') {
-            continue;
-        }
-        if scalar.contains(": ") {
+        } else if !(scalar.starts_with('[') || scalar.starts_with('{'))
+            && scalar.contains(": ")
+            && !map_item
+        {
+            out.push((n, format!("unquoted value holds a colon-space: {scalar}")));
+        } else if map_item && !(scalar.starts_with('[') || scalar.starts_with('{'))
+            && !scalar.starts_with(['"', '\''])
+            && scalar.contains(": ")
+        {
             out.push((n, format!("unquoted value holds a colon-space: {scalar}")));
         }
+        if item.is_some() {
+            if let Some(b) = blocks.last_mut() {
+                if map_item {
+                    b.maps.push(n);
+                } else {
+                    b.plain += 1;
+                }
+            }
+        }
+    }
+    while let Some(b) = blocks.pop() {
+        flush(b, &mut out);
     }
     if let Some((n, _)) = open_quote {
         out.push((n, "quoted value is never closed".to_string()));
     }
+    out.sort();
     out
 }
 
@@ -505,6 +629,58 @@ mod tests {
             load(dir.path(), "t").ok().map(|i| i.repo),
             Some("acme/widget".to_string())
         );
+    }
+
+    #[test]
+    fn a_bare_word_lead_among_plain_items_is_a_hazard() {
+        // The shape a colon-space retirement of a prose item produces: a parser
+        // reads `- Paper-fixes: rename` as a map among prose items.
+        let yaml = "non_goals:\n  - MVP deferrals\n  - Paper-fixes: rename or doc-comment only\n  - Scope expansion\n";
+        let h = colon_space_hazards(yaml);
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert_eq!(h[0].0, 3);
+        assert!(h[0].1.contains("reads as a map"), "{h:?}");
+        // A lowercase single word is the same shape.
+        assert_eq!(
+            colon_space_hazards("g:\n  - one\n  - fixes: two\n").len(),
+            1
+        );
+        // Controls: a list that is all map items is a map list, a lone map
+        // item is too, and the semicolon form is plain.
+        for ok in [
+            "t:\n  - path: README.md\n  - glob: docs/**\n  - source: git-history\n",
+            "t:\n  - source: git-history\n",
+            "non_goals:\n  - MVP deferrals\n  - Paper-fixes; rename or doc-comment only\n",
+            "a:\n  - x\nb:\n  - k: v\n",
+        ] {
+            assert_eq!(colon_space_hazards(ok), vec![], "{ok:?}");
+        }
+    }
+
+    #[test]
+    fn text_after_a_closing_quote_is_a_hazard() {
+        // A parser rejects all of these.
+        for bad in [
+            "note: \"abc\": def\n",
+            "note: \"abc\" def\n",
+            "note: 'abc' def\n",
+            "t:\n  - \"abc\" def\n",
+            "t:\n  - \"first\n    second\" tail\n",
+        ] {
+            let h = colon_space_hazards(bad);
+            assert_eq!(h.len(), 1, "{bad:?} -> {h:?}");
+            assert!(h[0].1.contains("after a closing quote"), "{h:?}");
+        }
+        // Controls: a trailing comment, an escaped quote, a doubled single
+        // quote and a closed multi-line value are fine.
+        for ok in [
+            "note: \"abc\" # a comment: here\n",
+            "note: \"a \\\" b: c\"\n",
+            "note: 'it''s: fine'\n",
+            "t:\n  - \"first\n    second\"\n",
+        ] {
+            assert_eq!(colon_space_hazards(ok), vec![], "{ok:?}");
+        }
     }
 
     #[test]
