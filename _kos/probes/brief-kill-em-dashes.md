@@ -324,11 +324,17 @@ construction makes moot.
     lib.rs:72, `title`) and are trimmed. Blank lines are dropped. A title is
     ignored unless it is at least 12 characters long and holds at least 4
     letters or digits, so a title of a lone dash, or a dash with spaces,
-    exempts nothing. The floor only removes degenerate titles. What keeps a
+    exempts nothing. Characters are Unicode scalar values: `s.chars().count()`
+    in Rust, never `len()`, which counts UTF-8 bytes, and `len(s)` on a `str`
+    in Python 3. The dash is one character and three bytes, so the two counts
+    differ on every fixture below that holds one. The floor only removes degenerate titles. What keeps a
     title from exempting more than its own dashes is the located span below,
     not the floor.
   - **Located, per dash.** The check finds each occurrence of each usable
-    title in the candidate and records the character span it covers. A dash
+    title in the candidate and records the span it covers. Spans and dash
+    positions are taken in one unit: byte offsets in Rust (`match_indices` and
+    `char_indices` both give them), `str` indexes in Python. Either unit gives
+    the same answer as long as both sides use it. A dash
     is exempt only if it lies inside such a span: one whole stored title,
     matched exactly. Every other dash is refused, including one beside a
     quoted title on the same line, so the exemption never widens to a line
@@ -337,7 +343,10 @@ construction makes moot.
     non-overlapping, leftmost first: Rust's `str::match_indices`, or in
     Python `str.find` restarted at the end of each match. Occurrences of two
     different titles may overlap or nest, and a dash inside any span is
-    exempt. Matching is exact and case-sensitive, and the candidate is not
+    exempt. Spans are tested one at a time and never merged: a dash in the
+    gap between two quoted titles lies inside neither span and is refused,
+    even though it sits between the first span's start and the last span's
+    end. Matching is exact and case-sensitive, and the candidate is not
     normalized, so a title wrapped across two lines does not match and its
     dashes are refused; the curator quotes a title on one line. Non-overlapping
     was chosen because, where the two readings differ, it exempts less, and
@@ -363,12 +372,22 @@ construction makes moot.
     dropped), against a body whose only dashes are those strings; every dash
     is refused. An empty line is in the file too, as a pin: an empty match
     covers no character, so that row cannot fail under the span rule.
+  - `dash_between_two_titles_is_refused`: titles
+    `first \u{2014} title one` (17 characters) and
+    `second \u{2014} title two` (18), and a candidate made of the first, then
+    ` \u{2014} `, then the second. Both titles' dashes pass and the one between
+    them is refused. This fails under a rule that merges spans into one range
+    from the first start to the last end.
   - `overlapping_title_occurrences_do_not_chain`: the title
     `ab \u{2014} ab \u{2014} ab` (12 characters, 6 letters or digits) and a
     candidate `ab \u{2014} ab \u{2014} ab \u{2014} ab`. The search finds one
     span, the first 12 characters, so the first two dashes pass and the third
     is refused. This fails under a search from every start position, which
     finds a second span and refuses nothing.
+  - The floor is counted in characters by test, not only by prose:
+    `abcd \u{2014} efgh` is 11 characters and 13 bytes, so a byte count lets it
+    through and `degenerate_titles_exempt_nothing` fails. The 12-character
+    titles above are 16 bytes each.
   - `beadle_titles_is_read_only`: a scratch store's metadata hash (name,
     size, mtime, inode for every file) is the same before and after the
     command, and the command makes no network call (stubbed `gh` logs none).
@@ -442,8 +461,8 @@ Red first; each test is run and seen failing before its fix.
    The candidate-body check: `candidate_with_em_dash_is_refused`,
    `candidate_without_em_dash_passes` (the positive control) and
    `quoted_title_with_em_dash_is_exempt`, `dash_beside_quoted_title_is_refused`,
-   `degenerate_titles_exempt_nothing` and
-   `overlapping_title_occurrences_do_not_chain`, in verify.rs and in the Python tests,
+   `degenerate_titles_exempt_nothing`, `dash_between_two_titles_is_refused`
+   and `overlapping_title_occurrences_do_not_chain`, in verify.rs and in the Python tests,
    with a Python case that `--titles` absent exempts nothing; and
    `beadle_titles_is_read_only`.
    Two regression pins go with them and pass on main, so they are not reds:
