@@ -900,9 +900,11 @@ pub(crate) mod tests {
         // in the sentinel. compose() adds the H1.
         let mut weird = mk_issue(7, "odd");
         weird.state = "reopened-ish".into();
-        let mut stats = CommentStats::default();
-        stats.total = 1;
-        stats.per_actor.insert("alice".into(), 1);
+        let stats = CommentStats {
+            total: 1,
+            per_actor: BTreeMap::from([("alice".to_string(), 1)]),
+            ..Default::default()
+        };
         let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
         let run = provisional_run(&mk_run(18, 5), 19);
         let derived = render_derived(

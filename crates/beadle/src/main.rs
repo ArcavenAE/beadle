@@ -16,6 +16,7 @@ use clap::{Parser, Subcommand};
 
 mod classify;
 mod controls;
+mod dash;
 mod direction;
 mod enumerate;
 mod gh;
@@ -90,6 +91,9 @@ enum Cmd {
         #[arg(long)]
         renames: Option<PathBuf>,
     },
+    /// Print the stored issue titles of a target, one per line, for the
+    /// Python gate's `--titles FILE`. Reads the store; changes nothing.
+    Titles { target: String },
     /// Append a note record to the store (perf ledger entries, audit trails,
     /// operator remarks). Diagnostic only; nothing gates on notes.
     Note {
@@ -158,6 +162,7 @@ fn main() -> Result<()> {
             candidate,
             renames,
         } => verify::run(&root, &target, &before, &candidate, renames.as_deref()),
+        Cmd::Titles { target } => verify::titles(&root, &target),
         Cmd::Note {
             target,
             topic,

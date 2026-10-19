@@ -155,6 +155,58 @@ fn a_candidate_that_keeps_the_old_dashes_is_refused() {
     assert!(r.says("9: em dash in candidate"), "{}", r.out);
 }
 
+/// `beadle verify` over a scratch root whose store may hold one issue title.
+fn gate_with_store_title(title: Option<&str>, candidate: &str) -> Outcome {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("targets")).unwrap();
+    std::fs::copy(
+        repo_root().join("targets/vsdd-factory.verify.json"),
+        root.join("targets/vsdd-factory.verify.json"),
+    )
+    .unwrap();
+    if let Some(title) = title {
+        let store = root.join("store/vsdd-factory");
+        std::fs::create_dir_all(&store).unwrap();
+        let row = serde_json::json!({
+            "kind": "issue", "ts": "2026-09-09T00:00:00Z", "target": "vsdd-factory",
+            "number": 9, "observed_in_run": 19, "title": title, "author": "x",
+            "state": "open", "created_at": "2026-09-01T00:00:00Z",
+            "updated_at": "2026-09-02T00:00:00Z", "body_len": 1, "body_sha256": "s",
+        });
+        std::fs::write(store.join("state.jsonl"), format!("{row}\n")).unwrap();
+    }
+    let cand_path = root.join("candidate.md");
+    std::fs::write(&cand_path, candidate).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_beadle"))
+        .arg("--root")
+        .arg(root)
+        .args(["verify", "vsdd-factory", "--before"])
+        .arg(repo_root().join(BEFORE))
+        .arg("--candidate")
+        .arg(&cand_path)
+        .output()
+        .expect("run beadle verify");
+    let mut out = String::from_utf8_lossy(&output.stdout).into_owned();
+    out.push_str(&String::from_utf8_lossy(&output.stderr));
+    Outcome {
+        passed: output.status.success(),
+        out,
+    }
+}
+
+#[test]
+fn verify_exempts_a_title_held_in_the_store_and_only_that() {
+    let title = format!("Fix parser {} handle eof", support::em_dash());
+    let cand = format!("{}\n- #9 {title}\n", dash_free(&read(CANDIDATE)));
+    let with = gate_with_store_title(Some(&title), &cand);
+    assert!(with.passed, "a stored title is quoted as written:\n{}", with.out);
+    // Control: the same body with no such title in the store is refused.
+    let without = gate_with_store_title(None, &cand);
+    assert!(!without.passed, "{}", without.out);
+    assert!(without.says("9: em dash in candidate"), "{}", without.out);
+}
+
 #[test]
 fn the_inherited_details_table_warns_rather_than_failing() {
     // The live body carries one <details> holding one 30-row table. An absolute

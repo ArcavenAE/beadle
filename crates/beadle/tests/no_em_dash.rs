@@ -30,7 +30,7 @@ struct Hit {
 
 /// Files that may build the character from an integer.
 fn is_helper(path: &str) -> bool {
-    path.ends_with("tests/support/mod.rs") || path.ends_with("src/testsupport.rs")
+    path.ends_with("tests/support/mod.rs") || path.ends_with("src/dash.rs")
 }
 
 fn line_of(text: &str, byte: usize) -> usize {
@@ -260,7 +260,9 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
 
 /// Scan every `.rs` file under `crates_dir`, following includes. Returns the
 /// hits as (path, hit) and the number of files read under each crate dir.
-fn scan_tree(crates_dir: &Path) -> (Vec<(String, Hit)>, Vec<(String, usize)>) {
+type Scan = (Vec<(String, Hit)>, Vec<(String, usize)>);
+
+fn scan_tree(crates_dir: &Path) -> Scan {
     let mut files = Vec::new();
     rust_files(crates_dir, &mut files);
     let mut hits = Vec::new();

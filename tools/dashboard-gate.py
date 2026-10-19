@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """Regression gate for /dashboard-refresh step 3. Exit 0 = pass."""
-import json, re, sys
+import argparse, json, re, sys
 
-before_p, cand_p = sys.argv[1], sys.argv[2]
+ap = argparse.ArgumentParser(description=__doc__)
+ap.add_argument("before")
+ap.add_argument("candidate")
+ap.add_argument("--titles", help="file of stored issue titles, one per line "
+                                 "(`beadle titles <target>`); absent exempts nothing")
+args = ap.parse_args()
+before_p, cand_p = args.before, args.candidate
 before, cand = open(before_p).read(), open(cand_p).read()
+# The em dash is built here so this file carries no raw character.
+DASH = chr(0x2013 + 1)
 fails, warns = [], []
 
 def sentinel(t):
@@ -102,14 +110,21 @@ if sb:
     for a in DECLARED_REMOVALS["axes"]:
         if a not in sb:
             warns.append(f"3b: stale declared removal, key not in before-snapshot -> '{a}'")
+def retire(h):
+    """A heading with every spaced em dash replaced by a colon and a space."""
+    return h.replace(f" {DASH} ", ": ")
+
 for h in hb:
     if h in hc:
         continue
     tgt, why = DECLARED_RENAMES.get(h, (None, None))
-    if tgt and tgt in hc:
+    if tgt and (tgt in hc or retire(tgt) in hc):
         warns.append(f"2: declared rename -> {h[:60]!r} => {tgt[:60]!r} ({why})")
     elif h in DECLARED_REMOVALS["headings"]:
         warns.append(f"2: declared removal -> {h[:60]!r} ({DECLARED_REMOVALS['headings'][h]})")
+    elif retire(h) != h and retire(h) in hc:
+        # One-way retirement: the same heading with its dash retired.
+        warns.append(f"2: em dash retired -> {h[:60]!r}")
     else:
         fails.append(f"2: HEADING LOST -> {h[:95]}")
 
@@ -225,6 +240,30 @@ if sc and 'attn' in sc:
         for n in sorted(attn_nums):
             if not re.search(rf'#{n}\b', visible):
                 fails.append(f"5c: attn issue #{n} in sentinel but not a visible row in the lane table")
+
+# ---- 9. no em dash in the candidate --------------------------------------
+# The before-snapshot is not checked, since history keeps its dashes. A stored
+# issue title is quoted as written, so a dash inside one whole title is exempt:
+# usable titles only (>= 12 characters and >= 4 letters or digits), each located
+# non-overlapping and leftmost first, a dash exempt only inside one such span.
+# Spans are tested one at a time, never merged. Without --titles nothing is
+# exempt, so the check fails closed. Python 3 str indexes are characters.
+def usable(t):
+    return len(t) >= 12 and sum(c.isalnum() for c in t) >= 4
+
+titles = []
+if args.titles:
+    titles = [t.strip() for t in open(args.titles).read().split("\n")]
+    titles = [t for t in titles if usable(t)]
+spans = []
+for t in titles:
+    i = cand.find(t)
+    while i != -1:
+        spans.append((i, i + len(t)))
+        i = cand.find(t, i + len(t))
+for i, ch in enumerate(cand):
+    if ch == DASH and not any(s <= i < e for s, e in spans):
+        fails.append(f"9: em dash in candidate, line {cand.count(chr(10), 0, i) + 1}")
 
 # ---- report --------------------------------------------------------------
 print(f"before: {len(before):,} chars, {len(hb)} headings")

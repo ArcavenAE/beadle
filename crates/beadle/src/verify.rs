@@ -37,8 +37,11 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
+use beadle_store::{latest_issue_observations, Record};
 use serde::Deserialize;
 use serde_json::{Map, Value};
+
+use crate::dash::EM_DASH;
 
 /// Axes that reset every run by design, and so are exempt from per-axis
 /// preservation. Matched on the *leaf* key, so `operational_impact.degraded_new`
@@ -476,6 +479,7 @@ impl Report {
 
 /// Run every check. Errors only when the gate itself cannot operate (a missing
 /// before-snapshot sentinel); everything else lands in the report.
+#[cfg(test)]
 pub fn evaluate(
     before: &str,
     candidate: &str,
@@ -494,7 +498,6 @@ pub fn evaluate_with_titles(
     removals: &[Removal],
     titles: &[String],
 ) -> Result<Report> {
-    let _ = titles;
     let sb = sentinel(before)
         .ok_or_else(|| anyhow!("before-snapshot sentinel missing or unparseable"))?;
     let sc = sentinel(candidate);
@@ -610,18 +613,31 @@ pub fn evaluate_with_titles(
             continue;
         }
         match renames.iter().find(|r| r.from == *h) {
-            Some(r) if headings_cand.contains(r.to.as_str()) => rep.warns.push(format!(
-                "2: declared rename -> {:?} => {:?} ({})",
-                clip(h, 60),
-                clip(&r.to, 60),
-                r.why
-            )),
+            Some(r)
+                if headings_cand.contains(r.to.as_str())
+                    || headings_cand.contains(retire_dash(&r.to).as_str()) =>
+            {
+                rep.warns.push(format!(
+                    "2: declared rename -> {:?} => {:?} ({})",
+                    clip(h, 60),
+                    clip(&r.to, 60),
+                    r.why
+                ))
+            }
             _ => match removals.iter().find(|r| r.heading.as_deref() == Some(*h)) {
                 Some(r) => rep.warns.push(format!(
                     "2: declared removal -> {:?} ({})",
                     clip(h, 60),
                     r.why
                 )),
+                // One-way retirement: a before-heading whose every spaced em
+                // dash became a colon and a space is the same heading, retired.
+                None if retire_dash(h) != *h
+                    && headings_cand.contains(retire_dash(h).as_str()) =>
+                {
+                    rep.warns
+                        .push(format!("2: em dash retired -> {:?}", clip(h, 60)))
+                }
                 None => rep
                     .fails
                     .push(format!("2: HEADING LOST -> {}", clip(h, 95))),
@@ -759,7 +775,92 @@ pub fn evaluate_with_titles(
         }
     }
 
+    // ---- 9. no em dash in the candidate ----------------------------------
+    // The before-snapshot is not checked, since history keeps its dashes. The
+    // curated body is what posts, so the guarantee sits here: carried-forward
+    // text and text taken from the shape canon are refused alongside new prose.
+    for line in em_dash_lines(candidate, titles) {
+        rep.fails
+            .push(format!("9: em dash in candidate, line {line}"));
+    }
+
     Ok(rep)
+}
+
+// ------------------------------------------------------------- text utils ---
+
+/// A heading with every spaced em dash replaced by a colon and a space (P4).
+fn retire_dash(h: &str) -> String {
+    h.replace(&format!(" {} ", EM_DASH), ": ")
+}
+
+/// A stored title is usable as a quote only when it is at least 12 characters
+/// long and holds at least 4 letters or digits. Characters, not bytes: the
+/// dash is one character and three bytes, so `len()` would let a short title in.
+fn usable_title(t: &str) -> bool {
+    t.chars().count() >= 12 && t.chars().filter(|c| c.is_alphanumeric()).count() >= 4
+}
+
+/// The 1-based line of every em dash in `candidate` that lies outside a quoted
+/// stored title. Each usable title is located in the candidate, non-overlapping
+/// and leftmost first (`match_indices`), and a dash is exempt only when it sits
+/// inside one such span. Spans are tested one at a time, never merged, so a
+/// dash in the gap between two quoted titles, or beside one, is refused.
+fn em_dash_lines(candidate: &str, titles: &[String]) -> Vec<usize> {
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+    for t in titles.iter().map(|t| t.trim()).filter(|t| usable_title(t)) {
+        spans.extend(
+            candidate
+                .match_indices(t)
+                .map(|(at, m)| (at, at + m.len())),
+        );
+    }
+    let mut lines = Vec::new();
+    for (at, c) in candidate.char_indices() {
+        if c != EM_DASH {
+            continue;
+        }
+        let end = at + c.len_utf8();
+        if spans.iter().any(|(s, e)| *s <= at && end <= *e) {
+            continue;
+        }
+        lines.push(candidate[..at].bytes().filter(|b| *b == b'\n').count() + 1);
+    }
+    lines
+}
+
+/// The latest stored title of every issue, trimmed, blank ones dropped, by
+/// issue number. Reads the store file directly and never creates anything.
+pub fn stored_titles(root: &Path, target: &str) -> Result<Vec<String>> {
+    let path = root.join("store").join(target).join("state.jsonl");
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let mut records = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let rec: Record = serde_json::from_str(line)
+            .with_context(|| format!("parse line {} of {}", i + 1, path.display()))?;
+        records.push(rec);
+    }
+    let mut issues = latest_issue_observations(&records);
+    issues.sort_by_key(|i| i.number);
+    Ok(issues
+        .into_iter()
+        .map(|i| i.title.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect())
+}
+
+/// `beadle titles <target>`: print the stored titles, one per line.
+pub fn titles(root: &Path, target: &str) -> Result<()> {
+    for t in stored_titles(root, target)? {
+        println!("{t}");
+    }
+    Ok(())
 }
 
 // ------------------------------------------------------------- text utils ---
@@ -863,7 +964,13 @@ pub fn run(
         .with_context(|| format!("read candidate {}", candidate_path.display()))?;
     let (renames, removals) = load_declared(root, target, renames_path)?;
 
-    let report = evaluate(&before, &candidate, &renames, &removals)?;
+    // Titles are quoted as written and exempt from check 9. A store that cannot
+    // be read exempts nothing, so the check fails closed.
+    let titles = stored_titles(root, target).unwrap_or_else(|e| {
+        eprintln!("beadle verify: WARN no titles exempted: {e:#}");
+        Vec::new()
+    });
+    let report = evaluate_with_titles(&before, &candidate, &renames, &removals, &titles)?;
     print!("{}", report.render());
     if !report.passed() {
         bail!(
