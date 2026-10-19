@@ -85,7 +85,7 @@ twelfth literal is a test assertion. Where the 7 land:
 
 **En dashes (U+2013) in crates/:** one, `direction.rs:1113`, a number range in a
 v2 rationale (`~68` to `73%`). None in render.rs. The live board holds 18 and
-SKILL.md 8, all ranges. The ruling names em dashes; see Open questions.
+SKILL.md 8, all ranges. The ruling names em dashes; see Rulings and open questions.
 
 Adjacent, out of scope: render.rs:693 emits a unicode ellipsis in long cluster
 member lists, which AGENTS.md lists as a tell to sweep.
@@ -254,9 +254,23 @@ construction makes moot.
   `char::try_from` or `char::from` applied to a `u32`, matched as text. That
   costs nothing on main, which has no `from_u32` under `crates/` (`git grep`);
   the `try_from` impls in `director-envelope` are not on `char` and do not match.
-  What remains is bytes built at run time and passed to `String::from_utf8`.
-  The scan cannot refuse `from_utf8`, since gh.rs:23 needs it, so that case
-  stays a review matter, and the brief says so. The scan is a tripwire against
+  It also refuses `from_utf16`, `from_utf16_lossy` and `decode_utf16` outside
+  the helper, which costs nothing on main (no use under `crates/`). It follows
+  every `include_str!` and `include_bytes!` to its target file and applies the
+  raw-character and spelling rules to that file as text. On main there are two
+  targets, `vocabulary.json` (also in the data check) and
+  `director-envelope.schema.json` (0 dashes; it does not reach a body).
+  Named residuals, which the scan does not refuse:
+  - bytes built at run time and passed to `String::from_utf8`. gh.rs:23 needs
+    `from_utf8`, so it cannot be refused.
+  - a `u32` turned into a `char` with `try_into()`, where the type is
+    inferred. That cannot be seen as text without refusing `try_into`
+    altogether, which would bar a common conversion. main has no `try_into`
+    under `crates/`.
+  Where these reach the body or the board data, the output checks
+  (`rendered_body_has_no_em_dash`, the candidate-body check in both gates and
+  `body_data_has_no_em_dash`) catch them. Where they reach only stderr or a
+  branch no test renders, they stay a review matter, and the brief says so. The scan is a tripwire against
   accidental spellings, not proof against deliberate construction. The inputs that must carry a dash (the old checked boxes in
   controls.rs:119 and 126, push.rs:298, render.rs:1549) and the five test files
   that hold raw dashes today move to the helper, which needs `pub` access from
@@ -279,7 +293,8 @@ construction makes moot.
   :780, and the skill scores the manifest, so the curator may quote its
   values). The intent files hold 33 characters on 31 lines at c1f95a5:
   `_template` 7 on 7 lines and `prism` 2 on 1, all in comments, and
-  `vsdd-factory` 24 on 23 lines, 8 of those lines values. All 33 are clause
+  `vsdd-factory` 24 on 23 lines: 6 in values and 2 in trailing comments
+  after a value (lines 43 and 166), the rest in comment lines. All 33 are clause
   breaks or asides; none is a range. The check reads each file as text, so
   comments count too.
   **YAML rule:** in these files only P1 (semicolon) or P5 (parentheses) may
@@ -302,15 +317,37 @@ construction makes moot.
   This check, not the later fixture test, is what stops curator prose,
   carry-forward text and canon text from posting with a dash.
 - **Quoted titles.** An issue or PR title is someone else's words. The
-  default rule: a title is quoted exactly as written and is exempt, but only
-  as an exact substring match against a title the store holds for that target
-  (`beadle-store` lib.rs:72, `title`). The exemption is mechanical and needs
-  no markup, so a dash the curator writes beside a title is still refused.
-  `beadle verify` reads the titles from the target's store. The Python gate
-  takes `--titles FILE`, one title per line, written by a new read-only
-  `beadle titles <target>`. Without the file it exempts nothing, so it fails
-  closed. The alternative, rewriting dashes inside quoted titles, changes
-  another author's words. It is listed for the operator under Open questions.
+  default rule is that a title is quoted exactly as written and its dashes are
+  exempt, under these limits:
+  - **Usable titles only.** Titles come from the target's store (`beadle-store`
+    lib.rs:72, `title`) and are trimmed. Blank lines are dropped. A title is
+    ignored unless it is at least 12 characters long and holds at least 4
+    letters or digits, so a title of a lone dash, or a dash with spaces,
+    exempts nothing.
+  - **Located, per dash.** The check finds each occurrence of each usable
+    title in the candidate and records the character span it covers. A dash
+    is exempt only if it lies inside such a span: one whole stored title,
+    matched exactly. Every other dash is refused, including one beside a
+    quoted title on the same line, so the exemption never widens to a line
+    or a paragraph.
+  - **Where the titles come from.** `beadle verify` reads them from the
+    target's store. The Python gate takes `--titles FILE`, one title per line,
+    written by a new `beadle titles <target>`, which only reads the store.
+    Without the file it exempts nothing, so it fails closed.
+  Tests, in both gates:
+  - `quoted_title_with_em_dash_is_exempt`;
+  - `dash_beside_quoted_title_is_refused`: a line `- #12 <title> \u{2014} more`,
+    where the title holds a dash. The title's dash passes and the trailing
+    dash is refused. This fails under a whole-line exemption.
+  - `degenerate_titles_exempt_nothing`: titles `\u{2014}`, ` \u{2014} `, an
+    empty line and an 11-character title, against a body whose only dashes
+    are those strings; every dash is refused.
+  - `beadle_titles_is_read_only`: a scratch store's metadata hash (name,
+    size, mtime, inode for every file) is the same before and after the
+    command, and the command makes no network call (stubbed `gh` logs none).
+  The alternative, rewriting dashes inside quoted titles, changes another
+  author's words. It is listed for the operator under Rulings and open
+  questions.
 - `render::tests::rendered_body_has_no_em_dash`, the behavioral check on the
   body: renders a store that reaches the body branches (a stale cluster, an
   unreadable issue state, one commenter, a zero trailing mean for filing
@@ -363,7 +400,9 @@ Red first; each test is run and seen failing before its fix.
 
 1. **Red, source, data and renderer guards:** `sources_have_no_em_dash_spelling`,
    `scan_catches_planted_spelling` (red until the scan function exists),
-   `body_data_has_no_em_dash`, `intent_files_parse_after_retirement`,
+   `body_data_has_no_em_dash`, `intent_files_parse_after_retirement` (a
+   regression pin: the files parse on main too, and it guards the replacement
+   step),
    `rendered_body_has_no_em_dash` (both cases), `board_controls_block_has_no_em_dash`.
    The direction and stderr literals are covered by the source scan, not by a
    behavioral test.
@@ -375,8 +414,10 @@ Red first; each test is run and seen failing before its fix.
    its other controls); Python `test_em_dash_retirement_warns_and_passes`.
    The candidate-body check: `candidate_with_em_dash_is_refused`,
    `candidate_without_em_dash_passes` (the positive control) and
-   `quoted_title_with_em_dash_is_exempt`, in verify.rs and in the Python tests,
-   with a Python case that `--titles` absent exempts nothing.
+   `quoted_title_with_em_dash_is_exempt`, `dash_beside_quoted_title_is_refused`
+   and `degenerate_titles_exempt_nothing`, in verify.rs and in the Python tests,
+   with a Python case that `--titles` absent exempts nothing; and
+   `beadle_titles_is_read_only`.
    Two regression pins go with them and pass on main, so they are not reds:
    `a_heading_retired_with_a_semicolon_is_still_lost` and Python
    `test_heading_retired_with_another_mark_fails`. They are kept so the fold
