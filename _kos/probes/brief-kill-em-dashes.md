@@ -218,16 +218,36 @@ Structural, so they may gate (ADR-007 and the diagnostic-not-gate rule: they
 ask "is this artifact well-formed against a written rule", not "is the project
 healthy"):
 
-- `tests/no_em_dash.rs::sources_have_no_raw_em_dash`, the guard that reaches
-  every literal: no raw U+2014 character in any `.rs` file under `crates/`,
-  code, comments and tests alike. Behavioral tests cannot reach all of them:
-  the 13 v2 literals in `direction.rs` are on mutually exclusive branches, and
-  the 4 stderr literals and render.rs 245 never reach a rendered body in the
-  suite. A source scan reaches each one regardless of branch. Test inputs that
-  must carry a dash, such as the old checked boxes in controls.rs:119 and 126
-  and push.rs:298, spell it as the escape `\u{2014}`, which the scan does not
-  match and the compiler turns into the same character. Positive control: the
-  scan fails on main, where render.rs alone has 31.
+- `tests/no_em_dash.rs::sources_have_no_em_dash`, the guard that reaches
+  every literal. Behavioral tests cannot reach all of them: the 13 v2 literals
+  in `direction.rs` are on mutually exclusive branches, and the 4 stderr
+  literals never reach a rendered body. A source scan reaches each one
+  regardless of branch. It reads every `.rs` file under `crates/` and applies
+  two rules.
+  - **Everywhere, test code included:** no raw U+2014 character.
+  - **Outside test code:** none of the forms that compile or render to U+2014
+    either. That means the Rust escape (`\u{2014}`, any case, any leading
+    zeros, matched as `\\u\{0*2014\}`), the HTML entities (`&mdash;`,
+    `&#8212;`, `&#x2014;`, any case), the number `0x2014` (for
+    `char::from_u32`), and the UTF-8 byte escape `\xe2\x80\x94` (any case).
+    Without this rule, an escaped dash in a non-test literal would pass every
+    guard.
+  - **Test code** is any file under `crates/*/tests/`, plus, in a `src/` file,
+    the item that follows a `#[cfg(test)]` attribute, bounded by brace
+    matching that skips string and char literals and comments. Test inputs
+    that must carry a dash (the old checked boxes in controls.rs:119 and 126,
+    push.rs:298) spell it as the escape there. At c1f95a5 the only escape in
+    `src/` is render.rs:1549, inside `#[cfg(test)]`.
+  - **The scanner's own patterns** are built from these escape forms, so
+    `tests/no_em_dash.rs` holds no raw character and passes its own scan.
+  - **Positive controls that stay:** the scan is a function over (path, text).
+    `scan_catches_planted_dash` runs it on in-memory sources, one case per
+    form. The raw character outside and inside test code is refused. Each of
+    the escape, the three entities, `0x2014` and the byte escape is refused
+    outside test code, and each is accepted inside a `#[cfg(test)]` module,
+    including one whose string literal holds a `}`. A failure names the form
+    and the line. On main the file scan also fails, since render.rs alone has
+    31.
 - `render::tests::rendered_body_has_no_em_dash`, the behavioral check on the
   body: renders a store that reaches the body branches (a stale cluster, an
   unreadable issue state, one commenter, a zero trailing mean for filing
@@ -245,9 +265,9 @@ healthy"):
   the dash to match). Doc text that names the old title writes "an em dash
   (U+2014)" in words instead of the character.
 
-The guards cover U+2014 only, matching the ruling. Rust test code and comments
-are covered by the source scan; a test input that needs the character writes
-it as the `\u{2014}` escape.
+The guards cover U+2014 only, matching the ruling. Comments and test code are
+covered by the raw-character rule. A test input that needs the character
+writes it as an escape, which only test code may use.
 
 ## 6. The replacement fixture and #115
 
@@ -278,7 +298,8 @@ after the builder PR merges.
 
 Red first; each test is run and seen failing before its fix.
 
-1. **Red, source and renderer guards:** `sources_have_no_raw_em_dash`,
+1. **Red, source and renderer guards:** `sources_have_no_em_dash`,
+   `scan_catches_planted_dash` (it is red until the scan function exists),
    `rendered_body_has_no_em_dash` (both cases), `board_controls_block_has_no_em_dash`.
    The direction and stderr literals are covered by the source scan, not by a
    behavioral test.
