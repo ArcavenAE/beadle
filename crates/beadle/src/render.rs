@@ -125,6 +125,8 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
     let class_summary = classification_summary(&latest_class);
     let direction_report = direction::compute(target, &records);
 
+    let attn = attn_open(&latest_issues, &latest_class);
+    let opening = render_opening(&direction_report, &latest_issues, &class_summary, &attn);
     let derived = render_derived(
         target,
         &intent.repo,
@@ -133,10 +135,19 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
         &latest_clusters,
         &comment_stats,
         &class_summary,
-        &direction_report,
     );
-    let derived_digest = sha256_hex(&derived);
-    let body = compose(target, &intent.repo, &latest_run, &derived, &derived_digest);
+    // The opening carries renderer numbers too, so the digest covers it. Its
+    // editor slot is still the fixed placeholder here; push merges the live
+    // text in afterwards.
+    let derived_digest = sha256_hex(&format!("{opening}{derived}"));
+    let body = compose(
+        target,
+        &intent.repo,
+        &latest_run,
+        &opening,
+        &derived,
+        &derived_digest,
+    );
 
     eprintln!("{}", body_size_report(body.len()));
 
@@ -433,8 +444,7 @@ fn decay_display(cluster: &ClusterRecord, current_run: u32) -> String {
     }
 }
 
-/// Render just the derived zone — the piece the sentinel digest is computed over.
-/// Editor slots are NOT part of this string.
+/// The glyph shown beside a direction verdict.
 fn verdict_glyph(verdict: &str) -> &'static str {
     match verdict {
         "drifting" => "🔴",
@@ -444,54 +454,56 @@ fn verdict_glyph(verdict: &str) -> &'static str {
     }
 }
 
-/// Render the derived-zone Direction verdict block. Deterministic projection
-/// of `DirectionReport` — the free-text paragraph is still an editor slot
-/// below. See `question-renderer-editorial-boundary` sub-question A: this is
-/// a *whole section* the renderer owns (the numbers), sitting above the
-/// editor's *whole section* (the prose rationale).
-fn render_direction_block(d: &DirectionReport) -> String {
+/// Issues in the attention lane whose latest observation is not closed:
+/// the skill's fallback for "next" when a board has no Next decisive move.
+fn attn_open(
+    issues: &[IssueRecord],
+    latest_class: &HashMap<u32, ClassificationRecord>,
+) -> Vec<u32> {
+    let closed: std::collections::HashSet<u32> = issues
+        .iter()
+        .filter(|i| i.state == "closed")
+        .map(|i| i.number)
+        .collect();
+    let mut out: Vec<u32> = latest_class
+        .values()
+        .filter(|c| c.is_in_attn_lane() && !closed.contains(&c.number))
+        .map(|c| c.number)
+        .collect();
+    out.sort_unstable();
+    out
+}
+
+/// One `- signal: <glyph> <verdict> · <detail>` item per direction signal.
+/// A list, not a table: these items sit inside the opening fold, and a pipe
+/// table does not render inside `<details>` (verify check 5d).
+fn render_signal_list(d: &DirectionReport) -> String {
     use crate::direction::{SignalOrPending, ZeroEngagementOrPending};
-    let mut out = String::new();
-
-    out.push_str(&format!(
-        "**{} {}** — run {} — top signal: {}\n\n",
-        verdict_glyph(d.verdict),
-        d.verdict,
-        d.run,
-        d.top_signal,
-    ));
-
-    out.push_str("| Signal | Verdict | Detail |\n|---|---|---|\n");
+    let mut out = String::from("Signal detail, one item per direction signal:\n\n");
+    let mut item = |name: &str, verdict: &str, detail: &str| {
+        out.push_str(&format!(
+            "- {}: {} {} · {}\n",
+            name,
+            verdict_glyph(verdict),
+            verdict,
+            md_escape(detail),
+        ));
+    };
 
     let f = &d.signals.filing_density;
-    out.push_str(&format!(
-        "| filing-density | {} {} | {} |\n",
-        verdict_glyph(f.verdict),
-        f.verdict,
-        md_escape(&f.rationale),
-    ));
+    item("filing-density", f.verdict, &f.rationale);
 
     let (iv, idetail) = match &d.signals.integrity_density {
         SignalOrPending::Live(s) => (s.verdict, s.rationale.clone()),
-        SignalOrPending::Pending(p) => (p.verdict, format!("pending — {}", p.reason)),
+        SignalOrPending::Pending(p) => (p.verdict, format!("pending: {}", p.reason)),
     };
-    out.push_str(&format!(
-        "| integrity-density (B) | {} {} | {} |\n",
-        verdict_glyph(iv),
-        iv,
-        md_escape(&idetail),
-    ));
+    item("integrity-density (B)", iv, &idetail);
 
     let (sv, sdetail) = match &d.signals.silent_data_loss_share {
         SignalOrPending::Live(s) => (s.verdict, s.rationale.clone()),
-        SignalOrPending::Pending(p) => (p.verdict, format!("pending — {}", p.reason)),
+        SignalOrPending::Pending(p) => (p.verdict, format!("pending: {}", p.reason)),
     };
-    out.push_str(&format!(
-        "| silent-data-loss-share (C) | {} {} | {} |\n",
-        verdict_glyph(sv),
-        sv,
-        md_escape(&sdetail),
-    ));
+    item("silent-data-loss-share (C)", sv, &sdetail);
 
     let (zv, zdetail) = match &d.signals.silent_data_loss_zero_engagement {
         ZeroEngagementOrPending::Live(s) => {
@@ -513,15 +525,62 @@ fn render_direction_block(d: &DirectionReport) -> String {
             }
             (s.verdict, detail)
         }
-        ZeroEngagementOrPending::Pending(p) => (p.verdict, format!("pending — {}", p.reason)),
+        ZeroEngagementOrPending::Pending(p) => (p.verdict, format!("pending: {}", p.reason)),
     };
+    item("silent-data-loss-zero-engagement (A4)", zv, &zdetail);
+
+    out
+}
+
+/// Render the board opening in the SKILL.md step 7 layout: a visible verdict
+/// line, a two-column At a glance table, then one closed "Why this verdict"
+/// fold holding the editor's direction slot and the per-signal detail.
+///
+/// The renderer has no Next decisive move, so "next" names the open issues in
+/// the attention lane, as the skill's fallback does, or says that none is
+/// waiting. The editor slot sits inside the fold; `push` finds it by its
+/// markers wherever it is, so a live body in the old layout keeps its text.
+fn render_opening(
+    d: &DirectionReport,
+    issues: &[IssueRecord],
+    class_summary: &ClassificationSummary,
+    attn: &[u32],
+) -> String {
+    let states = issue_states(issues);
+    let next = if attn.is_empty() {
+        "no open issue waits on a human reading".to_string()
+    } else {
+        let ids: Vec<String> = attn.iter().map(|n| format!("#{}", n)).collect();
+        format!("read {}", ids.join(" "))
+    };
+    let mut out = String::new();
     out.push_str(&format!(
-        "| silent-data-loss-zero-engagement (A4) | {} {} | {} |\n\n",
-        verdict_glyph(zv),
-        zv,
-        md_escape(&zdetail),
+        "**Direction verdict: {} {}** · run {} · {} · next: {}\n\n",
+        verdict_glyph(d.verdict),
+        d.verdict.to_uppercase(),
+        d.run,
+        md_escape(&d.top_signal),
+        next,
     ));
 
+    out.push_str("| At a glance | Result |\n|---|---|\n");
+    out.push_str(&format!("| Open issues | **{}** |\n", states.open));
+    out.push_str(&format!("| Closed (observed) | **{}** |\n", states.closed));
+    out.push_str(&format!(
+        "| Integrity (⚠) | **{}** |\n",
+        class_summary.integrity
+    ));
+    out.push_str(&format!(
+        "| Silent data loss (▲) | **{}** |\n",
+        class_summary.silent_data_loss
+    ));
+    out.push_str(&format!("| Needs human reading | **{}** |\n\n", attn.len()));
+
+    out.push_str("<details><summary>Why this verdict</summary>\n\n");
+    out.push_str(EDITOR_SLOT_DIRECTION);
+    out.push_str("\n\n");
+    out.push_str(&render_signal_list(d));
+    out.push_str("\n</details>\n\n");
     out
 }
 
@@ -534,13 +593,8 @@ fn render_derived(
     clusters: &[ClusterRecord],
     comments: &CommentStats,
     class_summary: &ClassificationSummary,
-    direction: &DirectionReport,
 ) -> String {
     let mut out = String::new();
-
-    out.push_str("## Direction verdict\n\n");
-    out.push_str(&render_direction_block(direction));
-    out.push('\n');
 
     out.push_str("## Baseline (derived from store)\n\n");
     out.push_str("| Metric | Value | Provenance |\n");
@@ -711,11 +765,13 @@ fn render_derived(
     out
 }
 
-/// Compose the final body: header + sentinel + editor slots + derived zone.
+/// Compose the final body: header + sentinel + opening (with the direction
+/// editor slot inside its fold) + derived zone + notes slot.
 fn compose(
     target: &str,
     repo: &str,
     run: &RunRecord,
+    opening: &str,
     derived: &str,
     derived_digest: &str,
 ) -> String {
@@ -724,8 +780,7 @@ fn compose(
     out.push_str(&format!("# 📋 beadle — Triage Dashboard · {}\n\n", repo));
     out.push_str(&sentinel);
     out.push_str("\n\n");
-    out.push_str(EDITOR_SLOT_DIRECTION);
-    out.push_str("\n\n");
+    out.push_str(opening);
     out.push_str(derived);
     out.push('\n');
     out.push_str(EDITOR_SLOT_NOTES);
@@ -781,7 +836,7 @@ fn sha256_hex(s: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// A cluster record written in `run`, whose last member add was in
@@ -825,7 +880,6 @@ mod tests {
             clusters,
             &CommentStats::default(),
             &classification_summary(&empty),
-            &mk_direction_pending(),
         )
     }
 
@@ -1058,7 +1112,6 @@ mod tests {
         let mut latest_class = HashMap::new();
         latest_class.insert(42, c);
         let summary = classification_summary(&latest_class);
-        let direction = mk_direction_pending();
         let body = render_derived(
             "t",
             "acme/widget",
@@ -1067,7 +1120,6 @@ mod tests {
             &[],
             &CommentStats::default(),
             &summary,
-            &direction,
         );
         assert!(body.contains("## Classification summary"), "summary header");
         assert!(body.contains("| Integrity"), "integrity row");
@@ -1098,7 +1150,6 @@ mod tests {
         };
         let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
         let summary = classification_summary(&empty);
-        let direction = mk_direction_pending();
         let body = render_derived(
             "t",
             "acme/widget",
@@ -1107,7 +1158,6 @@ mod tests {
             &[],
             &CommentStats::default(),
             &summary,
-            &direction,
         );
         assert!(
             body.contains("no classifications in store"),
@@ -1117,7 +1167,7 @@ mod tests {
 
     /// Build a minimal on-disk workspace (intent + store) for exercising the
     /// public `render::run` fail-loud guard end-to-end.
-    fn setup_workspace(run_no: u32, class_runs: &[u32]) -> tempfile::TempDir {
+    pub(crate) fn setup_workspace(run_no: u32, class_runs: &[u32]) -> tempfile::TempDir {
         let td = tempfile::TempDir::new().unwrap();
         let root = td.path();
         std::fs::create_dir_all(root.join("targets")).unwrap();
@@ -1220,7 +1270,6 @@ mod tests {
         let issues = vec![mk_issue(10, "wobble"), mk_issue(11, "wibble")];
         let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
         let summary = classification_summary(&empty);
-        let direction = mk_direction_pending();
         let run = RunRecord {
             ts: "2026-07-01T00:00:00Z".into(),
             target: "t".into(),
@@ -1242,7 +1291,6 @@ mod tests {
             &[],
             &CommentStats::default(),
             &summary,
-            &direction,
         );
         assert!(
             !body.contains("_unclassified_"),
@@ -1338,7 +1386,6 @@ mod tests {
             &[],
             &CommentStats::default(),
             &classification_summary(&latest_class),
-            &mk_direction_pending(),
         );
         assert!(
             body.contains("| Classified issues | 1 | of 2 observed (open + closed) |"),
@@ -1474,51 +1521,145 @@ mod tests {
     }
 
     #[test]
-    fn render_includes_direction_verdict_block() {
-        let run = RunRecord {
-            ts: "2026-07-01T00:00:00Z".into(),
-            target: "t".into(),
-            run: 1,
-            watermark_before: 0,
-            watermark_after: 0,
-            counts: Default::default(),
-            digest: "d".into(),
-            warmup: None,
-            intent_version: None,
-            new_this_run: vec![],
-            notes: None,
-        };
+    fn render_opening_lists_signals_inside_the_fold() {
         let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
         let summary = classification_summary(&empty);
         let direction = mk_direction_pending();
-        let body = render_derived(
-            "t",
-            "acme/widget",
-            &run,
-            &[],
-            &[],
-            &CommentStats::default(),
-            &summary,
-            &direction,
-        );
-        assert!(body.contains("## Direction verdict"), "verdict header");
-        assert!(body.contains("🟢 on-course"), "verdict glyph + label");
-        assert!(body.contains("| filing-density |"), "filing-density row");
+        let opening = render_opening(&direction, &[], &summary, &[]);
         assert!(
-            body.contains("| integrity-density (B) |"),
-            "integrity-density row"
+            opening.starts_with("**Direction verdict: 🟢 ON-COURSE** · run 1 · "),
+            "verdict literal leads the opening: {opening}"
         );
         assert!(
-            body.contains("| silent-data-loss-share (C) |"),
-            "SDL share row"
+            opening.contains("· next: no open issue waits on a human reading\n"),
+            "with no attn issue, next says so plainly"
+        );
+        let fold = opening
+            .split_once("<details><summary>Why this verdict</summary>")
+            .expect("opening fold")
+            .1;
+        for item in [
+            "- filing-density: 🟢 on-course",
+            "- integrity-density (B): ⚪ pending · pending: ",
+            "- silent-data-loss-share (C): ⚪ pending",
+            "- silent-data-loss-zero-engagement (A4): ⚪ pending",
+        ] {
+            assert!(fold.contains(item), "fold lists {item}");
+        }
+        assert!(!opening.contains('\u{2014}'), "no em dash in the opening");
+    }
+
+    #[test]
+    fn render_opening_next_names_open_attn_issues() {
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        let summary = classification_summary(&empty);
+        let opening = render_opening(&mk_direction_pending(), &[], &summary, &[7, 12]);
+        let head = opening.lines().next().unwrap();
+        assert!(head.ends_with(" · next: read #7 #12"), "{head}");
+        assert!(opening.contains("| Needs human reading | **2** |"));
+    }
+
+    #[test]
+    fn attn_open_skips_issues_observed_closed() {
+        let mut class = HashMap::new();
+        for n in [10, 11, 12] {
+            let mut c = mk_class(n, 3, "2026-07-01T00:00:00Z");
+            if n != 12 {
+                c.attn = Some(beadle_store::Attn {
+                    subtype: "direction".into(),
+                    order: None,
+                    why: None,
+                });
+            }
+            class.insert(n, c);
+        }
+        let mut closed = mk_issue(11, "done");
+        closed.state = "closed".into();
+        let issues = vec![mk_issue(10, "open one"), closed, mk_issue(12, "no attn")];
+        assert_eq!(attn_open(&issues, &class), vec![10]);
+    }
+
+    /// The opening of a body `render::run` emits: everything between the
+    /// sentinel and the first H2.
+    fn opening_of(body: &str) -> &str {
+        let after = body.split_once("beadle-state -->").unwrap().1;
+        let end = after.find("\n## ").unwrap();
+        &after[..end]
+    }
+
+    #[test]
+    fn rendered_body_opens_with_head_then_two_column_table_then_one_fold() {
+        let td = setup_workspace(3, &[3]);
+        let body = super::run(td.path(), "t").expect("render should succeed");
+        let opening = opening_of(&body);
+
+        let verdict = opening
+            .find("**Direction verdict: ")
+            .expect("verdict literal");
+        let table = opening
+            .find("| At a glance | Result |\n|---|---|\n")
+            .expect("glance table");
+        let fold = opening
+            .find("<details><summary>Why this verdict</summary>\n\n")
+            .expect("fold");
+        assert!(
+            verdict < table && table < fold,
+            "verdict, table, fold in order"
         );
         assert!(
-            body.contains("| silent-data-loss-zero-engagement (A4) |"),
-            "A4 row"
+            opening[verdict..table].lines().count() == 2,
+            "the verdict is one line, then a blank line"
+        );
+        for row in opening[table..fold].lines().filter(|l| l.starts_with('|')) {
+            assert_eq!(row.matches('|').count(), 3, "two columns: {row}");
+        }
+
+        assert_eq!(
+            body.matches("<details>").count(),
+            1,
+            "the fold is the body's only <details>"
+        );
+        assert_eq!(opening.matches("<details>").count(), 1, "exactly one fold");
+        assert_eq!(
+            opening.matches("</details>").count(),
+            1,
+            "the fold is closed"
+        );
+        assert!(!opening.contains("<details open"), "the fold starts closed");
+        let inside = &opening[fold..opening.find("</details>").unwrap()];
+        assert!(inside.contains("<!-- editor:direction-verdict -->"));
+        assert!(inside.contains("<!-- /editor:direction-verdict -->"));
+        assert!(
+            !inside.lines().any(|l| {
+                let l = l.trim();
+                l.len() >= 2 && l.starts_with('|') && l.ends_with('|')
+            }),
+            "no pipe-table row inside the fold: {inside}"
         );
         assert!(
-            body.contains("pending — "),
-            "pending signals render their reason"
+            !body.contains("## Direction verdict"),
+            "the old section heading is gone"
+        );
+    }
+
+    #[test]
+    fn rendered_body_passes_the_head_literal_and_the_fold_checks() {
+        let td = setup_workspace(3, &[3]);
+        let body = super::run(td.path(), "t").expect("render should succeed");
+        let before = "<!-- beadle-state:v1\n{\"run\": 2, \"watermark\": 5}\nbeadle-state -->\n";
+        let rep = crate::verify::evaluate(before, &body, &[], &[]).unwrap();
+        for f in &rep.fails {
+            assert!(
+                !f.starts_with("1: bolded") && !f.starts_with("5b") && !f.starts_with("5d"),
+                "rendered body fails a head or fold check: {f}"
+            );
+        }
+        assert!(
+            rep.fails
+                .iter()
+                .any(|f| f.starts_with("1: required section missing")),
+            "positive control: the gate did run over this body: {:?}",
+            rep.fails
         );
     }
 
@@ -1539,7 +1680,6 @@ mod tests {
         };
         let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
         let summary = classification_summary(&empty);
-        let direction = mk_direction_pending();
         let body = render_derived(
             "t",
             "acme/widget",
@@ -1548,7 +1688,6 @@ mod tests {
             &[],
             &CommentStats::default(),
             &summary,
-            &direction,
         );
         assert!(body.contains("## Board controls"), "board controls header");
         assert!(body.contains("- [ ] `reprioritize`"));
@@ -1607,12 +1746,20 @@ mod tests {
                 ),
             },
         };
-        let block = render_direction_block(&direction);
-        assert!(block.contains("🔴 drifting"), "drifting glyph");
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        let block = render_opening(&direction, &[], &classification_summary(&empty), &[]);
+        assert!(
+            block.starts_with("**Direction verdict: 🔴 DRIFTING** · run 3 · "),
+            "drifting glyph and label lead"
+        );
         assert!(block.contains("drifting: #42"), "issue named in detail");
         assert!(
-            block.contains("top signal: silent-data-loss-zero-engagement"),
-            "top signal surfaced"
+            block
+                .lines()
+                .next()
+                .unwrap()
+                .contains(" · silent-data-loss-zero-engagement drifting"),
+            "top signal surfaced on the visible line"
         );
     }
 }
