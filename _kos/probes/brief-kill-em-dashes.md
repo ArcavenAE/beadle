@@ -218,36 +218,62 @@ Structural, so they may gate (ADR-007 and the diagnostic-not-gate rule: they
 ask "is this artifact well-formed against a written rule", not "is the project
 healthy"):
 
-- `tests/no_em_dash.rs::sources_have_no_em_dash`, the guard that reaches
-  every literal. Behavioral tests cannot reach all of them: the 13 v2 literals
-  in `direction.rs` are on mutually exclusive branches, and the 4 stderr
-  literals never reach a rendered body. A source scan reaches each one
-  regardless of branch. It reads every `.rs` file under `crates/` and applies
-  two rules.
-  - **Everywhere, test code included:** no raw U+2014 character.
-  - **Outside test code:** none of the forms that compile or render to U+2014
-    either. That means the Rust escape (`\u{2014}`, any case, any leading
-    zeros, matched as `\\u\{0*2014\}`), the HTML entities (`&mdash;`,
-    `&#8212;`, `&#x2014;`, any case), the number `0x2014` (for
-    `char::from_u32`), and the UTF-8 byte escape `\xe2\x80\x94` (any case).
-    Without this rule, an escaped dash in a non-test literal would pass every
-    guard.
-  - **Test code** is any file under `crates/*/tests/`, plus, in a `src/` file,
-    the item that follows a `#[cfg(test)]` attribute, bounded by brace
-    matching that skips string and char literals and comments. Test inputs
-    that must carry a dash (the old checked boxes in controls.rs:119 and 126,
-    push.rs:298) spell it as the escape there. At c1f95a5 the only escape in
-    `src/` is render.rs:1549, inside `#[cfg(test)]`.
-  - **The scanner's own patterns** are built from these escape forms, so
-    `tests/no_em_dash.rs` holds no raw character and passes its own scan.
-  - **Positive controls that stay:** the scan is a function over (path, text).
-    `scan_catches_planted_dash` runs it on in-memory sources, one case per
-    form. The raw character outside and inside test code is refused. Each of
-    the escape, the three entities, `0x2014` and the byte escape is refused
-    outside test code, and each is accepted inside a `#[cfg(test)]` module,
-    including one whose string literal holds a `}`. A failure names the form
-    and the line. On main the file scan also fails, since render.rs alone has
-    31.
+**Which guard, and why.** Three review rounds each found new edges in a
+hand-written Rust lexer that marks off test code. A source scan also has a
+limit no lexer removes: code can build the character from arithmetic, which no
+scan of spellings can see. So the design splits the job. The output and data
+checks below carry the guarantee wherever a test can reach the text. The
+source scan is a tripwire for the spellings people write by accident, with no
+test-code boundary at all. Of the reviewer's three options it takes the third,
+refuse everywhere and build the dash at run time in tests, because that
+removes the lexer instead of growing it. The first option, checking outputs, is
+used for the body and the data files. The second, a real parser through `syn`,
+is not taken: it would add a dev-dependency to close edges that the run-time
+construction makes moot.
+
+- `tests/no_em_dash.rs::sources_have_no_em_dash_spelling`, the tripwire. It
+  reads every `.rs` file under `crates/` and refuses, in code, comments and tests
+  alike, with no test-code boundary:
+  - the raw U+2014 character;
+  - a `\u{...}` escape whose hex digits, with underscores removed, equal
+    `2014` after any leading zeros, in either case (`\u{2014}`, `\u{02014}`,
+    `\u{20_14}`, `\U{2014}` as text);
+  - an integer literal whose value is 0x2014 (8212), whatever its base or
+    underscores: `0x2014`, `0x02014`, `0x20_14`, `8212`, `8_212`, `0o20024`,
+    `0b10000000010100`, with or without a type suffix;
+  - the UTF-8 bytes as a byte escape (`\xe2\x80\x94`, either case) or as three
+    adjacent integer literals of value 0xE2, 0x80, 0x94 in a list;
+  - the HTML entities `&mdash;`, `&#8212;` and `&#x2014;`, in either case,
+    with leading zeros.
+  Tests that need the character get it from one helper,
+  `tests/support/mod.rs::em_dash()`, which returns
+  `char::from_u32(0x2013 + 1).unwrap()`. Each literal there is one off, so the
+  scan passes it. The helper is the only sanctioned construction, and review
+  checks for any other arithmetic that builds the dash. The scan is a tripwire
+  against accidental spellings, not proof against deliberate construction, and
+  the brief says so. The inputs that must carry a dash (the old checked boxes in
+  controls.rs:119 and 126, push.rs:298, render.rs:1549) and the five test files
+  that hold raw dashes today move to the helper, which needs `pub` access from
+  unit tests; a `#[cfg(test)]` copy in `src/` is the fallback.
+- `scan_catches_planted_spelling`: the scan is a function over (path, text),
+  and this test runs it on in-memory sources, one case per form in the list
+  above, including each named variant (leading zeros, upper case, an
+  underscore in the escape, decimal, octal, binary, a suffix, the byte list).
+  Each case must be refused, and the failure must name the form and the line.
+  Controls that must pass: `0x2013`, `8211`, `0x2015`, the helper's own
+  expression, and the bytes `0xe2, 0x80, 0x93` (the en dash). The scan must
+  also report at least one file read under each crate, so an empty walk fails
+  instead of passing.
+- `tests/no_em_dash.rs::body_data_has_no_em_dash`, an output-side check over
+  the data that reaches the body and is not Rust:
+  `skills/beadle-triage/vocabulary.json` (compiled in by `include_str!` at
+  vocab.rs:15, gates `report_type` at classify.rs:202, and printed into the
+  body at render.rs:731-737; 0 dashes at c1f95a5) and every
+  `targets/*.intent.yaml` (its `repo` becomes the H1 through render.rs:132 and
+  :780, and the skill scores the manifest, so the curator may quote its
+  values). The intent files hold 31 at c1f95a5: `_template` 7 and `prism` 1,
+  all in comments, and `vsdd-factory` 23, of which 8 are in values. All go, by
+  section 3. The check reads each file as text, so comments count too.
 - `render::tests::rendered_body_has_no_em_dash`, the behavioral check on the
   body: renders a store that reaches the body branches (a stale cluster, an
   unreadable issue state, one commenter, a zero trailing mean for filing
@@ -266,8 +292,8 @@ healthy"):
   (U+2014)" in words instead of the character.
 
 The guards cover U+2014 only, matching the ruling. Comments and test code are
-covered by the raw-character rule. A test input that needs the character
-writes it as an escape, which only test code may use.
+covered by the spelling tripwire. A test input that needs the character gets
+it from the `em_dash()` helper.
 
 ## 6. The replacement fixture and #115
 
@@ -298,8 +324,9 @@ after the builder PR merges.
 
 Red first; each test is run and seen failing before its fix.
 
-1. **Red, source and renderer guards:** `sources_have_no_em_dash`,
-   `scan_catches_planted_dash` (it is red until the scan function exists),
+1. **Red, source, data and renderer guards:** `sources_have_no_em_dash_spelling`,
+   `scan_catches_planted_spelling` (red until the scan function exists),
+   `body_data_has_no_em_dash`,
    `rendered_body_has_no_em_dash` (both cases), `board_controls_block_has_no_em_dash`.
    The direction and stderr literals are covered by the source scan, not by a
    behavioral test.
@@ -316,10 +343,10 @@ Red first; each test is run and seen failing before its fix.
 4. **Green, renderer:** render.rs 11 source literals, controls.rs 2,
    direction.rs 14, by section 3. Keep `advisory only` lowercase. Retire the
    comment dashes across `crates/` too, since the source scan covers them, and
-   spell any dash a test input needs as `\u{2014}`. At c1f95a5 five test files
+   build any dash a test input needs with the `em_dash()` helper. At c1f95a5 five test files
    hold raw dashes: classification_fidelity.rs (2), direction_v2.rs (9),
    run_ordering.rs (1), verify_gate.rs (4) and vocabulary_contract.rs (3)
-   (`git grep -c` for U+2014).
+   (`git grep -c` for U+2014). Also the 31 in `targets/*.intent.yaml`.
 5. **Green, gates:** the fold in `verify.rs` check 2 and `tools/dashboard-gate.py`
    check 2, with the rename-`to` case. `verify.json` and `DECLARED_RENAMES`
    unchanged.
