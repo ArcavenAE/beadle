@@ -494,15 +494,13 @@ since the fixture PR finishes it.
 
 ## Rulings and open questions
 
-Two are ruled and one is open.
+All three are ruled.
 
 - **En dashes stay.** Ruled 2026-10-19, Desk beadle-117-en-dashes (option a).
   There are 18 on the live board, 8 in SKILL.md and 1 in direction.rs, all
   number ranges. The guards cover U+2014 only.
-- **Quoted titles: open.** The design assumes they are quoted as written and
-  exempt by exact store match (section 5). The alternative, rewriting them,
-  changes another author's words. It is the operator's call, and the card goes
-  to the Desk.
+- **Quoted titles are quoted as written, exempt by exact store match
+  (section 5).** Ruled 2026-10-19, Desk beadle-118-quoted-titles (option a).
 - **The title and H1 keep the middle dot (P6).** Ruled 2026-10-19, Desk
   beadle-117-title-separator (option a).
 
