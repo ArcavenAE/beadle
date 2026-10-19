@@ -381,17 +381,17 @@ human consolidation** (a duplicate already exists; never pick one silently, neve
 create a third). Wrong author → STOP, don't fork. None → re-check immediately, then
 create+pin.
 
-`beadle render <target>` now emits a **Direction verdict** section as the first
-derived-zone block (finding-017). It contains a deterministic projection of the
-current run's `DirectionReport`: header line `<glyph> <verdict>` (🟢/🟡/🔴) +
-top signal, plus a 4-row table with per-signal verdicts + rationale for
-filing-density, integrity-density (B), silent-data-loss-share (C), and
-silent-data-loss-zero-engagement (A4). When A4 fires, the row's detail cell
-names the affected issues (`· drifting: #42, #87` or `· watch: #12`). The
-editor still owns the free-text paragraph above the table — it goes in the
-`<!-- editor:direction-verdict -->` slot and is preserved verbatim across
-regens. Whole-section ownership: renderer owns the numbers/table, editor owns
-the interpretation (`question-renderer-editorial-boundary` sub-question A).
+`beadle render <target>` emits the opening in the layout below (finding-017). Its
+visible line is `**Direction verdict: <glyph> <VERDICT>** · run <N> · <top signal> ·
+next: <...>`, where "next" names the open issues in the attention lane, or says none
+is waiting, since the renderer has no Next decisive move. Its At a glance rows are
+open and closed issues, integrity, silent data loss and the attention count. The
+fold holds the `<!-- editor:direction-verdict -->` slot, preserved verbatim across
+regens, and one list item per signal: filing-density, integrity-density (B),
+silent-data-loss-share (C) and silent-data-loss-zero-engagement (A4). When A4 fires,
+its item names the affected issues (`· drifting: #42, #87` or `· watch: #12`).
+Whole-section ownership: the renderer owns the numbers, the editor owns the
+interpretation (`question-renderer-editorial-boundary` sub-question A).
 
 **Opening layout: a short visible head, one closed fold.** A reader who stops early
 should have the state, so the opening of the published body is laid out this way:

@@ -53,15 +53,7 @@ pub fn run(root: &Path, target: &str, dry_run: bool) -> Result<()> {
     // the notes queue.
     record_board_controls(root, target, &dashboard.body, dry_run)?;
 
-    // Extract editor slots from the LIVE body; preserve them across regen.
-    let direction = extract_slot(&dashboard.body, DIRECTION_OPEN, DIRECTION_CLOSE)
-        .unwrap_or_else(default_direction_slot);
-    let notes =
-        extract_slot(&dashboard.body, NOTES_OPEN, NOTES_CLOSE).unwrap_or_else(default_notes_slot);
-
-    // Merge: substitute the fresh renderer's placeholder slots with the
-    // live-body's editor content.
-    let merged = merge_slots(&rendered, &direction, &notes);
+    let merged = merge_live_slots(&rendered, &dashboard.body);
 
     // Finalize sentinel: compute body_digest over the merged body (minus the
     // sentinel line itself — pre-image invariant so the digest isn't self-referential).
@@ -210,6 +202,18 @@ fn default_direction_slot() -> String {
 fn default_notes_slot() -> String {
     extract_slot(render::EDITOR_SLOT_NOTES, NOTES_OPEN, NOTES_CLOSE)
         .unwrap_or_else(|| render::EDITOR_SLOT_NOTES.to_string())
+}
+
+/// Extract the editor slots from the LIVE body and substitute them for the
+/// fresh render's placeholders, so the maintainer's text survives regen.
+/// Slots are found by their markers, not by position: a live body in the old
+/// layout (direction slot above a `## Direction verdict` section) re-pushes
+/// with that text inside the new opening fold.
+fn merge_live_slots(rendered: &str, live_body: &str) -> String {
+    let direction = extract_slot(live_body, DIRECTION_OPEN, DIRECTION_CLOSE)
+        .unwrap_or_else(default_direction_slot);
+    let notes = extract_slot(live_body, NOTES_OPEN, NOTES_CLOSE).unwrap_or_else(default_notes_slot);
+    merge_slots(rendered, &direction, &notes)
 }
 
 /// Replace the placeholder editor slots in the rendered body with the live
@@ -380,6 +384,48 @@ mod tests {
             recs.iter()
                 .all(|r| !matches!(r, Record::Note(n) if n.topic == "control-request")),
             "dry-run must not append control-request notes"
+        );
+    }
+
+    #[test]
+    fn old_layout_slot_text_moves_into_the_opening_fold() {
+        // A live body in the layout before the opening fold: the direction
+        // slot sits right under the sentinel, above a `## Direction verdict`
+        // section with a signal table, and both slots carry editor text.
+        let live = "# 📋 beadle · Triage Dashboard · acme/widget\n\n\
+            <!-- beadle-state:v1\n{\"run\": 2}\nbeadle-state -->\n\n\
+            <!-- editor:direction-verdict -->\n\
+            The queue is steady; #10 is the one to watch.\n\
+            <!-- /editor:direction-verdict -->\n\n\
+            ## Direction verdict\n\n\
+            | Signal | Verdict | Detail |\n|---|---|---|\n| filing-density | x | y |\n\n\
+            ## Editor notes\n\n\
+            <!-- editor:notes -->\nKeep this note.\n<!-- /editor:notes -->\n";
+        let td = crate::render::tests::setup_workspace(3, &[3]);
+        let rendered = render::run(td.path(), "t").expect("render should succeed");
+
+        let merged = merge_live_slots(&rendered, live);
+
+        let fold_start = merged
+            .find("<details><summary>Why this verdict</summary>")
+            .expect("new layout fold");
+        let fold_end = fold_start + merged[fold_start..].find("</details>").unwrap();
+        let text = merged
+            .find("The queue is steady; #10 is the one to watch.")
+            .expect("editor direction text preserved");
+        assert!(
+            fold_start < text && text < fold_end,
+            "the preserved text sits inside the fold"
+        );
+        assert_eq!(merged.matches(DIRECTION_OPEN).count(), 1);
+        assert!(merged.contains("Keep this note."), "notes slot preserved");
+        assert!(
+            !merged.contains("## Direction verdict"),
+            "the old section does not come back"
+        );
+        assert!(
+            !merged.contains("_Editor: fill in the direction verdict paragraph."),
+            "the placeholder was replaced"
         );
     }
 }
