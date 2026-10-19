@@ -301,7 +301,8 @@ construction makes moot.
   replace a dash, never colon-space. A colon-space in an unquoted value breaks
   the YAML: vsdd-factory.intent.yaml:124, `note: canonical principle \u{2014}
   production-grade default, ...`, fails to parse with `: ` and parses with
-  `; ` (measured by the reviewer). After the replacement every intent file
+  `; ` (measured by the reviewer with Ruby's YAML parser, not `serde_yaml`;
+  the test below is what checks it under `serde_yaml`). After the replacement every intent file
   must still load through the manifest loader (`intent.rs`, `serde_yaml`).
   The test `intent_files_parse_after_retirement` loads each one, and that
   test runs in the same red/green sequence.
@@ -323,13 +324,29 @@ construction makes moot.
     lib.rs:72, `title`) and are trimmed. Blank lines are dropped. A title is
     ignored unless it is at least 12 characters long and holds at least 4
     letters or digits, so a title of a lone dash, or a dash with spaces,
-    exempts nothing.
+    exempts nothing. The floor only removes degenerate titles. What keeps a
+    title from exempting more than its own dashes is the located span below,
+    not the floor.
   - **Located, per dash.** The check finds each occurrence of each usable
     title in the candidate and records the character span it covers. A dash
     is exempt only if it lies inside such a span: one whole stored title,
     matched exactly. Every other dash is refused, including one beside a
     quoted title on the same line, so the exemption never widens to a line
     or a paragraph.
+  - **One reading of every match.** Occurrences of one title are found
+    non-overlapping, leftmost first: Rust's `str::match_indices`, or in
+    Python `str.find` restarted at the end of each match. Occurrences of two
+    different titles may overlap or nest, and a dash inside any span is
+    exempt. Matching is exact and case-sensitive, and the candidate is not
+    normalized, so a title wrapped across two lines does not match and its
+    dashes are refused; the curator quotes a title on one line. Non-overlapping
+    was chosen because, where the two readings differ, it exempts less, and
+    because it is what the standard search in both languages does, so the two
+    gates cannot drift apart on it.
+  - **Residual, by design.** Curator prose that is exactly equal to a stored
+    title of 12 or more characters passes with its dashes, because the check
+    cannot tell it from a quote. Requiring the title to sit next to its own
+    `#N` would narrow this further; it is not part of this design.
   - **Where the titles come from.** `beadle verify` reads them from the
     target's store. The Python gate takes `--titles FILE`, one title per line,
     written by a new `beadle titles <target>`, which only reads the store.
@@ -339,9 +356,19 @@ construction makes moot.
   - `dash_beside_quoted_title_is_refused`: a line `- #12 <title> \u{2014} more`,
     where the title holds a dash. The title's dash passes and the trailing
     dash is refused. This fails under a whole-line exemption.
-  - `degenerate_titles_exempt_nothing`: titles `\u{2014}`, ` \u{2014} `, an
-    empty line and an 11-character title, against a body whose only dashes
-    are those strings; every dash is refused.
+  - `degenerate_titles_exempt_nothing`: titles `\u{2014}`, ` \u{2014} `,
+    `abcd \u{2014} efgh` (11 characters, 8 letters or digits: fails if the
+    length half of the floor is dropped) and `x \u{2014} y \u{2014} z !!` (12
+    characters, 3 letters or digits: fails if the letters-or-digits half is
+    dropped), against a body whose only dashes are those strings; every dash
+    is refused. An empty line is in the file too, as a pin: an empty match
+    covers no character, so that row cannot fail under the span rule.
+  - `overlapping_title_occurrences_do_not_chain`: the title
+    `ab \u{2014} ab \u{2014} ab` (12 characters, 6 letters or digits) and a
+    candidate `ab \u{2014} ab \u{2014} ab \u{2014} ab`. The search finds one
+    span, the first 12 characters, so the first two dashes pass and the third
+    is refused. This fails under a search from every start position, which
+    finds a second span and refuses nothing.
   - `beadle_titles_is_read_only`: a scratch store's metadata hash (name,
     size, mtime, inode for every file) is the same before and after the
     command, and the command makes no network call (stubbed `gh` logs none).
@@ -414,8 +441,9 @@ Red first; each test is run and seen failing before its fix.
    its other controls); Python `test_em_dash_retirement_warns_and_passes`.
    The candidate-body check: `candidate_with_em_dash_is_refused`,
    `candidate_without_em_dash_passes` (the positive control) and
-   `quoted_title_with_em_dash_is_exempt`, `dash_beside_quoted_title_is_refused`
-   and `degenerate_titles_exempt_nothing`, in verify.rs and in the Python tests,
+   `quoted_title_with_em_dash_is_exempt`, `dash_beside_quoted_title_is_refused`,
+   `degenerate_titles_exempt_nothing` and
+   `overlapping_title_occurrences_do_not_chain`, in verify.rs and in the Python tests,
    with a Python case that `--titles` absent exempts nothing; and
    `beadle_titles_is_read_only`.
    Two regression pins go with them and pass on main, so they are not reds:
