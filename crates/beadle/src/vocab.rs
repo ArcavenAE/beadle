@@ -1,4 +1,4 @@
-//! Shared classification vocabulary — single source of truth for the bounded
+//! Shared classification vocabulary: single source of truth for the bounded
 //! axes, embedded from `skills/beadle-triage/vocabulary.json` at build time.
 //!
 //! finding-020 F2 / beadle#32: the binary's enums and SKILL §3 drifted because
@@ -22,10 +22,10 @@ pub struct Vocabulary {
     pub defect_nature: Vec<String>,
     pub reproducibility: Vec<String>,
     /// finding-009 liveness tokens. The safety cluster lives in the record's
-    /// `integrity` / `integrity_anchor` / `silent_data_loss` fields — never here.
+    /// `integrity` / `integrity_anchor` / `silent_data_loss` fields; never here.
     /// (The manifest also carries `operational_impact_labels`, the store-token →
     /// GitHub-label map; the binary doesn't consume it yet, so it is not
-    /// deserialized here — the contract tests read it from the JSON directly.)
+    /// deserialized here: the contract tests read it from the JSON directly.)
     pub operational_impact: Vec<String>,
     pub priority: Vec<String>,
     /// Pre-finding-009 severity-flavored values → canonical liveness token,
@@ -42,12 +42,12 @@ impl Vocabulary {
 
 /// The embedded manifest. A parse failure here is a build defect (the manifest
 /// ships inside the binary), caught by `vocabulary_contract` tests before any
-/// release — so an `expect` with an actionable message is the honest shape.
+/// release: so an `expect` with an actionable message is the honest shape.
 pub fn vocab() -> &'static Vocabulary {
     static V: OnceLock<Vocabulary> = OnceLock::new();
     V.get_or_init(|| {
         parse().expect(
-            "embedded skills/beadle-triage/vocabulary.json failed to parse — \
+            "embedded skills/beadle-triage/vocabulary.json failed to parse; \
              fix the manifest and re-run tests/vocabulary_contract.rs",
         )
     })

@@ -1,4 +1,4 @@
-//! `beadle push <target>` — write the rendered body to the dashboard issue.
+//! `beadle push <target>`: write the rendered body to the dashboard issue.
 //!
 //! Preserves editor-slot contents from the live body so the maintainer's
 //! direction verdict and notes survive regeneration. Computes the final
@@ -35,8 +35,8 @@ pub fn run(root: &Path, target: &str, dry_run: bool) -> Result<()> {
     // Render FIRST so push inherits the fail-loud guard before any side effect.
     // render::run refuses to emit when the current run has zero classifications;
     // running it before the dashboard fetch and the control-request note append
-    // means a push against an unclassified run fails cleanly — no GitHub read,
-    // no notes appended, no checkbox left half-processed — so a retried push
+    // means a push against an unclassified run fails cleanly; no GitHub read,
+    // no notes appended, no checkbox left half-processed; so a retried push
     // before classification lands cannot strand duplicate control-request notes.
     let rendered = render::run(root, target)?;
 
@@ -49,18 +49,18 @@ pub fn run(root: &Path, target: &str, dry_run: bool) -> Result<()> {
     // Scan the LIVE body for checked board-control boxes (F5 Tier 2).
     // Record one Note per verb; the fresh render always emits unchecked boxes,
     // so the next push through the same body resets the box (natural de-bounce).
-    // Dispatch of the requested routines is deferred — Phase-1 gh-aw will drain
+    // Dispatch of the requested routines is deferred; Phase-1 gh-aw will drain
     // the notes queue.
     record_board_controls(root, target, &dashboard.body, dry_run)?;
 
     let merged = merge_live_slots(&rendered, &dashboard.body);
 
     // Finalize sentinel: compute body_digest over the merged body (minus the
-    // sentinel line itself — pre-image invariant so the digest isn't self-referential).
+    // sentinel line itself: pre-image invariant so the digest isn't self-referential).
     let final_body = finalize_sentinel(&merged);
 
     if dry_run {
-        eprintln!("beadle push: dry-run — writing to stdout, {} bytes", final_body.len());
+        eprintln!("beadle push: dry-run: writing to stdout, {} bytes", final_body.len());
         print!("{}", final_body);
         return Ok(());
     }
@@ -140,7 +140,7 @@ fn record_board_controls(root: &Path, target: &str, live_body: &str, dry_run: bo
         .collect();
     if dry_run {
         eprintln!(
-            "beadle push: dry-run — {} board-control request(s) would be recorded ({})",
+            "beadle push: dry-run: {} board-control request(s) would be recorded ({})",
             recs.len(),
             verbs.join(", ")
         );
@@ -181,7 +181,7 @@ fn find_dashboard_issue(repo: &str) -> Result<GhIssueRef> {
         0 => Err(anyhow!("no dashboard issue found with beadle-state:v1 sentinel in {repo}")),
         1 => Ok(hits.into_iter().next().unwrap()),
         n => Err(anyhow!(
-            "{n} dashboard candidates in {repo} — STOP for consolidation before push"
+            "{n} dashboard candidates in {repo}; STOP for consolidation before push"
         )),
     }
 }
@@ -294,11 +294,14 @@ mod tests {
     #[test]
     fn record_board_controls_appends_notes() {
         let td = tempfile::TempDir::new().unwrap();
-        let body = "\
-- [x] `full-refresh` — foo <!-- verb=full-refresh;id=board -->
+        // An old checked box carries the dash the renderer no longer emits.
+        let body = crate::testsupport::dashed(
+            "\
+- [x] `full-refresh` {D} foo <!-- verb=full-refresh;id=board -->
 - [x] `revalidate` <!-- verb=revalidate;id=board -->
-";
-        record_board_controls(td.path(), "vsdd-factory", body, false).unwrap();
+",
+        );
+        record_board_controls(td.path(), "vsdd-factory", &body, false).unwrap();
         let store = Store::open(td.path().join("store"), "vsdd-factory").unwrap();
         let recs = store.read_all().unwrap();
         let notes: Vec<_> = recs
@@ -321,7 +324,7 @@ mod tests {
 - [ ] `revalidate` <!-- verb=revalidate;id=board -->
 ";
         record_board_controls(td.path(), "vsdd-factory", body, false).unwrap();
-        // No store dir should have been created — extract_checked_verbs
+        // No store dir should have been created: extract_checked_verbs
         // returned empty, so `record_board_controls` returned before touching
         // the filesystem.
         assert!(!td.path().join("store").exists());

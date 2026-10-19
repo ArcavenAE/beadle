@@ -208,7 +208,7 @@ for a, b, ctx in vc:
     if (a, b) in kb:
         kb.remove((a, b))          # inherited — accounted for below
     else:
-        fails.append(f"{a}: NEW render-integrity violation — {b} :: {ctx}")
+        fails.append(f"{a}: NEW render-integrity violation: {b} :: {ctx}")
 if vb:
     warns.append(f"{len(vb)} pre-existing render-integrity violation(s) inherited from run-18 "
                  f"(not introduced here): " + "; ".join(sorted({f'{a} {b}' for a, b, _ in vb})))
@@ -235,7 +235,7 @@ if sb and sc:
 print()
 for w in warns: print("WARN", w)
 if fails:
-    print(f"GATE FAILED — {len(fails)} check(s):")
+    print(f"GATE FAILED: {len(fails)} check(s):")
     for f in fails: print("  ✗", f)
     sys.exit(1)
-print("GATE PASSED — all checks green")
+print("GATE PASSED: all checks green")

@@ -1,7 +1,7 @@
 //! Minimal `targets/<name>.intent.yaml` reader.
 //!
-//! We need a handful of top-level scalars, two YAML sequences, and — for
-//! instrument v2 (SKILL §6b) — the `maintainer_capacity:` block with its
+//! We need a handful of top-level scalars, two YAML sequences, and, for
+//! instrument v2 (SKILL §6b), the `maintainer_capacity:` block with its
 //! nested `observed:` sub-block. Rather than pull a full YAML parser, we grep
 //! for `key: value`, for sequence-under-key blocks, and walk indent-delimited
 //! sub-blocks. When the manifest structure grows past this shape, swap in
@@ -17,7 +17,7 @@ pub struct Intent {
     pub version: Option<String>,
     pub maintainers: Vec<String>,
     pub measured_contributors: Vec<String>,
-    /// `maintainer_capacity:` — present from manifest schema v0.4. Its
+    /// `maintainer_capacity:`: present from manifest schema v0.4. Its
     /// presence is what switches a direction verdict from instrument v1 to
     /// v2; absent, the crate computes v1 and says so out loud (SKILL §6b).
     pub maintainer_capacity: Option<MaintainerCapacity>,
@@ -28,18 +28,18 @@ pub struct Intent {
 pub struct MaintainerCapacity {
     pub class: String,
     pub team_size: Option<u32>,
-    /// The unit an attention window is measured in — `action-day` today.
+    /// The unit an attention window is measured in: `action-day` today.
     pub attention_window: String,
     /// Window dates the run observed, including maintainer actions the store
     /// never sees (merges and commits on their own PRs). Refreshed each run.
     pub observed_windows: Vec<String>,
-    /// `observed.pr_acceptance` — the store holds no PR records, so the
+    /// `observed.pr_acceptance`: the store holds no PR records, so the
     /// acceptance band has no store-side input.
     pub pr_acceptance: Option<PrAcceptance>,
-    /// `observed.measured_prs` — measured-side PRs with their readiness
+    /// `observed.measured_prs`: measured-side PRs with their readiness
     /// dates. Feeds the merge-latency band and §6b rule 4(b).
     pub measured_prs: Vec<MeasuredPr>,
-    /// `observed.acted_with_diff` — §6b rule 3's cost covariate: the share of
+    /// `observed.acted_with_diff`: §6b rule 3's cost covariate: the share of
     /// acted-on items that arrived with a mergeable diff.
     pub acted_with_diff: Option<ActedWithDiff>,
 }
@@ -57,7 +57,7 @@ pub struct MeasuredPr {
     pub ready: String,
     /// `YYYY-MM-DD` it merged, when it has.
     pub merged: Option<String>,
-    /// Issue numbers this PR actually repairs — what §6b rule 4(b) tests
+    /// Issue numbers this PR actually repairs: what §6b rule 4(b) tests
     /// against the silent lane.
     pub fixes: Vec<u32>,
 }
@@ -70,7 +70,7 @@ pub struct ActedWithDiff {
 
 impl Intent {
     /// Classify an author login: "maintainer", "measured", or "other".
-    /// This is the axis the delta-sweep needs — everything else is analysis.
+    /// This is the axis the delta-sweep needs: everything else is analysis.
     pub fn actor_role(&self, login: &str) -> &'static str {
         if self.maintainers.iter().any(|m| m == login) {
             "maintainer"
@@ -186,7 +186,7 @@ fn scalar(text: &str, key: &str) -> Option<String> {
     None
 }
 
-/// Return the indented body under a bare `key:` header line — every following
+/// Return the indented body under a bare `key:` header line; every following
 /// line indented deeper than the header, up to the first that is not. Blank
 /// lines pass through; relative indentation is preserved so the result can be
 /// fed back into `block`, `scalar` and `list`.
@@ -504,7 +504,7 @@ goals:
     #[test]
     fn success_bands_nested_scalar_does_not_leak_into_observed() {
         // `success_bands.pr_acceptance.green` must not be read as the
-        // observed pr_acceptance — the observed block is scoped separately.
+        // observed pr_acceptance: the observed block is scoped separately.
         let cap = parse_capacity(CAPACITY_YAML).expect("capacity block present");
         assert_eq!(cap.pr_acceptance.map(|p| p.decided), Some(31));
     }

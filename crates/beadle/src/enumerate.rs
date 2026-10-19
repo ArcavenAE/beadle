@@ -1,4 +1,4 @@
-//! `beadle enum <target>` — watermark-bounded issue enumeration.
+//! `beadle enum <target>`: watermark-bounded issue enumeration.
 //!
 //! Fetches open issues from the target repo via `gh`, filters to numbers
 //! strictly greater than the current watermark (or --full = ignore watermark),
@@ -54,7 +54,7 @@ struct GhIssue {
 
 /// Upper bound on a single `gh issue list` fetch.
 ///
-/// Not a tuning knob — a tripwire. `gh` truncates silently at `--limit`, so a
+/// Not a tuning knob: a tripwire. `gh` truncates silently at `--limit`, so a
 /// fetch returning exactly this many is indistinguishable from a truncated one
 /// and [`fetch_issues`] refuses it rather than reporting success on partial
 /// data (ArcavenAE/beadle#82).
@@ -64,7 +64,7 @@ const ISSUE_FETCH_LIMIT: usize = 1000;
 ///
 /// `>=`, not `>`: a result of exactly `limit` is indistinguishable from a
 /// truncated one, so it counts as truncated. Treating it as complete is the
-/// bug — `gh` gives no signal either way.
+/// bug: `gh` gives no signal either way.
 fn fetch_was_truncated(count: usize, limit: usize) -> bool {
     count >= limit
 }
@@ -90,7 +90,7 @@ fn needs_reconciliation(believed_open: &HashSet<u32>, closed_numbers: &[u32]) ->
 ///
 /// The old code asked for 500 against a repo with 519 open issues and reported
 /// `fetched 500 open issues` as success. Newest-first ordering made it harmless
-/// incrementally — the dropped 19 were the oldest and sat below the watermark —
+/// incrementally: the dropped 19 were the oldest and sat below the watermark;
 /// but `--full` exists to re-observe everything, and silently returning 500 of
 /// 519 from the recovery path is the silent-success class finding-019 is about.
 fn fetch_issues(repo: &str, state: &str, limit: usize) -> Result<Vec<GhIssue>> {
@@ -163,7 +163,7 @@ pub fn run(root: &Path, target: &str, full: bool) -> Result<()> {
         .format(&Rfc3339)
         .context("format RFC3339 timestamp")?;
 
-    // Pass 1 — DISCOVERY. New issues above the watermark.
+    // Pass 1: DISCOVERY. New issues above the watermark.
     let issues = fetch_issues(&intent.repo, "open", ISSUE_FETCH_LIMIT)?;
     eprintln!("beadle enum: fetched {} open issues", issues.len());
 
@@ -178,12 +178,12 @@ pub fn run(root: &Path, target: &str, full: bool) -> Result<()> {
     }
     new_numbers.sort_unstable();
 
-    // Pass 2 — RECONCILIATION. Issues the store still believes are open that
+    // Pass 2: RECONCILIATION. Issues the store still believes are open that
     // GitHub has since closed.
     //
     // Discovery alone can never learn this. It queries `--state open` and skips
     // anything at or below the watermark, so an issue's state was frozen at its
-    // first observation forever — #418, #465 and #472 read `open` in the store
+    // first observation forever: #418, #465 and #472 read `open` in the store
     // for nine runs after GitHub closed them (ArcavenAE/beadle#81). `--full` did
     // not help: it zeroes the watermark but the query stays `--state open`.
     //
@@ -205,7 +205,7 @@ pub fn run(root: &Path, target: &str, full: bool) -> Result<()> {
 
     if reconciled.is_empty() {
         eprintln!(
-            "beadle enum: reconciled 0 — no tracked issue closed since it was last seen \
+            "beadle enum: reconciled 0; no tracked issue closed since it was last seen \
              ({} closed on GitHub, none of them believed open here)",
             closed.len()
         );
@@ -222,7 +222,7 @@ pub fn run(root: &Path, target: &str, full: bool) -> Result<()> {
     } else {
         store.append(&recs)?;
         eprintln!(
-            "beadle enum: appended {} issue observation(s) — {} new, {} reconciled",
+            "beadle enum: appended {} issue observation(s); {} new, {} reconciled",
             recs.len(),
             new_numbers.len(),
             reconciled.len()

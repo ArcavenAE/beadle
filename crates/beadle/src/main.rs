@@ -1,4 +1,4 @@
-//! beadle — CLI entrypoint.
+//! beadle: CLI entrypoint.
 //!
 //! Phase 2 shape:
 //!   beadle enum   <target>   → fetch open issues via `gh`, append new observations
@@ -91,7 +91,7 @@ enum Cmd {
         renames: Option<PathBuf>,
     },
     /// Append a note record to the store (perf ledger entries, audit trails,
-    /// operator remarks). Diagnostic only — nothing gates on notes.
+    /// operator remarks). Diagnostic only; nothing gates on notes.
     Note {
         target: String,
         /// Note topic (e.g. `perf`, `migration`).

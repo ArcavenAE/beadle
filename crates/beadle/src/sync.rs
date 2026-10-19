@@ -1,4 +1,4 @@
-//! `beadle sync <target>` — comment delta-sweep across open issues.
+//! `beadle sync <target>`: comment delta-sweep across open issues.
 //!
 //! Purpose: capture maintainer-engagement events (the compass) without
 //! re-reading whole issue bodies. We fetch open issues once with

@@ -2,12 +2,12 @@
 //!
 //! Renderer emits a fixed vocabulary of unchecked checkboxes in the derived
 //! zone. Push scans the LIVE body for checked boxes, records one
-//! `control-request` note per verb, then writes the fresh render — which is
+//! `control-request` note per verb, then writes the fresh render, which is
 //! always unchecked. That reset IS the de-bounce: the checkbox lives in the
 //! derived zone, so every regen clears it.
 //!
 //! Dispatch of the requested routines (`reprioritize`, `full-refresh`,
-//! `revalidate`, `rescore-intent`) is deferred — the notes are the request
+//! `revalidate`, `rescore-intent`) is deferred; the notes are the request
 //! queue Phase-1 gh-aw will drain. See
 //! `_kos/nodes/frontier/question-maintenance-request-controls.yaml`.
 
@@ -36,17 +36,17 @@ pub const BOARD_VERBS: &[(&str, &str)] = &[
 ];
 
 /// Render the derived-zone board-controls block. Every regeneration emits
-/// unchecked boxes — that's the reset that makes the control eventually-
+/// unchecked boxes: that's the reset that makes the control eventually-
 /// consistent (finding-018 / `question-maintenance-request-controls`).
 pub fn render_board_controls_block() -> String {
     let mut out = String::new();
     out.push_str("## Board controls\n\n");
     out.push_str(
-        "_Tier-2 maintenance requests. Check a box, wait for the next `beadle push` — beadle records the request as a `control-request` note and resets the box. Dispatch of the routines lands with the Phase-1 gh-aw cron (deferred, per `question-maintenance-request-controls`)._\n\n",
+        "_Tier-2 maintenance requests. Check a box, wait for the next `beadle push`; beadle records the request as a `control-request` note and resets the box. Dispatch of the routines lands with the Phase-1 gh-aw cron (deferred, per `question-maintenance-request-controls`)._\n\n",
     );
     for (verb, description) in BOARD_VERBS {
         out.push_str(&format!(
-            "- [ ] `{}` — {} <!-- verb={};id=board -->\n",
+            "- [ ] `{}`: {} <!-- verb={};id=board -->\n",
             verb, description, verb
         ));
     }
@@ -55,7 +55,7 @@ pub fn render_board_controls_block() -> String {
 }
 
 /// Scan a live dashboard body for checked board-verb boxes. Returns the
-/// verbs in canonical `BOARD_VERBS` order, deduped — a maintainer who
+/// verbs in canonical `BOARD_VERBS` order, deduped; a maintainer who
 /// unfolds two identical-looking rows and checks both still only queues
 /// the routine once (idempotency guard, F5 debounce concern 4).
 ///
@@ -129,15 +129,19 @@ mod tests {
 
     #[test]
     fn extract_one_checked_verb() {
-        let body = "- [x] `full-refresh` — foo <!-- verb=full-refresh;id=board -->\n";
-        let verbs = extract_checked_verbs(body);
+        let body = crate::testsupport::dashed(
+            "- [x] `full-refresh` {D} foo <!-- verb=full-refresh;id=board -->\n",
+        );
+        let verbs = extract_checked_verbs(&body);
         assert_eq!(verbs, vec!["full-refresh".to_string()]);
     }
 
     #[test]
     fn extract_capital_x_also_matches() {
-        let body = "- [X] `revalidate` — foo <!-- verb=revalidate;id=board -->\n";
-        let verbs = extract_checked_verbs(body);
+        let body = crate::testsupport::dashed(
+            "- [X] `revalidate` {D} foo <!-- verb=revalidate;id=board -->\n",
+        );
+        let verbs = extract_checked_verbs(&body);
         assert_eq!(verbs, vec!["revalidate".to_string()]);
     }
 
@@ -170,7 +174,7 @@ mod tests {
 
     #[test]
     fn extract_ignores_tier1_per_issue_verbs() {
-        // A per-issue verb (id=#42) is Tier 1, not this scanner's business —
+        // A per-issue verb (id=#42) is Tier 1, not this scanner's business;
         // the marker names one of the four canonical Tier-2 verbs so it
         // WOULD match verb=... today. That's OK: Tier 1 uses a distinct
         // verb vocabulary (fast-track / investigate / accept-deferral).

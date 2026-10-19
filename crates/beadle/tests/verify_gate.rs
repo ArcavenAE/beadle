@@ -2,7 +2,7 @@
 //!
 //! The acceptance contract for aae-orc-agwo8: the historical pair PASSES, the
 //! inherited `<details>` table WARNS rather than fails, and three named
-//! negative controls each FAIL — deleting a cluster member, resetting a `*_new`
+//! negative controls each FAIL: deleting a cluster member, resetting a `*_new`
 //! axis without roll-forward, and introducing a blockquote-adjacent table.
 //!
 //! The controls are produced by mutating the real run-19 body here rather than
@@ -225,7 +225,7 @@ fn control_a2_a_loss_masked_by_another_axis_still_fails() {
     );
     assert!(
         !r.says("dropped from state"),
-        "the union check is blind here by construction — if it fired, the \
+        "the union check is blind here by construction; if it fired, the \
          control no longer proves per-axis is doing the work:\n{}",
         r.out
     );
@@ -275,7 +275,7 @@ fn control_b2_quick_wins_reset_without_roll_forward_fails() {
 
 #[test]
 fn control_c_introducing_a_blockquote_adjacent_table_fails() {
-    // GFM lazy continuation swallows a table that hugs a blockquote — the
+    // GFM lazy continuation swallows a table that hugs a blockquote; the
     // run-14→16 attn-lane regression.
     let bad = read(CANDIDATE).replace(
         "## Controls",
@@ -288,7 +288,7 @@ fn control_c_introducing_a_blockquote_adjacent_table_fails() {
         r.out
     );
     assert!(
-        r.says("5a: NEW render-integrity violation — table directly follows blockquote"),
+        r.says("5a: NEW render-integrity violation: table directly follows blockquote"),
         "{}",
         r.out
     );

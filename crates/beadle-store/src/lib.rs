@@ -1,4 +1,4 @@
-//! beadle-store — append-only JSONL store for a beadle target.
+//! beadle-store: append-only JSONL store for a beadle target.
 //!
 //! Every record has `kind` + `ts` + `target`. See `store/README.md` for the
 //! schema. This crate only cares about reading and writing records; the
@@ -26,7 +26,7 @@ pub enum Record {
     CommentEvent(CommentEventRecord),
     Cluster(ClusterRecord),
     Note(NoteRecord),
-    /// Any kind we don't recognize — preserved verbatim on rewrite.
+    /// Any kind we don't recognize: preserved verbatim on rewrite.
     #[serde(untagged)]
     Other(Value),
 }
@@ -90,7 +90,7 @@ pub struct IssueRecord {
 /// reading order within the lane (`reply-needed`, `standing`, …); `why` is
 /// the one-paragraph case for the human's attention.
 ///
-/// Historical fixtures carry two older encodings of the same facet — a bare
+/// Historical fixtures carry two older encodings of the same facet; a bare
 /// string subtype with sibling `attn_reading_order` / `attn_why` keys
 /// (run-12), and `{type, reason, reading_order}` (run-14). Neither is
 /// accepted on ingest; `scripts/backfill-classification-fields.py` normalizes
@@ -149,7 +149,7 @@ pub struct ClassificationRecord {
     pub cited_evidence: Option<String>,
     #[serde(default)]
     pub quick_win_disqualification: Option<String>,
-    /// Short human title for the issue — finding-005 row legibility ("title
+    /// Short human title for the issue: finding-005 row legibility ("title
     /// leads, verdict trails"). Absent on rows classified before the field
     /// existed; renderers fall back to `#<number>`.
     #[serde(default)]
@@ -173,7 +173,7 @@ impl ClassificationRecord {
         self.attn.is_some()
     }
 
-    /// True when the record is in the silent-data-loss safety class — either
+    /// True when the record is in the silent-data-loss safety class; either
     /// via the dedicated `silent_data_loss` field or via the legacy
     /// pre-finding-009 encoding inside `operational_impact` (stores that have
     /// not yet run `beadle classify migrate-impact`).
@@ -245,7 +245,7 @@ impl Record {
 /// appends observations tagged with the new run immediately; the `Run` record
 /// is only written later, at push. Anything keying on `Record::Run` therefore
 /// computes against the PREVIOUS run for the entire pass it is supposed to
-/// inform — direction reported `run: 9` and "no classification records for
+/// inform: direction reported `run: 9` and "no classification records for
 /// run 9" while 66 fresh run-10 records sat in the same store.
 ///
 /// Max, not last: file order is not run order, and a resumed pass can append
@@ -258,7 +258,7 @@ pub fn working_run(records: &[Record]) -> u32 {
 ///
 /// "Most recent" is by `observed_in_run`, not file order: a resumed pass can
 /// append an older run's observation after a newer one. Lives here rather than
-/// in `render` because enumeration needs the same view — it has to know what
+/// in `render` because enumeration needs the same view; it has to know what
 /// the store currently believes is open in order to notice that GitHub has
 /// closed something (ArcavenAE/beadle#81).
 pub fn latest_issue_observations(records: &[Record]) -> Vec<IssueRecord> {
@@ -327,7 +327,7 @@ impl Store {
     }
 
     /// Append records. Writes are line-buffered and flushed before return.
-    /// Not atomic across a crash — but each line is atomic (JSONL invariant).
+    /// Not atomic across a crash, but each line is atomic (JSONL invariant).
     pub fn append(&self, recs: &[Record]) -> Result<()> {
         let path = self.state_path();
         let file = OpenOptions::new()
@@ -346,7 +346,7 @@ impl Store {
 
     /// Atomically replace the entire store contents: write a temp file, back
     /// up any existing state to `state.jsonl.bak-<label>`, rename the temp
-    /// into place. Migration-only path — `append` remains the normal write.
+    /// into place. Migration-only path; `append` remains the normal write.
     /// Returns the backup path when a prior state file existed.
     pub fn rewrite(&self, recs: &[Record], backup_label: &str) -> Result<Option<PathBuf>> {
         let path = self.state_path();
@@ -542,7 +542,7 @@ mod tests {
         }
     }
 
-    /// Rows written before the fields existed must still load — ~300 of them
+    /// Rows written before the fields existed must still load; ~300 of them
     /// are in the live vsdd-factory store.
     #[test]
     fn classification_without_late_added_fields_still_loads() {
@@ -561,7 +561,7 @@ mod tests {
     /// kept as an executable note (beadle#66 / aae-orc-l5b5i).
     ///
     /// `Record` is internally tagged with an untagged `Other` catch-all. With
-    /// the attribute on `ClassificationRecord`, a drifted row does not error —
+    /// the attribute on `ClassificationRecord`, a drifted row does not error;
     /// the variant declines it and the row lands in `Record::Other`, where it
     /// round-trips happily while vanishing from every consumer that matches on
     /// `Record::Classification`. That converts a loud failure into exactly the
@@ -574,7 +574,7 @@ mod tests {
         match serde_json::from_str::<Record>(line).unwrap() {
             // Today: parsed as a Classification, the extra key dropped.
             Record::Classification(c) => assert_eq!(c.number, 1),
-            // With deny_unknown_fields it would land here instead — accepted,
+            // With deny_unknown_fields it would land here instead; accepted,
             // invisible, and unclassified. Worse, not better.
             Record::Other(v) => panic!("fell through to Other: {v}"),
             other => panic!("unexpected {other:?}"),

@@ -3,7 +3,7 @@
 //! The classification vocabulary lives once, in
 //! `skills/beadle-triage/vocabulary.json`; the binary embeds it and SKILL §3
 //! prose defers to it. These tests are the tripwire that keeps the three
-//! surfaces — manifest, SKILL prose, committed rich fixtures — from drifting
+//! surfaces (manifest, SKILL prose, committed rich fixtures) from drifting
 //! apart silently, which is exactly how the pre-alignment enum went wrong
 //! (the validator's vocabulary diverged from the spec's, and validation
 //! green-lit the divergence).
@@ -70,7 +70,7 @@ fn operational_impact_is_exactly_the_finding_009_axis() {
 fn skill_names_the_manifest_as_canonical() {
     assert!(
         skill_text().contains("vocabulary.json"),
-        "SKILL.md must point executors at vocabulary.json — that pointer is \
+        "SKILL.md must point executors at vocabulary.json; that pointer is \
          what makes the manifest canonical for the skill side"
     );
 }
@@ -110,7 +110,7 @@ fn skill_impact_labels_match_manifest() {
 }
 
 /// The committed rich fixtures are the empirical record of what the skill's
-/// graders actually emit on the aligned axes — every value they use must be
+/// graders actually emit on the aligned axes: every value they use must be
 /// ingestable. (report_type and operational_impact only: defect_nature and
 /// reproducibility shorthand in fixtures is normalized by the skill before
 /// ingest and is out of scope here.)

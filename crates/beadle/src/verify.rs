@@ -1,4 +1,4 @@
-//! `beadle verify` — the `/dashboard-refresh` §3 regression gate, as a verb.
+//! `beadle verify`: the `/dashboard-refresh` §3 regression gate, as a verb.
 //!
 //! Ported from `tools/dashboard-gate.py` (run-19), which is the reference
 //! implementation. Pure mechanism, no judgment: it compares a candidate
@@ -6,7 +6,7 @@
 //! the post when the candidate lost something the snapshot carried.
 //!
 //! Four semantics are load-bearing and were each learned the hard way in
-//! run-19 — do not "simplify" them back out:
+//! run-19: do not "simplify" them back out:
 //!
 //! 1. **Per-axis preservation, not union.** The command doc's original check 3
 //!    compares the UNION of tracked issue numbers across the whole sentinel, so
@@ -14,7 +14,7 @@
 //!    appear under another axis. Run-19 dropped 11 members from
 //!    `operational_impact.degraded_new` and the union check passed it.
 //! 2. **Per-run axes must roll forward.** An axis named `*_new` is *expected*
-//!    to reset each run, so it is exempt from (1) — but its previous members
+//!    to reset each run, so it is exempt from (1); but its previous members
 //!    must reappear in a `*_prior` counterpart or the classification was
 //!    silently discarded.
 //! 3. **Render-integrity checks are REGRESSION-RELATIVE.** A violation already
@@ -27,7 +27,7 @@
 //!
 //! One parsing trap is worth naming: the sentinel is a single ~9 000-char JSON
 //! line. Dict INT VALUES in it are counters (`a4_windows` window counts,
-//! `counts` totals) and must never be read as issue numbers — only list
+//! `counts` totals) and must never be read as issue numbers; only list
 //! elements and digit-string KEYS are.
 
 use std::{
@@ -143,7 +143,7 @@ fn load_declared(
         }
         if r.why.trim().is_empty() {
             bail!(
-                "{}: declared rename {:?} has no `why` — an allowlisted rename \
+                "{}: declared rename {:?} has no `why`; an allowlisted rename \
                  must carry a justification",
                 path.display(),
                 clip(&r.from, 60)
@@ -248,7 +248,7 @@ fn ints_in(list: &[Value]) -> BTreeSet<i64> {
 ///
 /// Only list ELEMENTS and digit-string KEYS count. Dict int VALUES are counters
 /// (`a4_windows` window counts, `counts` totals) and must never be read as
-/// issue numbers — that was a real bug in an earlier draft of the gate.
+/// issue numbers: that was a real bug in an earlier draft of the gate.
 fn nums(state: &Map<String, Value>) -> BTreeSet<i64> {
     let mut out = BTreeSet::new();
     for value in state.values() {
@@ -370,7 +370,7 @@ fn render_violations(text: &str) -> Vec<Violation> {
     let mut v = Vec::new();
     let lines: Vec<&str> = text.lines().collect();
 
-    // 5a — GFM lazy continuation swallows a table that hugs a blockquote.
+    // 5a: GFM lazy continuation swallows a table that hugs a blockquote.
     for i in 1..lines.len() {
         if lines[i].trim_start().starts_with('|') && lines[i - 1].trim_start().starts_with('>') {
             v.push(Violation {
@@ -381,7 +381,7 @@ fn render_violations(text: &str) -> Vec<Violation> {
         }
     }
 
-    // 5b — <details> needs blank lines around its markdown body.
+    // 5b: <details> needs blank lines around its markdown body.
     for (i, line) in lines.iter().enumerate() {
         if line.contains("<details>") && line.contains("<summary>") {
             if let Some(next) = lines.get(i + 1) {
@@ -403,7 +403,7 @@ fn render_violations(text: &str) -> Vec<Violation> {
         }
     }
 
-    // 5d — pipe tables do not render inside <details>.
+    // 5d: pipe tables do not render inside <details>.
     for block in details_blocks(text) {
         let body = strip_fences(block);
         for row in body.lines().filter(|l| is_table_row(l)) {
@@ -461,9 +461,9 @@ impl Report {
             s.push_str(&format!("WARN {w}\n"));
         }
         if self.fails.is_empty() {
-            s.push_str("GATE PASSED — all checks green\n");
+            s.push_str("GATE PASSED: all checks green\n");
         } else {
-            s.push_str(&format!("GATE FAILED — {} check(s):\n", self.fails.len()));
+            s.push_str(&format!("GATE FAILED: {} check(s):\n", self.fails.len()));
             for f in &self.fails {
                 s.push_str(&format!("  ✗ {f}\n"));
             }
@@ -715,7 +715,7 @@ pub fn evaluate_with_titles(
                 budget.remove(i);
             }
             None => rep.fails.push(format!(
-                "{}: NEW render-integrity violation — {} :: {}",
+                "{}: NEW render-integrity violation: {} :: {}",
                 v.code, v.what, v.ctx
             )),
         }
@@ -809,7 +809,7 @@ fn section(text: &str, heading_prefix: &str) -> Option<String> {
     Some(out.join("\n"))
 }
 
-/// `#<n>` present with a word boundary after it — `#31` must not match `#312`.
+/// `#<n>` present with a word boundary after it: `#31` must not match `#312`.
 fn mentions_issue(text: &str, n: i64) -> bool {
     let needle = format!("#{n}");
     let mut pos = 0usize;
@@ -867,7 +867,7 @@ pub fn run(
     print!("{}", report.render());
     if !report.passed() {
         bail!(
-            "gate failed — {} check(s); do NOT post this body",
+            "gate failed: {} check(s); do NOT post this body",
             report.fails.len()
         );
     }
@@ -1246,7 +1246,7 @@ mod tests {
             format!("{debt}\n<details>\n<summary>more</summary>\n\n| c | d |\n\n</details>\n");
         let r2 = gate(&before, &doc(base_state(19, 836), &[18, 19], &worse));
         assert!(r2.fails.iter().any(
-            |f| f.contains("NEW render-integrity violation — pipe-table row inside <details>")
+            |f| f.contains("NEW render-integrity violation: pipe-table row inside <details>")
         ));
     }
 
@@ -1341,7 +1341,10 @@ mod tests {
 
     #[test]
     fn run_index_headings_are_extracted_by_number() {
-        let t = "### Run-18 index (carried forward — folded)\n### Run-19 index (NEW)\n### Run-20 notes\n";
+        let t = crate::testsupport::dashed(
+            "### Run-18 index (carried forward {D} folded)\n### Run-19 index (NEW)\n### Run-20 notes\n",
+        );
+        let t = t.as_str();
         assert_eq!(run_indexes(t), vec!["18".to_string(), "19".to_string()]);
     }
 
