@@ -85,7 +85,83 @@ impl Intent {
 pub fn load(root: &Path, target: &str) -> Result<Intent> {
     let path = root.join(format!("targets/{target}.intent.yaml"));
     let text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    // This reader is not a YAML parser. A line it would read one way and a real
+    // parser another is refused here, so a manifest edit cannot change meaning
+    // silently (the loader fails closed).
+    if let Some((n, what)) = colon_space_hazards(&text).into_iter().next() {
+        return Err(anyhow!("{}:{n}: {what}", path.display()));
+    }
     parse(&text).ok_or_else(|| anyhow!("no `repo:` scalar in {}", path.display()))
+}
+
+/// Lines this reader accepts but a real YAML parser would read differently:
+/// an unquoted scalar holding a colon-space (a map key, to a parser), and a
+/// quoted scalar left open at the end of the text. Returns (line, reason).
+///
+/// A `key: value` line is checked on its value; a list item is checked whole,
+/// unless it is a one-key map item (`- key: value`) with a bare key, in which
+/// case the value after the key is checked. Comments, quoted scalars (also
+/// across lines) and block scalars are not scalars of this kind.
+pub(crate) fn colon_space_hazards(text: &str) -> Vec<(usize, String)> {
+    let mut out = Vec::new();
+    let mut open_quote: Option<(usize, char)> = None;
+    let mut block_indent: Option<usize> = None;
+    let bare_key = |k: &str| {
+        let mut c = k.chars();
+        matches!(c.next(), Some(f) if f.is_ascii_alphabetic() || f == '_')
+            && k.chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    };
+    for (i, line) in text.lines().enumerate() {
+        let n = i + 1;
+        let indent = line.len() - line.trim_start().len();
+        if let Some((_, q)) = open_quote {
+            if line.contains(q) {
+                open_quote = None;
+            }
+            continue;
+        }
+        if let Some(b) = block_indent {
+            if line.trim().is_empty() || indent > b {
+                continue;
+            }
+            block_indent = None;
+        }
+        let t = line.trim_start();
+        if t.is_empty() || t.starts_with('#') {
+            continue;
+        }
+        // The scalar to judge: the value of `key: value`, or a whole list item.
+        let item = t.strip_prefix("- ");
+        let body = item.unwrap_or(t);
+        let scalar = match body.split_once(": ") {
+            Some((k, v)) if bare_key(k.trim()) => v,
+            Some(_) if item.is_some() => body,
+            Some((_, v)) => v,
+            None => body.trim_end_matches(':'),
+        };
+        let scalar = scalar.split(" #").next().unwrap_or(scalar).trim();
+        if scalar.starts_with('|') || scalar.starts_with('>') {
+            block_indent = Some(indent);
+            continue;
+        }
+        if let Some(q) = scalar.chars().next().filter(|c| matches!(c, '"' | '\'')) {
+            if !scalar[1..].contains(q) {
+                open_quote = Some((n, q));
+            }
+            continue;
+        }
+        if scalar.starts_with('[') || scalar.starts_with('{') {
+            continue;
+        }
+        if scalar.contains(": ") {
+            out.push((n, format!("unquoted value holds a colon-space: {scalar}")));
+        }
+    }
+    if let Some((n, _)) = open_quote {
+        out.push((n, "quoted value is never closed".to_string()));
+    }
+    out
 }
 
 /// Parse manifest text. Separated from `load` so the capacity block is
@@ -362,25 +438,73 @@ mod tests {
                 let i = load(&root, target).unwrap_or_else(|err| panic!("{name}: {err}"));
                 assert!(!i.repo.is_empty(), "{name}: empty repo");
             }
-            for (n, line) in text.lines().enumerate() {
-                let t = line.trim_start();
-                if t.starts_with('#') || t.starts_with('-') {
-                    continue;
-                }
-                let Some((_, val)) = t.split_once(": ") else {
-                    continue;
-                };
-                let val = val.split(" #").next().unwrap_or(val).trim();
-                let quoted = val.starts_with('"') || val.starts_with('\'');
-                let flow = val.starts_with('[') || val.starts_with('{');
-                assert!(
-                    quoted || flow || !val.contains(": "),
-                    "{name}:{}: unquoted value holds a colon-space: {val}",
-                    n + 1
-                );
-            }
+            assert_eq!(
+                colon_space_hazards(&text),
+                vec![],
+                "{name}: unquoted value holds a colon-space"
+            );
         }
         assert!(seen >= 3, "expected the intent files, saw {seen}");
+    }
+
+    #[test]
+    fn colon_space_in_a_list_item_is_a_hazard() {
+        // A parser reads `- build output (re-run: cheapest)` as a one-key map.
+        let yaml = "tier:\n  - generated code / build output (re-run: cheapest)\n";
+        let h = colon_space_hazards(yaml);
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert_eq!(h[0].0, 2);
+        // Controls: a semicolon is fine, and so are one-key map items, quoted
+        // items and comments.
+        for ok in [
+            "tier:\n  - generated code (re-run; cheapest)\n",
+            "tier:\n  - path: README.md\n  - source: git-history\n",
+            "tier:\n  - \"quoted (re-run: cheapest)\"\n",
+            "tier:\n  - fine # a comment: with a colon\n",
+            "# a comment: with a colon\nkey: value\n",
+        ] {
+            assert_eq!(colon_space_hazards(ok), vec![], "{ok:?}");
+        }
+    }
+
+    #[test]
+    fn colon_space_in_a_value_is_a_hazard() {
+        let h = colon_space_hazards("repo: acme/widget\nnote: canonical principle: no defer\n");
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert_eq!(h[0].0, 2);
+        assert_eq!(
+            colon_space_hazards("note: canonical principle; no defer\n"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_quoted_value_may_span_lines_but_must_close() {
+        let ok = "x:\n  - \"first line (e.g. a: b)\n    second line: still quoted\"\n";
+        assert_eq!(colon_space_hazards(ok), vec![]);
+        let open = "x:\n  - \"never closed\n";
+        let h = colon_space_hazards(open);
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert!(h[0].1.contains("never closed"));
+    }
+
+    #[test]
+    fn load_fails_closed_on_a_line_it_would_misread() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("targets")).unwrap();
+        let p = dir.path().join("targets/t.intent.yaml");
+        std::fs::write(&p, "repo: acme/widget\ntier:\n  - a thing (see: this)\n").unwrap();
+        let err = match load(dir.path(), "t") {
+            Err(e) => e.to_string(),
+            Ok(_) => panic!("a misread line must not load"),
+        };
+        assert!(err.contains(":3:") && err.contains("colon-space"), "{err}");
+        // Control: the same manifest with a semicolon loads.
+        std::fs::write(&p, "repo: acme/widget\ntier:\n  - a thing (see; this)\n").unwrap();
+        assert_eq!(
+            load(dir.path(), "t").ok().map(|i| i.repo),
+            Some("acme/widget".to_string())
+        );
     }
 
     #[test]

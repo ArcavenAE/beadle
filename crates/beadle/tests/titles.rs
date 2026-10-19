@@ -1,7 +1,7 @@
 //! `beadle titles <target>`: the stored issue titles, one per line, for the
 //! Python gate's `--titles FILE`. It only reads the store.
 
-use std::{fs, path::Path, process::Command};
+use std::{fs, os::unix::fs::MetadataExt, path::Path, process::Command};
 
 use serde_json::{json, Value};
 use tempfile::TempDir;
@@ -32,7 +32,8 @@ fn workspace(rows: &[Value]) -> TempDir {
     td
 }
 
-/// name, size and mtime of every file under `dir`, sorted.
+/// name, inode, size, mtime and ctime of every file and directory under `dir`,
+/// sorted. A rewrite changes the mtime or the inode, a rename the inode.
 fn snapshot(dir: &Path) -> Vec<String> {
     let mut out = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
@@ -65,7 +66,36 @@ fn beadle_titles_is_read_only() {
         issue(3, 2, ""),
     ]);
     let before = snapshot(td.path());
+
+    // A gh stub first on PATH logs every call; the command must make none.
+    let bin = TempDir::new().unwrap();
+    let log = bin.path().join("gh.log");
+    let stub = bin.path().join("gh");
+    fs::write(
+        &stub,
+        format!("#!/bin/sh\necho \"$@\" >> '{}'\nexit 1\n", log.display()),
+    )
+    .unwrap();
+    fs::set_permissions(&stub, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let path = format!(
+        "{}:{}",
+        bin.path().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
+    // Control: the stub is reachable by name, so an unlogged run means no call.
+    let probe = Command::new("gh")
+        .env("PATH", &path)
+        .arg("control")
+        .output()
+        .expect("run the gh stub");
+    assert!(!probe.status.success() && fs::read_to_string(&log).unwrap().contains("control"));
+    fs::remove_file(&log).unwrap();
+    let before_stub = snapshot(td.path());
+    assert_eq!(before, before_stub, "the control must not touch the store");
+
     let out = Command::new(env!("CARGO_BIN_EXE_beadle"))
+        .env("PATH", &path)
         .args(["--root".as_ref(), td.path().as_os_str()])
         .args(["titles", "t"])
         .output()
@@ -82,5 +112,14 @@ fn beadle_titles_is_read_only() {
         vec!["first title, edited", "second title"],
         "latest observation per issue, trimmed, blanks dropped"
     );
-    assert_eq!(before, snapshot(td.path()), "the store must not change");
+    assert!(
+        !log.exists(),
+        "beadle titles called gh: {}",
+        fs::read_to_string(&log).unwrap_or_default()
+    );
+    assert_eq!(
+        before,
+        snapshot(td.path()),
+        "the store must not change: no file rewritten, replaced or added"
+    );
 }

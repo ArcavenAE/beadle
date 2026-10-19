@@ -142,14 +142,14 @@ intent_sources:
 # What the project is for.
 goals:
   - Production-grade-default engine discipline (F5 asymptotic convergence)
-  - Self-referential factory: engine and product are one repo
+  - Self-referential factory; engine and product are one repo
   - Spec-driven, adversarially-reviewed, traceable artifacts (.factory/)
 non_goals:
   - MVP-driven deferrals, "good enough", "fix later" (explicit anti-pattern)
   - Paper-fixes (rename/doc-comment/assert-only without load-bearing test)
   - Scope expansion into new domains without surfaced architecture decisions
 scope_boundaries:
-  - Code-vs-spec conflicts: the SPEC wins; only a human authorizes spec amendment
+  - Code-vs-spec conflicts; the SPEC wins; only a human authorizes spec amendment
   - .factory/ mutations via Edit/Write only; no bypass (POL-3)
 
 # Systems-of-record ranked by recoverability (finding-004/005). The silent-integrity
