@@ -25,6 +25,8 @@ mod note;
 mod push;
 mod render;
 mod sync;
+#[cfg(test)]
+mod testsupport;
 mod verify;
 mod vocab;
 

@@ -345,6 +345,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn intent_files_parse_after_retirement() {
+        // Every shipped manifest loads, and no unquoted value gained a `: `
+        // (a colon-space would end the scalar). A regression pin: the files
+        // parse on main too, and this guards the dash replacement step.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut seen = 0;
+        for e in std::fs::read_dir(root.join("targets")).unwrap().flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let Some(target) = name.strip_suffix(".intent.yaml") else {
+                continue;
+            };
+            let text = std::fs::read_to_string(e.path()).unwrap();
+            seen += 1;
+            if !target.starts_with('_') {
+                let i = load(&root, target).unwrap_or_else(|err| panic!("{name}: {err}"));
+                assert!(!i.repo.is_empty(), "{name}: empty repo");
+            }
+            for (n, line) in text.lines().enumerate() {
+                let t = line.trim_start();
+                if t.starts_with('#') || t.starts_with('-') {
+                    continue;
+                }
+                let Some((_, val)) = t.split_once(": ") else {
+                    continue;
+                };
+                let val = val.split(" #").next().unwrap_or(val).trim();
+                let quoted = val.starts_with('"') || val.starts_with('\'');
+                let flow = val.starts_with('[') || val.starts_with('{');
+                assert!(
+                    quoted || flow || !val.contains(": "),
+                    "{name}:{}: unquoted value holds a colon-space: {val}",
+                    n + 1
+                );
+            }
+        }
+        assert!(seen >= 3, "expected the intent files, saw {seen}");
+    }
+
+    #[test]
     fn parses_sequence() {
         let yaml = "maintainers:\n  - drbothen\n  - Zious11\nother_key: hello\n";
         assert_eq!(

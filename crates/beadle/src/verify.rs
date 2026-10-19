@@ -482,6 +482,19 @@ pub fn evaluate(
     renames: &[Rename],
     removals: &[Removal],
 ) -> Result<Report> {
+    evaluate_with_titles(before, candidate, renames, removals, &[])
+}
+
+/// `evaluate`, with the target's stored issue titles. A title is quoted as
+/// written, so an em dash inside one whole stored title is exempt from check 9.
+pub fn evaluate_with_titles(
+    before: &str,
+    candidate: &str,
+    renames: &[Rename],
+    removals: &[Removal],
+    titles: &[String],
+) -> Result<Report> {
+    let _ = titles;
     let sb = sentinel(before)
         .ok_or_else(|| anyhow!("before-snapshot sentinel missing or unparseable"))?;
     let sc = sentinel(candidate);
@@ -908,6 +921,188 @@ mod tests {
 
     fn gate(before: &str, cand: &str) -> Report {
         evaluate(before, cand, &[], &[]).expect("gate runs")
+    }
+
+    fn dashed(s: &str) -> String {
+        crate::testsupport::dashed(s)
+    }
+
+    fn gate_titles(before: &str, cand: &str, titles: &[&str]) -> Report {
+        let titles: Vec<String> = titles.iter().map(|t| dashed(t)).collect();
+        evaluate_with_titles(before, cand, &[], &[], &titles).expect("gate runs")
+    }
+
+    fn nine(r: &Report) -> Vec<&String> {
+        r.fails
+            .iter()
+            .filter(|f| f.starts_with("9: em dash in candidate"))
+            .collect()
+    }
+
+    #[test]
+    fn retired_em_dash_heading_warns_instead_of_failing() {
+        let before = doc(
+            base_state(18, 830),
+            &[18],
+            &dashed("## Extras {D} safe to act on\n\n"),
+        );
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            "## Extras: safe to act on\n\n",
+        );
+        let r = gate(&before, &cand);
+        assert!(r.passed(), "unexpected fails: {:?}", r.fails);
+        assert!(
+            r.warns
+                .iter()
+                .any(|w| w.starts_with("2: em dash retired -> ")),
+            "the retirement must be reported: {:?}",
+            r.warns
+        );
+    }
+
+    #[test]
+    fn a_heading_retired_with_a_semicolon_is_still_lost() {
+        // Regression pin: the fold admits colon-space and nothing else, so a
+        // candidate that retires a dash with another mark still fails.
+        let before = doc(
+            base_state(18, 830),
+            &[18],
+            &dashed("## Extras {D} safe to act on\n\n"),
+        );
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            "## Extras; safe to act on\n\n",
+        );
+        let r = gate(&before, &cand);
+        assert!(
+            r.fails
+                .iter()
+                .any(|f| f.starts_with("2: HEADING LOST -> ## Extras")),
+            "{:?}",
+            r.fails
+        );
+    }
+
+    #[test]
+    fn declared_rename_target_matches_after_retirement() {
+        let before = doc(base_state(18, 830), &[18], "### Old name\n\n");
+        let cand = doc(base_state(19, 836), &[18, 19], "### New name: folded\n\n");
+        let declared = [Rename {
+            from: "### Old name".into(),
+            to: dashed("### New name {D} folded"),
+            why: "test rename".into(),
+        }];
+        let r = evaluate(&before, &cand, &declared, &[]).expect("gate runs");
+        assert!(r.passed(), "unexpected fails: {:?}", r.fails);
+        assert!(
+            r.warns.iter().any(|w| w.starts_with("2: declared rename")),
+            "{:?}",
+            r.warns
+        );
+    }
+
+    #[test]
+    fn candidate_with_em_dash_is_refused() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("Some prose {D} here\n"),
+        );
+        let line = cand
+            .lines()
+            .position(|l| l.starts_with("Some prose"))
+            .unwrap()
+            + 1;
+        let r = gate(&before, &cand);
+        let f = nine(&r);
+        assert_eq!(f.len(), 1, "{:?}", r.fails);
+        assert!(f[0].contains(&format!("line {line}")), "{f:?}");
+    }
+
+    #[test]
+    fn candidate_without_em_dash_passes() {
+        // The positive control for the refusal above.
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(base_state(19, 836), &[18, 19], "Some prose; here\n");
+        let r = gate(&before, &cand);
+        assert!(r.passed(), "unexpected fails: {:?}", r.fails);
+    }
+
+    #[test]
+    fn quoted_title_with_em_dash_is_exempt() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("- #12 Fix parser {D} handle eof\n"),
+        );
+        let r = gate_titles(&before, &cand, &["Fix parser {D} handle eof"]);
+        assert!(r.passed(), "unexpected fails: {:?}", r.fails);
+        // Control: without the title the same body is refused.
+        let r = gate_titles(&before, &cand, &[]);
+        assert_eq!(nine(&r).len(), 1, "{:?}", r.fails);
+    }
+
+    #[test]
+    fn dash_beside_quoted_title_is_refused() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("- #12 Fix parser {D} handle eof {D} more\n"),
+        );
+        let r = gate_titles(&before, &cand, &["Fix parser {D} handle eof"]);
+        assert_eq!(nine(&r).len(), 1, "only the trailing dash: {:?}", r.fails);
+    }
+
+    #[test]
+    fn degenerate_titles_exempt_nothing() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let strings = ["{D}", " {D} ", "abcd {D} efgh", "x {D} y {D} z !!"];
+        let extra: String = strings.iter().map(|s| format!("{s}\n")).collect();
+        let cand = doc(base_state(19, 836), &[18, 19], &dashed(&extra));
+        // 1 + 1 + 1 + 2 dashes; the empty title is a pin (it covers nothing).
+        let mut titles: Vec<&str> = strings.to_vec();
+        titles.push("");
+        let r = gate_titles(&before, &cand, &titles);
+        assert_eq!(nine(&r).len(), 5, "{:?}", r.fails);
+    }
+
+    #[test]
+    fn dash_between_two_titles_is_refused() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("first {D} title one {D} second {D} title two\n"),
+        );
+        let r = gate_titles(
+            &before,
+            &cand,
+            &["first {D} title one", "second {D} title two"],
+        );
+        assert_eq!(nine(&r).len(), 1, "only the dash between: {:?}", r.fails);
+    }
+
+    #[test]
+    fn overlapping_title_occurrences_do_not_chain() {
+        let before = doc(base_state(18, 830), &[18], "");
+        let cand = doc(
+            base_state(19, 836),
+            &[18, 19],
+            &dashed("ab {D} ab {D} ab {D} ab\n"),
+        );
+        let r = gate_titles(&before, &cand, &["ab {D} ab {D} ab"]);
+        assert_eq!(
+            nine(&r).len(),
+            1,
+            "the third dash is outside the one span: {:?}",
+            r.fails
+        );
     }
 
     #[test]

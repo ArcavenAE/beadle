@@ -93,6 +93,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn board_controls_block_has_no_em_dash() {
+        let block = render_board_controls_block();
+        assert!(
+            block.contains("## Board controls"),
+            "control: block rendered"
+        );
+        assert!(
+            !block.contains(crate::testsupport::em_dash()),
+            "the block must carry no em dash"
+        );
+    }
+
+    #[test]
     fn render_emits_every_verb_unchecked() {
         let block = render_board_controls_block();
         assert!(block.contains("## Board controls"));

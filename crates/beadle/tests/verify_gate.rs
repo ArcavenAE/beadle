@@ -16,6 +16,8 @@ use std::{
 
 use serde_json::Value;
 
+mod support;
+
 const BEFORE: &str = "docs/fixtures/vsdd-factory-312-curated-run18.md";
 const CANDIDATE: &str = "docs/fixtures/vsdd-factory-312-curated-run19.md";
 
@@ -39,8 +41,35 @@ impl Outcome {
     }
 }
 
-/// Run the real binary over `before` and a candidate written to a temp file.
+/// The candidate as the first dash-free run would carry it: a spaced em dash
+/// in a heading becomes a colon and a space (P4), one elsewhere becomes a
+/// semicolon (P1), and any other em dash a semicolon. The shipped fixtures are
+/// history and keep their dashes, so the tests mutate them here, in the house
+/// style of the other controls.
+fn dash_free(body: &str) -> String {
+    let d = support::em_dash().to_string();
+    let spaced = format!(" {d} ");
+    body.split('\n')
+        .map(|l| {
+            let heading = l.starts_with("## ") || l.starts_with("### ");
+            let l = if heading {
+                l.replace(&spaced, ": ")
+            } else {
+                l.replace(&spaced, "; ")
+            };
+            l.replace(&d, ";")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Run the real binary over `before` and a dash-free form of the candidate.
 fn gate(before_rel: &str, candidate_body: &str) -> Outcome {
+    gate_raw(before_rel, &dash_free(candidate_body))
+}
+
+/// Run the real binary over `before` and the candidate exactly as given.
+fn gate_raw(before_rel: &str, candidate_body: &str) -> Outcome {
     let dir = tempfile::tempdir().expect("tempdir");
     let cand_path = dir.path().join("candidate.md");
     std::fs::write(&cand_path, candidate_body).expect("write candidate");
@@ -106,6 +135,24 @@ fn the_run18_to_run19_pair_passes() {
     assert!(r.says("GATE PASSED"), "{}", r.out);
     assert!(r.says("run 18 -> 19 | watermark 830 -> 836"), "{}", r.out);
     assert!(r.says("tracked issue numbers: 407 -> 411"), "{}", r.out);
+}
+
+#[test]
+fn the_first_dash_free_run_passes_with_retirement_warnings() {
+    // run19 mutated so headings lose their dash by P4 and prose by P1: the
+    // first dash-free run against a dash-bearing before-snapshot. Without the
+    // retirement fold every retired heading is HEADING LOST.
+    let r = gate(BEFORE, &read(CANDIDATE));
+    assert!(r.passed, "the dash-free run must pass:\n{}", r.out);
+    assert!(r.says("2: em dash retired -> "), "{}", r.out);
+    assert!(!r.says("HEADING LOST"), "{}", r.out);
+}
+
+#[test]
+fn a_candidate_that_keeps_the_old_dashes_is_refused() {
+    let r = gate_raw(BEFORE, &read(CANDIDATE));
+    assert!(!r.passed, "{}", r.out);
+    assert!(r.says("9: em dash in candidate"), "{}", r.out);
 }
 
 #[test]

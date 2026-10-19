@@ -883,6 +883,49 @@ pub(crate) mod tests {
         )
     }
 
+    /// The first line of `body` that holds an em dash, as (line number, line).
+    fn first_dash(body: &str) -> Option<(usize, String)> {
+        let d = crate::testsupport::em_dash();
+        body.lines()
+            .enumerate()
+            .find(|(_, l)| l.contains(d))
+            .map(|(i, l)| (i, l.to_string()))
+    }
+
+    #[test]
+    fn rendered_body_has_no_em_dash() {
+        // A store that reaches the dash-bearing branches: a stale cluster
+        // (decay cell), an unreadable issue state (baseline provenance), one
+        // commenter (top commenters list), and the provisional run's warmup
+        // in the sentinel. compose() adds the H1.
+        let mut weird = mk_issue(7, "odd");
+        weird.state = "reopened-ish".into();
+        let mut stats = CommentStats::default();
+        stats.total = 1;
+        stats.per_actor.insert("alice".into(), 1);
+        let empty: HashMap<u32, ClassificationRecord> = HashMap::new();
+        let run = provisional_run(&mk_run(18, 5), 19);
+        let derived = render_derived(
+            "t",
+            "acme/widget",
+            &run,
+            &[weird],
+            &[mk_cluster(9, 9)],
+            &stats,
+            &classification_summary(&empty),
+        );
+        let body = compose("t", "acme/widget", &run, "", &derived, "d");
+        assert_eq!(first_dash(&body), None, "the body must carry no em dash");
+    }
+
+    #[test]
+    fn rendered_body_with_no_classifications_has_no_em_dash() {
+        // run() bails before this branch, so reach it through render_derived.
+        let body = derive(&[], &[], &mk_run(19, 10));
+        assert!(body.contains("no classifications in store"));
+        assert_eq!(first_dash(&body), None, "the body must carry no em dash");
+    }
+
     #[test]
     fn decay_progresses_while_records_are_current() {
         // gap = current_run - last_added_run, read off a record written THIS
