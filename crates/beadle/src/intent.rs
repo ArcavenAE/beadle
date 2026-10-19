@@ -257,15 +257,7 @@ pub(crate) fn colon_space_hazards(text: &str) -> Vec<(usize, String)> {
                     }
                 }
             }
-        } else if !(scalar.starts_with('[') || scalar.starts_with('{'))
-            && scalar.contains(": ")
-            && !map_item
-        {
-            out.push((n, format!("unquoted value holds a colon-space: {scalar}")));
-        } else if map_item && !(scalar.starts_with('[') || scalar.starts_with('{'))
-            && !scalar.starts_with(['"', '\''])
-            && scalar.contains(": ")
-        {
+        } else if !scalar.starts_with(['[', '{']) && scalar.contains(": ") {
             out.push((n, format!("unquoted value holds a colon-space: {scalar}")));
         }
         if item.is_some() {
