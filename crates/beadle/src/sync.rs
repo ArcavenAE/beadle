@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::{gh, intent};
+use crate::{enumerate::fetch_was_truncated, gh, intent};
 
 #[derive(Deserialize)]
 struct GhCommentAuthor {
@@ -64,7 +64,17 @@ fn fetch_open_issues(
         "--json",
         "number,comments",
     ];
-    fetch(&args)
+    let issues = fetch(&args)?;
+    if fetch_was_truncated(issues.len(), limit) {
+        anyhow::bail!(
+            "gh returned {} open issues against --limit {limit}: the fetch was \
+             probably truncated and this sync would silently skip the comments on \
+             whatever fell off the end. Raise SYNC_FETCH_LIMIT or paginate; do not \
+             proceed on a partial corpus.",
+            issues.len()
+        );
+    }
+    Ok(issues)
 }
 
 pub fn run(root: &Path, target: &str) -> Result<()> {
@@ -90,7 +100,7 @@ pub fn run(root: &Path, target: &str) -> Result<()> {
         seen.len()
     );
 
-    let issues = fetch_open_issues(&intent.repo, SYNC_FETCH_LIMIT, |args| gh::json(args))?;
+    let issues = fetch_open_issues(&intent.repo, SYNC_FETCH_LIMIT, gh::json)?;
 
     let mut recs: Vec<Record> = Vec::new();
     let mut maintainer_events = 0u32;
@@ -164,7 +174,10 @@ mod tests {
 
     fn issues(n: usize) -> Vec<GhIssueForSync> {
         (1..=n as u32)
-            .map(|number| GhIssueForSync { number, comments: Vec::new() })
+            .map(|number| GhIssueForSync {
+                number,
+                comments: Vec::new(),
+            })
             .collect()
     }
 
