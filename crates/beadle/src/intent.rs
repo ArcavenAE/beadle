@@ -85,18 +85,21 @@ impl Intent {
 pub fn load(root: &Path, target: &str) -> Result<Intent> {
     let path = root.join(format!("targets/{target}.intent.yaml"));
     let text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
-    // The values are still read by hand below, which is not a YAML parser. A
-    // real parser reads the whole file first, so a manifest edit cannot change
-    // meaning silently: a file it refuses, or a string list holding anything
-    // but strings, fails closed here with the path and line.
-    validate(&text).map_err(|(line, what)| anyhow!("{}:{line}: {what}", path.display()))?;
-    parse(&text).ok_or_else(|| anyhow!("no `repo:` scalar in {}", path.display()))
+    let intent = parse(&text).ok_or_else(|| anyhow!("no `repo:` scalar in {}", path.display()))?;
+    // The values are read by hand, which is not a YAML parser. A real parser
+    // reads the whole file as well, and the two must agree: a file it refuses,
+    // a string list holding anything but strings, or a value the two read
+    // differently fails closed here with the path and line, so a manifest edit
+    // cannot change meaning silently.
+    validate(&text, &intent)
+        .map_err(|(line, what)| anyhow!("{}:{line}: {what}", path.display()))?;
+    Ok(intent)
 }
 
-/// A list item that deserializes only from a YAML string. An integer, a map or
-/// a nested list is refused, so `- 12345` and `- name: alice` do not pass as
+/// A value that deserializes only from a YAML string. An integer, a map or a
+/// nested list is refused, so `- 12345` and `- name: alice` do not pass as
 /// logins.
-struct Str;
+struct Str(String);
 
 impl<'de> serde::Deserialize<'de> for Str {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
@@ -106,8 +109,8 @@ impl<'de> serde::Deserialize<'de> for Str {
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 f.write_str("a string")
             }
-            fn visit_str<E: serde::de::Error>(self, _: &str) -> std::result::Result<Str, E> {
-                Ok(Str)
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<Str, E> {
+                Ok(Str(v.to_string()))
             }
         }
         // `deserialize_any`, not `deserialize_str`: the latter hands an
@@ -116,37 +119,183 @@ impl<'de> serde::Deserialize<'de> for Str {
     }
 }
 
-/// The shape `validate` checks: only the string-list fields the reader
-/// extracts. Every other key is ignored, but the file must still parse.
-// Never read: the shape exists to be checked, not to carry the values.
-#[allow(dead_code)]
+type At<T> = serde_saphyr::Spanned<T>;
+
+/// What a YAML parser reads for the fields the hand reader extracts. Every
+/// other key is ignored, but the file must still parse.
 #[derive(serde::Deserialize)]
 struct Shape {
+    /// `repo:` is nested under `target:` in the shipped manifests, and
+    /// top-level in older fixtures; both are read, and two that differ are refused.
+    repo: Option<At<Str>>,
+    target: Option<TargetShape>,
     #[serde(default)]
-    maintainers: Vec<Str>,
+    maintainers: Option<At<Vec<Str>>>,
     #[serde(default)]
-    measured_contributors: Vec<Str>,
+    measured_contributors: Option<At<Vec<Str>>>,
     #[serde(default)]
-    maintainer_capacity: Option<CapacityShape>,
+    maintainer_capacity: Option<At<CapacityShape>>,
 }
 
-#[allow(dead_code)]
+#[derive(serde::Deserialize)]
+struct TargetShape {
+    repo: Option<At<Str>>,
+}
+
 #[derive(serde::Deserialize)]
 struct CapacityShape {
+    class: Option<Str>,
+    team_size: Option<u32>,
+    attention_window: Option<Str>,
     #[serde(default)]
     observed_windows: Vec<Str>,
+    observed: Option<ObservedShape>,
 }
 
-/// Parse the whole manifest with a YAML parser and require every string-list
-/// field to hold only strings. Returns (line, reason); line is 0 when the
-/// parser gives none.
-fn validate(text: &str) -> std::result::Result<(), (u64, String)> {
-    serde_saphyr::from_str::<Shape>(text)
-        .map(|_| ())
-        .map_err(|e| {
-            let line = e.location().map_or(0, |l| l.line());
-            (line, e.to_string().lines().next().unwrap_or("").to_string())
-        })
+#[derive(serde::Deserialize)]
+struct ObservedShape {
+    pr_acceptance: Option<PrAcceptanceShape>,
+    #[serde(default)]
+    measured_prs: Vec<MeasuredPrShape>,
+    acted_with_diff: Option<ActedWithDiffShape>,
+}
+
+#[derive(serde::Deserialize)]
+struct PrAcceptanceShape {
+    merged: Option<u32>,
+    decided: Option<u32>,
+}
+
+#[derive(serde::Deserialize)]
+struct ActedWithDiffShape {
+    with_diff: Option<u32>,
+    acted: Option<u32>,
+}
+
+#[derive(serde::Deserialize)]
+struct MeasuredPrShape {
+    number: Option<u32>,
+    ready: Option<Str>,
+    merged: Option<Str>,
+    #[serde(default)]
+    fixes: Vec<u32>,
+}
+
+fn strings(v: Vec<Str>) -> Vec<String> {
+    v.into_iter().map(|s| s.0).collect()
+}
+
+impl CapacityShape {
+    /// The capacity model as a parser reads it, with the hand reader's rules
+    /// for what is absent or incomplete.
+    fn read(self) -> MaintainerCapacity {
+        let observed = self.observed;
+        MaintainerCapacity {
+            class: self.class.map_or_else(|| "unknown".to_string(), |s| s.0),
+            team_size: self.team_size,
+            attention_window: self
+                .attention_window
+                .map_or_else(|| "action-day".to_string(), |s| s.0),
+            observed_windows: strings(self.observed_windows),
+            pr_acceptance: observed
+                .as_ref()
+                .and_then(|o| o.pr_acceptance.as_ref())
+                .and_then(|p| {
+                    Some(PrAcceptance {
+                        merged: p.merged?,
+                        decided: p.decided?,
+                    })
+                }),
+            measured_prs: observed
+                .as_ref()
+                .map(|o| {
+                    o.measured_prs
+                        .iter()
+                        .filter_map(|m| {
+                            Some(MeasuredPr {
+                                number: m.number?,
+                                ready: m.ready.as_ref()?.0.clone(),
+                                merged: m.merged.as_ref().map(|s| s.0.clone()),
+                                fixes: m.fixes.clone(),
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            acted_with_diff: observed
+                .as_ref()
+                .and_then(|o| o.acted_with_diff.as_ref())
+                .and_then(|a| {
+                    Some(ActedWithDiff {
+                        with_diff: a.with_diff?,
+                        acted: a.acted?,
+                    })
+                }),
+        }
+    }
+}
+
+/// Parse the whole manifest with a YAML parser, require every string-list
+/// field to hold only strings, then require the values the hand reader
+/// extracted to equal what the parser reads. Returns (line, reason); line is
+/// 0 when the parser gives none. Anything the parser reads differently (a
+/// flow list, an alias, a tag, a block scalar, a comment inside a list, a `#`
+/// inside a quoted value, a key repeated in a nested map) fails closed.
+fn validate(text: &str, intent: &Intent) -> std::result::Result<(), (u64, String)> {
+    let shape = serde_saphyr::from_str::<Shape>(text).map_err(|e| {
+        let line = e.location().map_or(0, |l| l.line());
+        (line, e.to_string().lines().next().unwrap_or("").to_string())
+    })?;
+    fn same<T: PartialEq + std::fmt::Debug>(
+        name: &str,
+        line: u64,
+        parser: T,
+        hand: &T,
+    ) -> std::result::Result<(), (u64, String)> {
+        if &parser == hand {
+            return Ok(());
+        }
+        Err((
+            line,
+            format!("`{name}` reads as {parser:?} to a YAML parser and as {hand:?} to this reader"),
+        ))
+    }
+    let list = |v: Option<At<Vec<Str>>>| -> (u64, Vec<String>) {
+        v.map_or((0, Vec::new()), |a| (a.referenced.line(), strings(a.value)))
+    };
+    let nested = shape.target.and_then(|t| t.repo);
+    let (line, repo) = match (shape.repo, nested) {
+        (Some(a), Some(b)) if a.value.0 != b.value.0 => {
+            return Err((
+                b.referenced.line(),
+                format!(
+                    "`repo` is {:?} at the top level and {:?} under `target`",
+                    a.value.0, b.value.0
+                ),
+            ));
+        }
+        (Some(a), _) | (None, Some(a)) => (a.referenced.line(), Some(a.value.0)),
+        (None, None) => (0, None),
+    };
+    same("repo", line, repo, &Some(intent.repo.clone()))?;
+    let (line, v) = list(shape.maintainers);
+    same("maintainers", line, v, &intent.maintainers)?;
+    let (line, v) = list(shape.measured_contributors);
+    same(
+        "measured_contributors",
+        line,
+        v,
+        &intent.measured_contributors,
+    )?;
+    let (line, cap) = shape
+        .maintainer_capacity
+        .map_or((0, None), |a| (a.referenced.line(), Some(a.value.read())));
+    same(
+        "maintainer_capacity",
+        line,
+        cap,
+        &intent.maintainer_capacity,
+    )
 }
 
 /// Parse manifest text. Separated from `load` so the capacity block is
@@ -568,23 +717,23 @@ goals:
     #[test]
     fn a_string_list_item_that_is_not_a_string_fails_closed_with_line() {
         // A login that is all digits reads as an integer to a parser.
-        let e = load_err("repo: acme/widget\nmaintainers:\n  - alice\n  - 12345\n");
-        assert!(e.contains("t.intent.yaml:4"), "{e}");
+        let e = load_err("target:\n  repo: acme/widget\nmaintainers:\n  - alice\n  - 12345\n");
+        assert!(e.contains("t.intent.yaml:5"), "{e}");
         // A map item, and a nested list item, are not strings either.
-        let e = load_err("repo: acme/widget\nmaintainers:\n  - name: alice\n");
-        assert!(e.contains("t.intent.yaml:3"), "{e}");
-        let e = load_err("repo: acme/widget\nmeasured_contributors:\n  - [a, b]\n");
-        assert!(e.contains("t.intent.yaml:3"), "{e}");
+        let e = load_err("target:\n  repo: acme/widget\nmaintainers:\n  - name: alice\n");
+        assert!(e.contains("t.intent.yaml:4"), "{e}");
+        let e = load_err("target:\n  repo: acme/widget\nmeasured_contributors:\n  - [a, b]\n");
+        assert!(e.contains("t.intent.yaml:4"), "{e}");
         // The capacity block's window list is checked at its own path.
         let e = load_err(
-            "repo: acme/widget\nmaintainer_capacity:\n  class: x\n  observed_windows: [\"2026-07-08\", 5]\n",
+            "target:\n  repo: acme/widget\nmaintainer_capacity:\n  class: x\n  observed_windows: [\"2026-07-08\", 5]\n",
         );
-        assert!(e.contains("t.intent.yaml:4"), "{e}");
+        assert!(e.contains("t.intent.yaml:5"), "{e}");
         // Controls: the same manifests with strings load.
         for ok in [
-            "repo: acme/widget\nmaintainers:\n  - alice\n  - \"12345\"\n",
-            "repo: acme/widget\nmaintainers: []\nmeasured_contributors:\n  - a\n  - b\n",
-            "repo: acme/widget\nmaintainer_capacity:\n  observed_windows: [\"2026-07-08\"]\n",
+            "target:\n  repo: acme/widget\nmaintainers:\n  - alice\n  - \"12345\"\n",
+            "target:\n  repo: acme/widget\nmaintainers: []\nmeasured_contributors:\n  - a\n  - b\n",
+            "target:\n  repo: acme/widget\nmaintainer_capacity:\n  observed_windows: [\"2026-07-08\"]\n",
         ] {
             assert!(load_text(ok).is_ok(), "{ok:?}");
         }
@@ -594,9 +743,9 @@ goals:
     fn the_whole_file_must_parse_not_only_the_lines_the_reader_reads() {
         // The hand reader never looks at `note`, so these load today.
         for bad in [
-            "repo: acme/widget\nnote: [unclosed\n",
-            "repo: acme/widget\nrepo: other/thing\n",
-            "repo: acme/widget\nnote:\n\t- tab indented\n",
+            "target:\n  repo: acme/widget\nnote: [unclosed\n",
+            "target:\n  repo: acme/widget\ntarget:\n  repo: other/thing\n",
+            "target:\n  repo: acme/widget\nnote:\n\t- tab indented\n",
         ] {
             let e = load_err(bad);
             assert!(e.contains("t.intent.yaml"), "{bad:?}: {e}");
@@ -607,35 +756,40 @@ goals:
     fn a_value_the_hand_reader_extracts_differently_fails_closed() {
         // Each manifest is valid YAML. The parser and the hand reader would
         // hand different values to the run, so load refuses it with a line.
-        let cases: [(&str, &str, usize); 9] = [
-            ("flow list", "repo: acme/widget\nmaintainers: [alice, bob]\n", 2),
+        let cases: [(&str, &str, usize); 10] = [
+            ("flow list", "target:\n  repo: acme/widget\nmaintainers: [alice, bob]\n", 3),
             (
                 "comment inside a block list",
-                "repo: acme/widget\nmaintainers:\n  - alice\n  # a note\n  - bob\n",
-                2,
+                "target:\n  repo: acme/widget\nmaintainers:\n  - alice\n  # a note\n  - bob\n",
+                4,
             ),
             (
                 "alias",
-                "repo: acme/widget\nx: &l alice\nmaintainers:\n  - *l\n",
+                "target:\n  repo: acme/widget\nx: &l alice\nmaintainers:\n  - *l\n",
+                5,
+            ),
+            (
+                "flow list in measured_contributors",
+                "target:\n  repo: acme/widget\nmeasured_contributors: [carol]\n",
                 3,
             ),
-            ("tag", "repo: acme/widget\nmaintainers:\n  - !!str alice\n", 2),
-            ("hash inside a quoted value", "repo: acme/widget\nmaintainers:\n  - \"a#b\"\n", 2),
-            ("block scalar item", "repo: acme/widget\nmaintainers:\n  - |\n    alice\n", 2),
+            ("tag", "target:\n  repo: acme/widget\nmaintainers:\n  - !!str alice\n", 4),
+            ("hash inside a quoted value", "target:\n  repo: acme/widget\nmaintainers:\n  - \"a#b\"\n", 4),
+            ("block scalar item", "target:\n  repo: acme/widget\nmaintainers:\n  - |\n    alice\n", 4),
             (
                 "block scalar holding a repo line",
-                "note: |\n  repo: evil/fork\n  maintainers:\n    - mallory\nrepo: acme/widget\nmaintainers:\n  - alice\n",
-                5,
+                "note: |\n  repo: evil/fork\n  maintainers:\n    - mallory\ntarget:\n  repo: acme/widget\nmaintainers:\n  - alice\n",
+                6,
             ),
             (
                 "nested maintainers key ahead of the real one",
-                "repo: acme/widget\nextra:\n  maintainers:\n    - mallory\nmaintainers:\n  - alice\n",
-                5,
+                "target:\n  repo: acme/widget\nextra:\n  maintainers:\n    - mallory\nmaintainers:\n  - alice\n",
+                7,
             ),
             (
                 "capacity value read from the wrong place",
-                "repo: acme/widget\nmaintainer_capacity:\n  class: \"a#b\"\n",
-                2,
+                "target:\n  repo: acme/widget\nmaintainer_capacity:\n  class: \"a#b\"\n",
+                4,
             ),
         ];
         let mut wrong = Vec::new();
@@ -649,9 +803,9 @@ goals:
         assert!(wrong.is_empty(), "{wrong:#?}");
         // Controls: plain manifests the two readers agree on still load.
         for ok in [
-            "repo: acme/widget\nmaintainers:\n  - alice\n  - bob\n",
-            "repo: acme/widget\nmaintainers:\n  - \"alice\"\n  - 'bob' # trailing\n",
-            "repo: acme/widget\nmaintainer_capacity:\n  class: solo\n  team_size: 2\n",
+            "target:\n  repo: acme/widget\nmaintainers:\n  - alice\n  - bob\n",
+            "target:\n  repo: acme/widget\nmaintainers:\n  - \"alice\"\n  - 'bob' # trailing\n",
+            "target:\n  repo: acme/widget\nmaintainer_capacity:\n  class: solo\n  team_size: 2\n",
         ] {
             assert!(load_text(ok).is_ok(), "{ok:?}");
         }
