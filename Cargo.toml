@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/ArcavenAE/beadle"
-rust-version = "1.85"
+rust-version = "1.89"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -16,6 +16,7 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 time = { version = "0.3", features = ["formatting", "parsing", "serde", "macros"] }
 sha2 = "0.10"
+serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
 
 [profile.release]
 lto = "thin"
