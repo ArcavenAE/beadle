@@ -800,4 +800,56 @@ goals:
         let cap = parse_capacity(CAPACITY_YAML).expect("capacity block present");
         assert_eq!(cap.pr_acceptance.map(|p| p.decided), Some(31));
     }
+
+    fn load_text(text: &str) -> Result<Intent> {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("targets")).unwrap();
+        std::fs::write(dir.path().join("targets/t.intent.yaml"), text).unwrap();
+        load(dir.path(), "t")
+    }
+
+    fn load_err(text: &str) -> String {
+        match load_text(text) {
+            Err(e) => e.to_string(),
+            Ok(_) => panic!("must not load: {text:?}"),
+        }
+    }
+
+    #[test]
+    fn a_string_list_item_that_is_not_a_string_fails_closed_with_line() {
+        // A login that is all digits reads as an integer to a parser.
+        let e = load_err("repo: acme/widget\nmaintainers:\n  - alice\n  - 12345\n");
+        assert!(e.contains("t.intent.yaml:4"), "{e}");
+        // A map item, and a nested list item, are not strings either.
+        let e = load_err("repo: acme/widget\nmaintainers:\n  - name: alice\n");
+        assert!(e.contains("t.intent.yaml:3"), "{e}");
+        let e = load_err("repo: acme/widget\nmeasured_contributors:\n  - [a, b]\n");
+        assert!(e.contains("t.intent.yaml:3"), "{e}");
+        // The capacity block's window list is checked at its own path.
+        let e = load_err(
+            "repo: acme/widget\nmaintainer_capacity:\n  class: x\n  observed_windows: [\"2026-07-08\", 5]\n",
+        );
+        assert!(e.contains("t.intent.yaml:4"), "{e}");
+        // Controls: the same manifests with strings load.
+        for ok in [
+            "repo: acme/widget\nmaintainers:\n  - alice\n  - \"12345\"\n",
+            "repo: acme/widget\nmaintainers: []\nmeasured_contributors: [a, b]\n",
+            "repo: acme/widget\nmaintainer_capacity:\n  observed_windows: [\"2026-07-08\"]\n",
+        ] {
+            assert!(load_text(ok).is_ok(), "{ok:?}");
+        }
+    }
+
+    #[test]
+    fn the_whole_file_must_parse_not_only_the_lines_the_reader_reads() {
+        // The hand reader never looks at `note`, so these load today.
+        for bad in [
+            "repo: acme/widget\nnote: [unclosed\n",
+            "repo: acme/widget\nrepo: other/thing\n",
+            "repo: acme/widget\nnote:\n\t- tab indented\n",
+        ] {
+            let e = load_err(bad);
+            assert!(e.contains("t.intent.yaml"), "{bad:?}: {e}");
+        }
+    }
 }
