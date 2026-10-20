@@ -583,7 +583,7 @@ goals:
         // Controls: the same manifests with strings load.
         for ok in [
             "repo: acme/widget\nmaintainers:\n  - alice\n  - \"12345\"\n",
-            "repo: acme/widget\nmaintainers: []\nmeasured_contributors: [a, b]\n",
+            "repo: acme/widget\nmaintainers: []\nmeasured_contributors:\n  - a\n  - b\n",
             "repo: acme/widget\nmaintainer_capacity:\n  observed_windows: [\"2026-07-08\"]\n",
         ] {
             assert!(load_text(ok).is_ok(), "{ok:?}");
@@ -600,6 +600,60 @@ goals:
         ] {
             let e = load_err(bad);
             assert!(e.contains("t.intent.yaml"), "{bad:?}: {e}");
+        }
+    }
+
+    #[test]
+    fn a_value_the_hand_reader_extracts_differently_fails_closed() {
+        // Each manifest is valid YAML. The parser and the hand reader would
+        // hand different values to the run, so load refuses it with a line.
+        let cases: [(&str, &str, usize); 9] = [
+            ("flow list", "repo: acme/widget\nmaintainers: [alice, bob]\n", 2),
+            (
+                "comment inside a block list",
+                "repo: acme/widget\nmaintainers:\n  - alice\n  # a note\n  - bob\n",
+                2,
+            ),
+            (
+                "alias",
+                "repo: acme/widget\nx: &l alice\nmaintainers:\n  - *l\n",
+                3,
+            ),
+            ("tag", "repo: acme/widget\nmaintainers:\n  - !!str alice\n", 2),
+            ("hash inside a quoted value", "repo: acme/widget\nmaintainers:\n  - \"a#b\"\n", 2),
+            ("block scalar item", "repo: acme/widget\nmaintainers:\n  - |\n    alice\n", 2),
+            (
+                "block scalar holding a repo line",
+                "note: |\n  repo: evil/fork\n  maintainers:\n    - mallory\nrepo: acme/widget\nmaintainers:\n  - alice\n",
+                5,
+            ),
+            (
+                "nested maintainers key ahead of the real one",
+                "repo: acme/widget\nextra:\n  maintainers:\n    - mallory\nmaintainers:\n  - alice\n",
+                5,
+            ),
+            (
+                "capacity value read from the wrong place",
+                "repo: acme/widget\nmaintainer_capacity:\n  class: \"a#b\"\n",
+                2,
+            ),
+        ];
+        let mut wrong = Vec::new();
+        for (what, text, line) in cases {
+            match load_text(text) {
+                Err(e) if e.to_string().contains(&format!("t.intent.yaml:{line}")) => {}
+                Err(e) => wrong.push(format!("{what}: wrong error: {e}")),
+                Ok(_) => wrong.push(format!("{what}: loaded")),
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+        // Controls: plain manifests the two readers agree on still load.
+        for ok in [
+            "repo: acme/widget\nmaintainers:\n  - alice\n  - bob\n",
+            "repo: acme/widget\nmaintainers:\n  - \"alice\"\n  - 'bob' # trailing\n",
+            "repo: acme/widget\nmaintainer_capacity:\n  class: solo\n  team_size: 2\n",
+        ] {
+            assert!(load_text(ok).is_ok(), "{ok:?}");
         }
     }
 }
