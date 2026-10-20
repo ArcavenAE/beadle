@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::{gh, intent};
+use crate::{enumerate::fetch_was_truncated, gh, intent};
 
 #[derive(Deserialize)]
 struct GhCommentAuthor {
@@ -37,6 +37,44 @@ struct GhIssueForSync {
     number: u32,
     #[serde(default)]
     comments: Vec<GhComment>,
+}
+
+/// Upper bound on the open-issue fetch. A tripwire, not a tuning knob: `gh`
+/// truncates silently at `--limit`, so a result of exactly this many may have
+/// lost rows (ArcavenAE/beadle#96).
+const SYNC_FETCH_LIMIT: usize = 500;
+
+/// Fetch the open issues with their comments through `fetch`, which stands in
+/// for `gh::json` so a test can hand back a fixture instead of calling `gh`.
+fn fetch_open_issues(
+    repo: &str,
+    limit: usize,
+    fetch: impl FnOnce(&[&str]) -> Result<Vec<GhIssueForSync>>,
+) -> Result<Vec<GhIssueForSync>> {
+    let limit_s = limit.to_string();
+    let args = [
+        "issue",
+        "list",
+        "--repo",
+        repo,
+        "--state",
+        "open",
+        "--limit",
+        limit_s.as_str(),
+        "--json",
+        "number,comments",
+    ];
+    let issues = fetch(&args)?;
+    if fetch_was_truncated(issues.len(), limit) {
+        anyhow::bail!(
+            "gh returned {} open issues against --limit {limit}: the fetch was \
+             probably truncated and this sync would silently skip the comments on \
+             whatever fell off the end. Raise SYNC_FETCH_LIMIT or paginate; do not \
+             proceed on a partial corpus.",
+            issues.len()
+        );
+    }
+    Ok(issues)
 }
 
 pub fn run(root: &Path, target: &str) -> Result<()> {
@@ -62,19 +100,7 @@ pub fn run(root: &Path, target: &str) -> Result<()> {
         seen.len()
     );
 
-    let args = vec![
-        "issue",
-        "list",
-        "--repo",
-        intent.repo.as_str(),
-        "--state",
-        "open",
-        "--limit",
-        "500",
-        "--json",
-        "number,comments",
-    ];
-    let issues: Vec<GhIssueForSync> = gh::json(&args)?;
+    let issues = fetch_open_issues(&intent.repo, SYNC_FETCH_LIMIT, gh::json)?;
 
     let mut recs: Vec<Record> = Vec::new();
     let mut maintainer_events = 0u32;
@@ -140,4 +166,45 @@ pub fn run(root: &Path, target: &str) -> Result<()> {
     });
     println!("{}", summary);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn issues(n: usize) -> Vec<GhIssueForSync> {
+        (1..=n as u32)
+            .map(|number| GhIssueForSync {
+                number,
+                comments: Vec::new(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_fetch_returning_exactly_its_limit_is_refused() {
+        // `gh` gives no truncation signal, so 500 of 500 may be 500 of 519.
+        let err = fetch_open_issues("acme/widget", 500, |_| Ok(issues(500)))
+            .map(|v| v.len())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("--limit 500"), "{err}");
+        assert!(err.contains("truncated"), "{err}");
+    }
+
+    #[test]
+    fn a_fetch_under_its_limit_passes_through() {
+        let got = fetch_open_issues("acme/widget", 500, |_| Ok(issues(499))).unwrap();
+        assert_eq!(got.len(), 499);
+    }
+
+    #[test]
+    fn the_fetch_asks_gh_for_the_limit_it_checks_against() {
+        fetch_open_issues("acme/widget", 500, |args| {
+            let at = args.iter().position(|a| *a == "--limit").unwrap();
+            assert_eq!(args[at + 1], "500");
+            Ok(Vec::new())
+        })
+        .unwrap();
+    }
 }

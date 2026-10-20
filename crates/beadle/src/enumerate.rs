@@ -65,7 +65,7 @@ const ISSUE_FETCH_LIMIT: usize = 1000;
 /// `>=`, not `>`: a result of exactly `limit` is indistinguishable from a
 /// truncated one, so it counts as truncated. Treating it as complete is the
 /// bug: `gh` gives no signal either way.
-fn fetch_was_truncated(count: usize, limit: usize) -> bool {
+pub(crate) fn fetch_was_truncated(count: usize, limit: usize) -> bool {
     count >= limit
 }
 
