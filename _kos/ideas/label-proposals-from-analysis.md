@@ -1,5 +1,7 @@
 # Label proposals from beadle's analysis: what its classification could do for GitHub labels
 
+Closed 2026-10-25: pointers closed
+
 **Status:** idea (pre-hypothesis, no commitment)
 **Born:** 2026-10-02, operator ask, relayed by director
 **Feeds:** elem-defect-classification-superset, elem-propose-not-act, elem-maintainer-compass, the Label discipline section of CLAUDE.md
