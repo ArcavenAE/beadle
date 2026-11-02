@@ -61,9 +61,11 @@ content: |
   and reusing the rule `enum` already uses (#121, f931006, closes #96). A
   manifest that a YAML parser reads differently from the hand reader is
   refused at load, which includes the flow-sequence case (#120, b6eca50).
-  Remaining from this class: `sync` keeps its own limit of 500 beside
-  `enum`'s (noted in the #121 body as an opportunity), so a raised limit
-  has to be raised in two places.
+  Remaining from this class: the two fetch limits are separate constants
+  with different values, `SYNC_FETCH_LIMIT` is 500 (`sync.rs:45`) and
+  `ISSUE_FETCH_LIMIT` is 1000 (`enumerate.rs:61`), so a repository between
+  the two is refused by `sync` and read by `enum` (noted in the #121 body as
+  an opportunity).
 edges:
   - target: elem-defect-classification-superset
     type: supports
