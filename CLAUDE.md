@@ -85,8 +85,6 @@ serializes writes and dispatches; it does not do specialist work itself. Read-on
 roles (classifiers, intent-scorer, the fresh-context verifier) never mutate
 GitHub or repo state — they emit findings the orchestrator acts on.
 
-Mint a finding id with `kos id finding <slug>`; never hand-allocate a number.
-
 ## Direct human edits
 
 Only a human edits this file and the project-root meta-docs. Everything else is
