@@ -39,6 +39,19 @@ content: |
     apparently depending on which GitHub SSH backend answered; a retry
     succeeded, and the finding warns against rewiring local SSH config for this
     symptom.
+  HARVEST 2026-11-02, from the PRs merged since 2026-10-09:
+  - Manifests are now validated when loaded. `load()` reads the whole file
+    with a YAML parser and fails closed as `<path>:<line>: <reason>` when it
+    cannot parse, when a string list holds a non-string, or when a value the
+    hand reader extracted differs from what the parser reads. The
+    colon-space heuristics and their tests are gone (#120, b6eca50). This
+    closes the flow-sequence `maintainers: [a, b]` loss recorded under
+    elem-silent-integrity-severity.
+  - Manifest text no longer carries em dashes, with a semicolon or parentheses
+    in their place so no unquoted value gains a colon-space (#119, 32fff66).
+  - Still open: every sub-question above (minimal shape, composite weights,
+    pin versus re-derive, held-out scenarios). #120 settles how a manifest is
+    read, not what it should say, so no close is proposed.
 edges:
   - target: elem-intent-alignment-whitespace
     type: derives

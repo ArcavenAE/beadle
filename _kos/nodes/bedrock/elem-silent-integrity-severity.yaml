@@ -55,6 +55,15 @@ content: |
   (beadle#83); `sync` is the remainder. A flow-sequence `maintainers: [a, b]`
   in an intent loads as an empty list, so every maintainer event counts as
   "other". Both turn a wrong board into a plausible one. Neither fix is built.
+
+  HARVEST 2026-11-02: both fixes are built. `sync` now refuses a result that
+  may have been cut off, counting a fetch of exactly the limit as truncated
+  and reusing the rule `enum` already uses (#121, f931006, closes #96). A
+  manifest that a YAML parser reads differently from the hand reader is
+  refused at load, which includes the flow-sequence case (#120, b6eca50).
+  Remaining from this class: `sync` keeps its own limit of 500 beside
+  `enum`'s (noted in the #121 body as an opportunity), so a raised limit
+  has to be raised in two places.
 edges:
   - target: elem-defect-classification-superset
     type: supports

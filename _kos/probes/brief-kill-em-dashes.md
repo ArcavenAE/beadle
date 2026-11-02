@@ -1,6 +1,6 @@
 # Brief: kill em dashes in beadle's rendered boards and triage skill
 
-Status: design for review, 2026-10-19. Owner: the architect role. Docs only.
+Status: complete, 2026-11-02. Built in #119 (32fff66), with the replacement fixture in #115 (776797f); issue #117 still reads open. Design for review 2026-10-19. Owner: the architect role. Docs only.
 Issue: #117.
 Commission: the operator's "kill emdashes" (2026-10-19), relayed by director.
 Checked against beadle origin/main c1f95a5.
