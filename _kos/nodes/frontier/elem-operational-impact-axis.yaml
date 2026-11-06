@@ -1,6 +1,6 @@
 id: elem-operational-impact-axis
 type: element
-confidence: bedrock
+confidence: frontier
 title: "Operational-impact axis — does the defect stop the autonomous process? (panic > halt > degraded)"
 tags: [beadle, classify, impact, liveness, autonomy, odc-impact, ieee-1044, finding-009]
 content: |
@@ -76,3 +76,36 @@ edges:
 provenance:
   created_by: agent
   created_at: "2026-06-28"
+notes: |
+  Moved from bedrock to frontier on 2026-11-06, by operator ruling ("Yes,
+  move to frontier"). The content above is unchanged.
+
+  Why. The node was minted at bedrock on 2026-06-28 (2adc89e) from desk
+  research, and nothing ratified that tier. The fleet sweep for findings whose
+  evidence cannot support their claim (2026-11-06)
+  graded finding-009 "Partial, a class problem", and split its evidence in two:
+  - The gap claim is measured. "No, confirmed gap" rests on a grep of the label
+    schema and beadle's nodes, which can tell "the axis exists" from "it does
+    not". That half stands.
+  - The axis itself is desk research. The IEEE 1044 reading (no crash or halt
+    Effect value), the ODC Reliability reading and the failure-model framing
+    come from reading standards and papers. Reading is good grounding, but it
+    is not a probe of whether panic, halt, data-loss and degraded classify real
+    defects well, and no classification run against real issues is cited.
+
+  Checked before the move, read only, at beadle origin/main 7e28895:
+  - git log of the node: two commits, 2adc89e (created at bedrock) and 45a0b28
+    (edge vocabulary only). No promotion commit, no review.
+  - charter.md and decisions/ (ADR-001 to ADR-005): no mention of the axis or
+    finding-009.
+  - finding-009: records the user's direction on method ("ground the axis in
+    our standards research, adopt it if we can") and on posting the upstream
+    proposal, not a ruling on the node's tier.
+  - CLAUDE.md lists impact.* as an autonomously set label (e122fc6). That
+    adopts the label scope, not the node's confidence.
+  - bd: no issue names the node.
+
+  What would earn bedrock again: one classification run over real issues
+  (the vsdd-factory corpus beadle already curates) that applies impact.* and
+  measures agreement or the halt and panic rates, with the ordering twist
+  checked against what recovery and detection actually cost.
