@@ -38,8 +38,14 @@
 //!     "short_title": "PASS certifies uncommitted artifacts",
 //!     "triage_state": "needs-triage",
 //!     "attn": {"subtype": "governance", "order": "reply-needed", "why": "..."},
-//!     "possibly_fixed": {"by": "PR #776", "confidence": "low", "verify": "..."}
+//!     "possibly_fixed": {"by": "PR #776", "confidence": "low", "verify": "..."},
+//!     "axes": {"<axis>": ["<value>"]},
+//!     "evidence": "test",
+//!     "requirements": ["<id>", "<id>"]
 //!   }
+//!
+//! `axes`, `evidence` and `requirements` are checked against the target's
+//! intent file (see `axes.rs`, `evidence.rs`, `requirements.rs`).
 //!
 //! Timestamps default to now (RFC3339); an explicit `ts` in the payload wins
 //! so the skill can replay historical classifications deterministically.
@@ -55,7 +61,14 @@ use beadle_store::{Attn, ClassificationRecord, PossiblyFixed, Record, Store};
 use serde_json::Value;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-use crate::{intent, vocab::vocab};
+use crate::{
+    axes::{self, Propose},
+    evidence,
+    intent::{self, Intent},
+    policy::Policy,
+    requirements::PatternSet,
+    vocab::vocab,
+};
 
 /// Every key `classify ingest` recognizes on a classification payload item.
 /// Anything else is rejected by name: the schema-drift alarm beadle#66 asked
@@ -87,6 +100,9 @@ pub const KNOWN_FIELDS: &[&str] = &[
     "triage_state",
     "attn",
     "possibly_fixed",
+    "axes",
+    "evidence",
+    "requirements",
 ];
 
 /// Keys of the nested `attn` object.
@@ -133,8 +149,9 @@ pub fn ingest(root: &Path, target: &str, payload_path: Option<&Path>) -> Result<
 
     let mut recs: Vec<Record> = Vec::with_capacity(items.len());
     for (i, item) in items.into_iter().enumerate() {
-        let rec = validate(&item, target, latest_run, &default_ts)
+        let mut rec = validate(&item, target, latest_run, &default_ts)
             .with_context(|| format!("payload item {}", i))?;
+        extend(&mut rec, &item, &intent).with_context(|| format!("payload item {}", i))?;
         recs.push(Record::Classification(Box::new(rec)));
     }
 
@@ -144,6 +161,20 @@ pub fn ingest(root: &Path, target: &str, payload_path: Option<&Path>) -> Result<
     }
 
     store.append(&recs)?;
+    // Evidence is a label beadle proposes. Where it may apply one is the
+    // policy's call, and the policy fails closed.
+    let policy = Policy::load(root);
+    for r in &recs {
+        if let Record::Classification(c) = r {
+            if let Some(e) = &c.evidence {
+                eprintln!(
+                    "label-plan: evidence.{e} {} {}",
+                    intent.repo,
+                    policy.mode(&intent.repo).as_str()
+                );
+            }
+        }
+    }
     eprintln!(
         "beadle classify ingest: appended {} classification record(s) to target={target}",
         recs.len()
@@ -324,7 +355,82 @@ fn validate(
         triage_state,
         attn,
         possibly_fixed,
+        ..Default::default()
     })
+}
+
+/// The per-target fields: `axes`, `evidence` and `requirements`, checked against
+/// what the target's intent file declares.
+fn extend(rec: &mut ClassificationRecord, item: &Value, intent: &Intent) -> Result<()> {
+    if let Some(v) = item.get("axes") {
+        let obj = v
+            .as_object()
+            .ok_or_else(|| anyhow!("`axes` must be an object of axis name to a list of values"))?;
+        for (name, vals) in obj {
+            let list = vals
+                .as_array()
+                .ok_or_else(|| anyhow!("axis `{name}` must be a list of values"))?;
+            let strs: Option<Vec<String>> =
+                list.iter().map(|x| x.as_str().map(String::from)).collect();
+            rec.axes.insert(
+                name.clone(),
+                strs.ok_or_else(|| anyhow!("axis `{name}`: values must be strings"))?,
+            );
+        }
+    }
+    if let Some(v) = item.get("evidence") {
+        let s = v.as_str().ok_or_else(|| anyhow!("`evidence` must be a string"))?;
+        let e = evidence::check_proposal(s).map_err(|m| anyhow!(m))?;
+        rec.evidence = Some(e.as_str().to_string());
+    }
+    if let Some(v) = item.get("requirements") {
+        let list = v
+            .as_array()
+            .ok_or_else(|| anyhow!("`requirements` must be a list of ids"))?;
+        let ids: Option<Vec<String>> = list.iter().map(|x| x.as_str().map(String::from)).collect();
+        let ids = ids.ok_or_else(|| anyhow!("`requirements` entries must be strings"))?;
+        if !ids.is_empty() {
+            let decl = intent.requirements.as_ref().ok_or_else(|| {
+                anyhow!("this target declares no requirements pattern; `requirements` is refused")
+            })?;
+            let pattern = PatternSet::new(&decl.patterns).map_err(|m| anyhow!(m))?;
+            if let Some(bad) = ids.iter().find(|i| !pattern.matches(i)) {
+                bail!(
+                    "requirement id `{bad}` does not fit the target's id pattern `{}`",
+                    pattern.describe()
+                );
+            }
+        }
+        rec.requirements = ids;
+    }
+    axes::check_assignment(&intent.axes, &rec.axes).map_err(|m| anyhow!(m))?;
+    // A row-prefix axis takes its value from the cited rows when the payload
+    // gave none; where the prefixes disagree on a scoped axis, or none fits,
+    // it stays unset and the board counts the row as unassigned.
+    for def in intent.axes.iter().filter(|a| a.propose == Propose::RowPrefix) {
+        if rec.axes.contains_key(&def.name) {
+            continue;
+        }
+        let mut derived: Vec<String> = Vec::new();
+        for id in &rec.requirements {
+            if let Some(v) = axes::derive_from_row(def, id) {
+                if !derived.contains(&v) {
+                    derived.push(v);
+                }
+            }
+        }
+        if !derived.is_empty() && (!def.scoped || derived.len() == 1) {
+            rec.axes.insert(def.name.clone(), derived);
+        }
+    }
+    if !rec.requirements.is_empty() {
+        let line = format!("Requirements: {}", rec.requirements.join(", "));
+        rec.cited_evidence = Some(match rec.cited_evidence.take() {
+            Some(prev) if !prev.is_empty() => format!("{prev}; {line}"),
+            _ => line,
+        });
+    }
+    Ok(())
 }
 
 /// Reject any key not in `known`, naming the offender and where it sat.
@@ -728,8 +834,12 @@ mod tests {
         let store = Store::open(td.path().join("store"), "t").unwrap();
         let line = std::fs::read_to_string(store.state_path()).unwrap();
         let v: Value = serde_json::from_str(line.trim()).unwrap();
-        let serialized: std::collections::BTreeSet<&str> =
+        // `axes`, `evidence` and `requirements` are written only when a row
+        // has them, so that a row classified before they existed round-trips
+        // byte for byte; they are payload keys all the same.
+        let mut serialized: std::collections::BTreeSet<&str> =
             v.as_object().unwrap().keys().map(String::as_str).collect();
+        serialized.extend(["axes", "evidence", "requirements"]);
         let known: std::collections::BTreeSet<&str> = KNOWN_FIELDS.iter().copied().collect();
         assert_eq!(
             serialized, known,

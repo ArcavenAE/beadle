@@ -81,5 +81,17 @@ minutiae_signals:
   - cluster_same_lever_filed_n_times
   - over_engineering_fingerprints
 
+# Optional, schema 0.7. Per-target classification axes and the requirement id pattern.
+# The names and values are this product's own terms; see targets/README.md for the shape.
+# axes:
+#   - name: lane
+#     scoped: true
+#     propose: label
+#     values: [a, b]
+# requirements:
+#   pattern: "{a}-{n}{l?}"   # or a list of forms
+#   list: requirements.txt
+#   version: 1
+
 composes_skill: arcavenai-issue-review
 status: draft-unpopulated

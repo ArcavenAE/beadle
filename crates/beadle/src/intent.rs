@@ -21,6 +21,12 @@ pub struct Intent {
     /// presence is what switches a direction verdict from instrument v1 to
     /// v2; absent, the crate computes v1 and says so out loud (SKILL §6b).
     pub maintainer_capacity: Option<MaintainerCapacity>,
+    /// The classification axes the target declares under `axes:` (empty when it
+    /// declares none). See `axes.rs`.
+    pub axes: Vec<crate::axes::AxisDef>,
+    /// The `requirements:` block: the id pattern and the list the board checks
+    /// coverage against. `None` when the target declares no pattern.
+    pub requirements: Option<crate::axes::RequirementsDecl>,
 }
 
 /// The capacity model a v2 verdict is conditioned on (SKILL §6b).
@@ -82,10 +88,24 @@ impl Intent {
     }
 }
 
+/// Where a target's intent file is read from: `targets/<target>.intent.yaml`
+/// under the root, else the repo-local `.beadle/intent.yaml` under the root.
+/// When both exist, the `targets/` file wins.
+fn intent_path(root: &Path, target: &str) -> std::path::PathBuf {
+    let shipped = root.join(format!("targets/{target}.intent.yaml"));
+    let local = root.join(".beadle/intent.yaml");
+    if !shipped.exists() && local.exists() {
+        local
+    } else {
+        shipped
+    }
+}
+
 pub fn load(root: &Path, target: &str) -> Result<Intent> {
-    let path = root.join(format!("targets/{target}.intent.yaml"));
+    let path = intent_path(root, target);
     let text = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
-    let intent = parse(&text).ok_or_else(|| anyhow!("no `repo:` scalar in {}", path.display()))?;
+    let mut intent =
+        parse(&text).ok_or_else(|| anyhow!("no `repo:` scalar in {}", path.display()))?;
     // The values are read by hand, which is not a YAML parser. A real parser
     // reads the whole file as well, and the two must agree: a file it refuses,
     // a string list holding anything but strings, or a value the two read
@@ -93,6 +113,11 @@ pub fn load(root: &Path, target: &str) -> Result<Intent> {
     // cannot change meaning silently.
     validate(&text, &intent)
         .map_err(|(line, what)| anyhow!("{}:{line}: {what}", path.display()))?;
+    // The axes and the requirements block are read by the parser alone.
+    let declared =
+        crate::axes::read(&text).map_err(|what| anyhow!("{}: {what}", path.display()))?;
+    intent.axes = declared.axes;
+    intent.requirements = declared.requirements;
     Ok(intent)
 }
 
@@ -307,6 +332,8 @@ pub fn parse(text: &str) -> Option<Intent> {
         maintainers: sequence(text, "maintainers"),
         measured_contributors: sequence(text, "measured_contributors"),
         maintainer_capacity: parse_capacity(text),
+        axes: Vec::new(),
+        requirements: None,
     })
 }
 
@@ -555,6 +582,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_shipped_vsdd_manifest_declares_its_public_axes_and_pattern() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let i = load(&root, "vsdd-factory").unwrap();
+        let names: Vec<&str> = i.axes.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["capability", "step", "principle"]);
+        assert!(i.axes[0].scoped && i.axes[1].scoped && !i.axes[2].scoped);
+        let req = i.requirements.expect("a requirements block");
+        assert_eq!(req.patterns, vec!["{a}-{n}".to_string()]);
+        assert!(req.list.is_none(), "no public requirement list exists to name");
+    }
+
+    #[test]
     fn intent_files_parse_after_retirement() {
         // Every shipped manifest loads: it parses as YAML and each string
         // list holds strings. A regression pin for the dash replacement step.
@@ -619,6 +658,8 @@ mod tests {
             maintainers: vec!["drbothen".into()],
             measured_contributors: vec!["arcavenai".into()],
             maintainer_capacity: None,
+            axes: Vec::new(),
+            requirements: None,
         };
         assert_eq!(i.actor_role("drbothen"), "maintainer");
         assert_eq!(i.actor_role("arcavenai"), "measured");

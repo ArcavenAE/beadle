@@ -231,6 +231,21 @@ group grows: legal/licensing, community/conduct, upstream-coordination.
   (3) standing reading (context that improves future triage but gates
   nothing). Render the group in that order with the reason as a chip.
 
+### 3c. per-target axes  (read-only; only where the target declares `axes:`)
+
+When the target's intent file declares `axes:`, add `axes`, `evidence` and `requirements` to the
+classification payload (`beadle classify ingest` checks them; schema in `targets/README.md`).
+
+- `axes`: `{"<axis>": ["<value>"]}`, values only from the declared list, one value on a scoped
+  axis. A `row_prefix` axis is derived from the cited requirement ids when you give none; leave
+  it out rather than guess.
+- `requirements`: run `beadle requirements <target> --file <body>` on the issue or PR body and
+  carry its output. Ids from the text outside a `Requirements:` line are not citations.
+- `evidence`: `test` when the row cites a test, else `none`. Never `live` or `soc-confirmed`;
+  those are set by a person and ingest refuses them.
+- Labels from this section are proposals. Read the `label-plan:` lines `ingest` prints: only a
+  line ending `apply` may be applied (its owner is on the allow-list), and `propose-only` lines go on the board for a person.
+
 ### 4. score-intent  (read-only): MANDATORY PER ARTIFACT, never skipped
 This is beadle's differentiator (B4). You MUST read each enumerated issue's BODY
 and grade it: title-level slotting is a defect, not a shortcut. For every issue:

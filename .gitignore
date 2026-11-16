@@ -22,3 +22,7 @@
 # Python byproducts (scripts/)
 __pycache__/
 *.pyc
+
+# per-checkout policy and repo-local intent: they name owners and a product's own terms, so they are never committed here
+.beadle/propose-only.yaml
+.beadle/intent.yaml

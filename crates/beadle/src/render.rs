@@ -136,6 +136,18 @@ pub fn run(root: &Path, target: &str) -> Result<String> {
         &comment_stats,
         &class_summary,
     );
+    // A target that declares axes gets their sections ahead of the board
+    // controls; a target that declares none renders as it always did.
+    let axes_section = crate::axes_board::render(root, &intent, &latest_class)?;
+    let derived = if axes_section.is_empty() {
+        derived
+    } else {
+        let controls = controls::render_board_controls_block();
+        match derived.find(&controls) {
+            Some(at) => format!("{}{axes_section}{}", &derived[..at], &derived[at..]),
+            None => format!("{derived}{axes_section}"),
+        }
+    };
     // The opening carries renderer numbers too, so the digest covers it. Its
     // editor slot is still the fixed placeholder here; push merges the live
     // text in afterwards.
