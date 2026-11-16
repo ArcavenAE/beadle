@@ -589,7 +589,7 @@ mod tests {
         assert_eq!(names, ["capability", "step", "principle"]);
         assert!(i.axes[0].scoped && i.axes[1].scoped && !i.axes[2].scoped);
         let req = i.requirements.expect("a requirements block");
-        assert_eq!(req.pattern, "{a}-{n}");
+        assert_eq!(req.patterns, vec!["{a}-{n}".to_string()]);
         assert!(req.list.is_none(), "no public requirement list exists to name");
     }
 

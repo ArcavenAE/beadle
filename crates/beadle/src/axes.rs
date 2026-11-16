@@ -20,7 +20,7 @@
 //!     propose: marker       # an unscoped marker: its value is present or absent
 //!     values: [fast]
 //! requirements:
-//!   pattern: "{a}-{n}{l?}"  # see requirements.rs for the tokens
+//!   pattern: "{a}-{n}{l?}"  # one form, or a list of forms; see requirements.rs
 //!   list: requirements.txt  # relative to --root; optional
 //!   version: 3              # optional
 //! ```
@@ -29,7 +29,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-use crate::requirements::Pattern;
+use crate::requirements::PatternSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Propose {
@@ -52,7 +52,8 @@ pub struct AxisDef {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequirementsDecl {
-    pub pattern: String,
+    /// One or more id forms; an id fits when it fits any of them.
+    pub patterns: Vec<String>,
     pub list: Option<String>,
     pub version: Option<String>,
 }
@@ -72,6 +73,13 @@ enum Scalar {
 }
 
 #[derive(Deserialize)]
+#[serde(untagged)]
+enum OneOrMany {
+    One(String),
+    Many(Vec<String>),
+}
+
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AxisShape {
     name: String,
@@ -86,7 +94,7 @@ struct AxisShape {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ReqShape {
-    pattern: String,
+    pattern: OneOrMany,
     list: Option<String>,
     version: Option<Scalar>,
 }
@@ -172,9 +180,13 @@ pub fn read(text: &str) -> Result<Declared, String> {
     let requirements = match shape.requirements {
         None => None,
         Some(r) => {
-            Pattern::new(&r.pattern).map_err(|e| format!("requirements.pattern: {e}"))?;
+            let patterns = match r.pattern {
+                OneOrMany::One(p) => vec![p],
+                OneOrMany::Many(v) => v,
+            };
+            PatternSet::new(&patterns).map_err(|e| format!("requirements.pattern: {e}"))?;
             Some(RequirementsDecl {
-                pattern: r.pattern,
+                patterns,
                 list: r.list,
                 version: r.version.map(|v| match v {
                     Scalar::S(s) => s,

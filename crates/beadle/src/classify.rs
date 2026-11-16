@@ -66,7 +66,7 @@ use crate::{
     evidence,
     intent::{self, Intent},
     policy::Policy,
-    requirements::Pattern,
+    requirements::PatternSet,
     vocab::vocab,
 };
 
@@ -393,9 +393,12 @@ fn extend(rec: &mut ClassificationRecord, item: &Value, intent: &Intent) -> Resu
             let decl = intent.requirements.as_ref().ok_or_else(|| {
                 anyhow!("this target declares no requirements pattern; `requirements` is refused")
             })?;
-            let pattern = Pattern::new(&decl.pattern).map_err(|m| anyhow!(m))?;
+            let pattern = PatternSet::new(&decl.patterns).map_err(|m| anyhow!(m))?;
             if let Some(bad) = ids.iter().find(|i| !pattern.matches(i)) {
-                bail!("requirement id `{bad}` does not fit the target's id pattern `{}`", decl.pattern);
+                bail!(
+                    "requirement id `{bad}` does not fit the target's id pattern `{}`",
+                    pattern.describe()
+                );
             }
         }
         rec.requirements = ids;

@@ -10,7 +10,8 @@
 //! * `{l}`  one or more ASCII lowercase letters
 //! * `{l?}` zero or one ASCII lowercase letter (a split row's trailing letter)
 //!
-//! An id matches only when the whole string fits, case as written.
+//! An id matches only when the whole string fits, case as written. A target may
+//! declare one form or a list of forms; an id fits when any form matches.
 
 use std::{collections::BTreeSet, fs, path::Path};
 
@@ -106,7 +107,7 @@ pub fn run(root: &Path, target: &str, file: Option<&Path>) -> Result<()> {
     let decl = intent.requirements.as_ref().with_context(|| {
         format!("target `{target}` declares no requirements pattern; there is nothing to match")
     })?;
-    let pattern = Pattern::new(&decl.pattern).map_err(|m| anyhow::anyhow!(m))?;
+    let pattern = PatternSet::new(&decl.patterns).map_err(|m| anyhow::anyhow!(m))?;
     let body = match file {
         Some(p) => fs::read_to_string(p).with_context(|| format!("read {}", p.display()))?,
         None => {
@@ -121,11 +122,43 @@ pub fn run(root: &Path, target: &str, file: Option<&Path>) -> Result<()> {
     for r in &parsed.rejected {
         eprintln!(
             "beadle requirements: `{r}` does not fit the id pattern `{}`",
-            decl.pattern
+            pattern.describe()
         );
     }
     println!("{}", serde_json::to_string(&parsed.ids)?);
     Ok(())
+}
+
+/// The id forms a target declares: an id fits when it fits any one of them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PatternSet {
+    forms: Vec<(String, Pattern)>,
+}
+
+impl PatternSet {
+    pub fn new(forms: &[String]) -> std::result::Result<PatternSet, String> {
+        if forms.is_empty() {
+            return Err("requirements.pattern lists no forms".to_string());
+        }
+        let mut out = Vec::new();
+        for f in forms {
+            out.push((f.clone(), Pattern::new(f)?));
+        }
+        Ok(PatternSet { forms: out })
+    }
+
+    pub fn matches(&self, id: &str) -> bool {
+        self.forms.iter().any(|(_, p)| p.matches(id))
+    }
+
+    /// The forms as written, for messages.
+    pub fn describe(&self) -> String {
+        self.forms
+            .iter()
+            .map(|(f, _)| f.as_str())
+            .collect::<Vec<_>>()
+            .join(" | ")
+    }
 }
 
 /// What a body's `Requirements:` lines held.
@@ -139,7 +172,7 @@ pub struct Parsed {
 
 /// Read the ids from every line of `body` that starts with `Requirements:`.
 /// Ids elsewhere in the text are not read.
-pub fn parse_body(body: &str, pattern: &Pattern) -> Parsed {
+pub fn parse_body(body: &str, pattern: &PatternSet) -> Parsed {
     let mut out = Parsed::default();
     for line in body.lines() {
         let Some(rest) = line.trim_start().strip_prefix("Requirements:") else {
@@ -161,7 +194,7 @@ pub fn parse_body(body: &str, pattern: &Pattern) -> Parsed {
 /// The versioned list of requirement ids a target names: one id per line, `#`
 /// starts a comment. An id repeated in the list is an error, since ids are
 /// never reused or renumbered.
-pub fn load_list(path: &Path, pattern: &Pattern) -> Result<Vec<String>> {
+pub fn load_list(path: &Path, pattern: &PatternSet) -> Result<Vec<String>> {
     let text = fs::read_to_string(path)
         .with_context(|| format!("read requirements list {}", path.display()))?;
     let mut seen = BTreeSet::new();

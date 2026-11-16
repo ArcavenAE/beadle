@@ -18,7 +18,7 @@ use crate::{
     axes::Propose,
     evidence::Evidence,
     intent::Intent,
-    requirements::{self, Pattern},
+    requirements::{self, PatternSet},
 };
 
 fn esc(s: &str) -> String {
@@ -99,7 +99,7 @@ pub fn render(
         out.push_str("## Scope coverage\n\n");
         match &decl.list {
             Some(list) => {
-                let pattern = Pattern::new(&decl.pattern).map_err(|m| anyhow!(m))?;
+                let pattern = PatternSet::new(&decl.patterns).map_err(|m| anyhow!(m))?;
                 let path = root.join(list);
                 let listed = requirements::load_list(&path, &pattern)
                     .with_context(|| "scope coverage needs the declared requirements list")?;
