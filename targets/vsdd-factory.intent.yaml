@@ -235,8 +235,8 @@ composes_skill: arcavenai-issue-review
 
 # v0.7 axes. Every value below is from the repository's public README and docs/guide
 # (pipeline-overview.md, id-reference.md). No roadmap or PRD file exists in the public
-# tree, so no list of requirements is declared and no soc-stage or cadence axis is
-# declared: the public sources carry neither. Add them here when a public source does.
+# tree, so no list of requirements is declared, and only the axes the public docs name
+# are declared. Add more here when a public source names them.
 axes:
   # What the plugin does: the README's "What does this plugin do?" list.
   - name: capability
