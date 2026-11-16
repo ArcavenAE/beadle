@@ -1,0 +1,110 @@
+# beadle intent manifest for ArcavenAE/marvel. Populated from targets/_template.intent.yaml
+# (schema 0.3) against marvel's charter.md, README.md and CLAUDE.md. This is the manifest the
+# dashboard issue ArcavenAE/marvel#401 has been scored against since its first run (it reports
+# the intent as marvel@draft-0.3). Status: draft; not yet ratified by a maintainer.
+# No maintainer_capacity block: the template carries none at 0.3, and the class value is for a
+# maintainer to declare. Without it beadle scores the instrument at v1 and says so.
+schema_version: 0.3
+
+target:
+  repo: ArcavenAE/marvel
+  default_branch: main
+  local_checkout: null
+
+# marvel is an ordinary product: the control plane does not build itself. Process and meta
+# issues about marvel's own repository hygiene are judged as ordinary work.
+self_referential: false
+
+maintainers:
+  - arcaven
+measured_contributors:
+  - arcavenai
+
+intent_sources:
+  static:
+    - path: README.md
+      weight: medium
+    - path: CLAUDE.md
+      weight: high
+    - path: charter.md
+      weight: high
+      note: "B1 and B8 lag the 2026-08-01 bedrock nodes; the nodes win (the charter's own pointer)"
+    - path: _kos/nodes/bedrock/
+      weight: high
+  dynamic:
+    - source: maintainer-comments
+      weight: high
+    - source: git-history
+      weight: medium
+
+goals:
+  - Manage the lifecycle of agent sessions in tmux panes (launch, health, restart, shift, teardown) from declarative manifests, through a reconciliation loop
+  - Govern agents by the agentic resource matrix (context, spend, cache locality, access, authority), not by CPU and memory alone
+  - Stay console-agnostic (BYOA) through runtime adapters; `runtime` names the harness, never the agent
+  - Enforce permissions through environment construction at spawn; grow admission and metering, then mid-flight revocation
+  - Survive its own restarts and upgrades without losing agents (detach and adopt, reexec, staged activation)
+  - Be reachable and operable remotely over mrvl:// with key-based auth and trust-on-first-use host keys
+  - Say what it did: truthful CLI status (sessions, CTX%, HEALTH, events, logs) and loud failures
+
+non_goals:
+  - Replacing the harness (Claude Code, codex, opencode) or wrapping it subtractively
+  - Requiring any other fleet component (director, switchboard, sideshow, kos) to function
+  - Holding third-party bearer credentials (the custody boundary, SOUL.md section 3)
+  - Model-only resources (Pack, Vault, Volume, Schedule, Gateway, Readycheck) before a concrete need
+  - Multi-host scheduling ahead of roadmap M5
+
+scope_boundaries:
+  - The store and manifests are the desired-state authority; the reconciler converges tmux to them, never the reverse
+  - The handoff schema is marvel's; the handoff content is the departing agent's (elem-handoff-schema-ownership)
+  - Bus transport is external NATS supervised by marvel as a declared workload
+
+# Systems-of-record ranked by recoverability. The silent-integrity classifier uses these to
+# ground its top-severity class: a defect that makes any of them disagree with reality without
+# a signal is source-of-truth corruption.
+integrity_anchors:
+  regenerable:
+    - tmux sessions and panes (re-launched by the reconciler)
+    - projected per-session files (policy, harness home, settings.local.json)
+    - build output and release artifacts
+  spec_process:
+    - applied manifests and the persisted store (desired state, generations, replica counts, RoleHealth)
+    - the marvel data directory, authorized_keys and known_hosts (access authority)
+    - bus auth registrations and grants (who may say what to whom)
+  learning:
+    - an agent's live context and uncommitted work in its pane or worktree (lost on a wrong kill)
+    - shift handoff artifacts
+    - the daemon log ring and events (the only record of why a session died)
+
+provenance_signal:
+  pilot_derived_markers:
+    - cites a real commit sha / PR / run with a reproduction
+    - observed on a live cluster (a named team, session key or daemon log line)
+    - concrete metrics or git evidence
+  speculative_markers:
+    - proposes a mechanism with no observed failure
+    - "'might need' / 'to be safe' without a triggering incident"
+
+alignment_rubric:
+  advances:
+    - fixes a defect where marvel's reported state disagrees with reality (silent wrong status, silent no-op, silent loss)
+    - fixes a defect that kills, strands, or respawns an agent wrongly
+    - hardens reconcile, shift or restart convergence with a load-bearing test
+    - closes a gap between an adapter and the harness it launches
+  neutral:
+    - documentation, examples, CI plumbing with bounded blast radius
+    - a decision question with no observed failure yet
+  drifts:
+    - proposes machinery before a concrete need (a gradual-elaboration violation)
+    - couples marvel to another fleet component as a requirement
+    - moves custody of a third-party credential into marvel
+    - re-files an already-decided question, or contradicts a ratified node
+
+minutiae_signals:
+  - low_leverage_ratio_rising
+  - filed_vs_acted_gap_widening
+  - cluster_same_lever_filed_n_times
+  - over_engineering_fingerprints
+
+composes_skill: arcavenai-issue-review
+
+status: draft

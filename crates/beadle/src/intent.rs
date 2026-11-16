@@ -575,6 +575,34 @@ mod tests {
     }
 
     #[test]
+    fn the_fleet_repos_that_carry_a_dashboard_have_populated_manifests() {
+        // beadle-triage refuses a target with no manifest, and refuses one
+        // marked `draft-unpopulated`. marvel and director each carry a
+        // dashboard issue, so each needs a manifest that loads, names its
+        // repo and both logins, and holds the sections the skill reads.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for (target, repo) in [("marvel", "ArcavenAE/marvel"), ("director", "ArcavenAE/director")] {
+            let i = load(&root, target).unwrap_or_else(|e| panic!("{target}: {e}"));
+            assert_eq!(i.repo, repo, "{target}: repo");
+            assert_eq!(i.maintainers, vec!["arcaven".to_string()], "{target}: maintainers");
+            assert_eq!(
+                i.measured_contributors,
+                vec!["arcavenai".to_string()],
+                "{target}: measured_contributors"
+            );
+            let text = std::fs::read_to_string(root.join(format!("targets/{target}.intent.yaml"))).unwrap();
+            assert_ne!(scalar(&text, "status").as_deref(), Some("draft-unpopulated"), "{target}: status");
+            for key in ["goals", "non_goals"] {
+                assert!(!sequence(&text, key).is_empty(), "{target}: {key} is empty");
+            }
+            let rubric = block(&text, "alignment_rubric").unwrap_or_default();
+            for key in ["advances", "neutral", "drifts"] {
+                assert!(!sequence(&rubric, key).is_empty(), "{target}: alignment_rubric.{key} is empty");
+            }
+        }
+    }
+
+    #[test]
     fn parses_sequence() {
         let yaml = "maintainers:\n  - drbothen\n  - Zious11\nother_key: hello\n";
         assert_eq!(
