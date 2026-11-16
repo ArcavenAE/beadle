@@ -490,3 +490,85 @@ fn literals_may_be_dash_dot_and_underscore() {
     let no = ingest(&td, &rec(1, json!({"requirements": ["S.AB_3"]})));
     assert!(!no.status.success());
 }
+
+fn parse_body(td: &TempDir, body: &str) -> Output {
+    let f = td.path().join("body.md");
+    fs::write(&f, body).unwrap();
+    beadle(
+        td.path(),
+        &["requirements", "t", "--file", f.to_str().unwrap()],
+    )
+}
+
+fn ids(o: &Output) -> Value {
+    serde_json::from_slice(&o.stdout)
+        .unwrap_or_else(|_| panic!("not JSON: {}", String::from_utf8_lossy(&o.stdout)))
+}
+
+#[test]
+fn the_requirements_line_of_a_body_yields_its_ids_in_order_without_repeats() {
+    let td = full();
+    let o = parse_body(
+        &td,
+        "Fixes a thing.\n\nRequirements: LA-2, EA-1, EA-2a, EA-1\n\nMore text.\n",
+    );
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert_eq!(ids(&o), json!(["LA-2", "EA-1", "EA-2a"]));
+}
+
+#[test]
+fn text_outside_a_requirements_line_is_not_read_and_a_misfit_is_reported_not_returned() {
+    let td = full();
+    let o = parse_body(
+        &td,
+        "See EA-9 in the text.\nRequirements: EA-1, nonsense, ea-2\n",
+    );
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert_eq!(ids(&o), json!(["EA-1"]));
+    assert!(
+        stderr(&o).contains("nonsense") && stderr(&o).contains("ea-2"),
+        "{}",
+        stderr(&o)
+    );
+}
+
+#[test]
+fn a_body_with_no_requirements_line_yields_an_empty_list() {
+    let td = full();
+    let o = parse_body(&td, "Nothing cited here.\n");
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert_eq!(ids(&o), json!([]));
+}
+
+#[test]
+fn the_parser_is_refused_for_a_target_that_declares_no_pattern() {
+    let td = workspace(&intent("acme/widget", AXES), &[run_row(1)]);
+    let o = parse_body(&td, "Requirements: EA-1\n");
+    assert!(!o.status.success());
+    assert!(
+        stderr(&o).contains("declares no requirements"),
+        "{}",
+        stderr(&o)
+    );
+}
+
+#[test]
+fn cited_requirements_are_recorded_in_the_cited_evidence() {
+    let td = full();
+    let o = ingest(
+        &td,
+        &rec(
+            1,
+            json!({"requirements": ["EA-1", "LA-1"], "cited_evidence": "docs/a.md line 3"}),
+        ),
+    );
+    assert!(o.status.success(), "{}", stderr(&o));
+    let c = last_class(&td)["cited_evidence"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        c.contains("docs/a.md line 3") && c.contains("Requirements: EA-1, LA-1"),
+        "{c}"
+    );
+}
