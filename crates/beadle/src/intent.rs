@@ -582,6 +582,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_shipped_vsdd_manifest_declares_its_public_axes_and_pattern() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let i = load(&root, "vsdd-factory").unwrap();
+        let names: Vec<&str> = i.axes.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["capability", "step", "principle"]);
+        assert!(i.axes[0].scoped && i.axes[1].scoped && !i.axes[2].scoped);
+        let req = i.requirements.expect("a requirements block");
+        assert_eq!(req.pattern, "{a}-{n}");
+        assert!(req.list.is_none(), "no public requirement list exists to name");
+    }
+
+    #[test]
     fn intent_files_parse_after_retirement() {
         // Every shipped manifest loads: it parses as YAML and each string
         // list holds strings. A regression pin for the dash replacement step.

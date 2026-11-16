@@ -17,7 +17,10 @@
 #       score the pr_acceptance and merge_latency bands instead of emitting
 #       `pending`. Same refresh discipline as observed_windows: the run
 #       refreshes it. See beadle#46 / aae-orc-it9r3.
-schema_version: 0.6
+# v0.7: added `axes:` and `requirements:` (generic per-target classification; schema in
+#       targets/README.md), built from vsdd-factory's public README and docs/guide only.
+#       Nothing above this line changed.
+schema_version: 0.7
 
 target:
   repo: BOHICA-LABS/vsdd-factory
@@ -229,3 +232,47 @@ minutiae_signals:
 
 # Compose the existing per-issue discipline rather than reinventing it.
 composes_skill: arcavenai-issue-review
+
+# v0.7 axes. Every value below is from the repository's public README and docs/guide
+# (pipeline-overview.md, id-reference.md). No roadmap or PRD file exists in the public
+# tree, so no list of requirements is declared and no soc-stage or cadence axis is
+# declared: the public sources carry neither. Add them here when a public source does.
+axes:
+  # What the plugin does: the README's "What does this plugin do?" list.
+  - name: capability
+    scoped: true
+    propose: label
+    values:
+      - brownfield-ingestion
+      - spec-crystallization
+      - story-decomposition
+      - tdd-delivery
+      - adversarial-refinement
+      - holdout-evaluation
+      - formal-hardening
+      - convergence-gating
+      - release-management
+  # Where in the pipeline: docs/guide/pipeline-overview.md, Phase 0 to Phase 7.
+  - name: step
+    scoped: true
+    propose: label
+    values:
+      - phase-0
+      - phase-1
+      - phase-2
+      - phase-3
+      - phase-4
+      - phase-5
+      - phase-6
+      - phase-7
+  # The three paradigms the README says VSDD fuses; a row can touch more than one.
+  - name: principle
+    scoped: false
+    propose: label
+    values: [sdd, tdd, vdd]
+
+# The id pattern covers the flat ids in docs/guide/id-reference.md (CAP-001, NFR-001,
+# VP-001, STORY-001 and the like). The behavioral-contract form BC-S.SS.NNN has dotted
+# groups and is not matched by this single pattern.
+requirements:
+  pattern: "{a}-{n}"
