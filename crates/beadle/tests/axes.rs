@@ -407,60 +407,133 @@ fn planned(config: Option<&str>, repo: &str) -> Vec<String> {
     plan_lines(&o)
 }
 
+fn propose_only(repo: &str) -> Vec<String> {
+    vec![format!("label-plan: evidence.test {repo} propose-only")]
+}
+
+fn apply(repo: &str) -> Vec<String> {
+    vec![format!("label-plan: evidence.test {repo} apply")]
+}
+
 #[test]
 fn a_missing_policy_file_means_propose_only_everywhere() {
-    assert_eq!(
-        planned(None, "acme/widget"),
-        vec!["label-plan: evidence.test acme/widget propose-only"]
-    );
+    assert_eq!(planned(None, "acme/widget"), propose_only("acme/widget"));
 }
 
 #[test]
 fn an_empty_policy_file_means_propose_only_everywhere() {
     assert_eq!(
         planned(Some(""), "acme/widget"),
-        vec!["label-plan: evidence.test acme/widget propose-only"]
+        propose_only("acme/widget")
     );
     assert_eq!(
-        planned(Some("owners: []\n"), "acme/widget"),
-        vec!["label-plan: evidence.test acme/widget propose-only"]
+        planned(Some("apply_owners: []\n"), "acme/widget"),
+        propose_only("acme/widget")
     );
 }
 
 #[test]
 fn an_unparsable_policy_file_means_propose_only_everywhere() {
-    assert_eq!(
-        planned(Some("owners: [unclosed\n"), "acme/widget"),
-        vec!["label-plan: evidence.test acme/widget propose-only"]
-    );
-    assert_eq!(
-        planned(Some("owners: 12\n"), "acme/widget"),
-        vec!["label-plan: evidence.test acme/widget propose-only"]
-    );
+    for text in ["apply_owners: [unclosed\n", "apply_owners: 12\n"] {
+        assert_eq!(
+            planned(Some(text), "acme/widget"),
+            propose_only("acme/widget"),
+            "{text}"
+        );
+    }
 }
 
 #[test]
-fn a_listed_owner_stays_propose_only() {
-    assert_eq!(
-        planned(Some("owners:\n  - acme\n"), "acme/widget"),
-        vec!["label-plan: evidence.test acme/widget propose-only"]
-    );
-}
-
-#[test]
-fn an_owner_absent_from_a_non_empty_list_may_be_applied_to() {
+fn a_file_using_the_old_deny_list_key_means_propose_only_everywhere() {
     assert_eq!(
         planned(Some("owners:\n  - other\n"), "acme/widget"),
-        vec!["label-plan: evidence.test acme/widget apply"]
+        propose_only("acme/widget")
     );
+}
+
+#[test]
+fn only_an_owner_the_list_names_may_be_applied_to() {
+    let cfg = "apply_owners:\n  - acme\n";
+    assert_eq!(planned(Some(cfg), "acme/widget"), apply("acme/widget"));
+    assert_eq!(
+        planned(Some(cfg), "other/widget"),
+        propose_only("other/widget")
+    );
+}
+
+#[test]
+fn an_owner_the_policy_has_never_heard_of_is_propose_only() {
+    // control: the same file does allow the owners it names
+    assert_eq!(
+        planned(Some("apply_owners:\n  - acme\n  - second\n"), "second/tool"),
+        apply("second/tool")
+    );
+    assert_eq!(
+        planned(
+            Some("apply_owners:\n  - acme\n  - second\n"),
+            "brand-new-org/tool"
+        ),
+        propose_only("brand-new-org/tool")
+    );
+}
+
+#[test]
+fn owners_are_compared_without_regard_to_case() {
+    assert_eq!(
+        planned(Some("apply_owners: [ACME]\n"), "acme/widget"),
+        apply("acme/widget")
+    );
+    assert_eq!(
+        planned(Some("apply_owners: [acme]\n"), "ACME/widget"),
+        apply("ACME/widget")
+    );
+    assert_eq!(
+        planned(Some("apply_owners: [ACME]\n"), "other/widget"),
+        propose_only("other/widget")
+    );
+}
+
+#[test]
+fn one_malformed_entry_makes_the_whole_file_fail_closed() {
+    // control: without the bad entry the same file is in force
+    assert_eq!(
+        planned(Some("apply_owners:\n  - acme\n"), "acme/widget"),
+        apply("acme/widget")
+    );
+    for entry in ["acme/widget", "a:b", "a b", "\"\"", "\" \""] {
+        let cfg = format!("apply_owners:\n  - acme\n  - {entry}\n");
+        assert_eq!(
+            planned(Some(&cfg), "acme/widget"),
+            propose_only("acme/widget"),
+            "entry {entry} left the file in force"
+        );
+    }
 }
 
 #[test]
 fn a_target_that_is_not_an_owner_and_repo_pair_is_propose_only() {
+    // control: a real owner and name in the same file is applied to
     assert_eq!(
-        planned(Some("owners:\n  - other\n"), "jira:PROJ"),
-        vec!["label-plan: evidence.test jira:PROJ propose-only"]
+        planned(Some("apply_owners:\n  - jira\n  - acme\n"), "acme/widget"),
+        apply("acme/widget")
     );
+    assert_eq!(
+        planned(Some("apply_owners:\n  - jira\n  - acme\n"), "jira:PROJ"),
+        propose_only("jira:PROJ")
+    );
+}
+
+#[test]
+fn the_policy_and_the_repo_local_intent_files_are_not_committed_here() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let ignore = fs::read_to_string(root.join(".gitignore")).unwrap();
+    let lines: Vec<&str> = ignore.lines().map(str::trim).collect();
+    for f in [".beadle/propose-only.yaml", ".beadle/intent.yaml"] {
+        assert!(
+            lines.contains(&f) || lines.contains(&".beadle/") || lines.contains(&".beadle"),
+            "{f} is not ignored"
+        );
+    }
 }
 
 #[test]
@@ -571,4 +644,69 @@ fn cited_requirements_are_recorded_in_the_cited_evidence() {
         c.contains("docs/a.md line 3") && c.contains("Requirements: EA-1, LA-1"),
         "{c}"
     );
+}
+
+const FORMS: &str = "\
+requirements:
+  pattern:
+    - \"{a}-{a}-{n}{l?}\"
+    - \"{a}-{n}\"
+  version: 1
+";
+
+fn forms() -> TempDir {
+    workspace(
+        &intent("acme/widget", &format!("{AXES}{FORMS}")),
+        &[run_row(1)],
+    )
+}
+
+#[test]
+fn a_list_of_forms_matches_an_id_that_fits_any_one_of_them() {
+    let td = forms();
+    for good in ["AB-CD-12", "AB-CD-12a", "AB-7"] {
+        let o = ingest(&td, &rec(1, json!({"requirements": [good]})));
+        assert!(o.status.success(), "{good}: {}", stderr(&o));
+    }
+}
+
+#[test]
+fn a_list_of_forms_refuses_an_id_that_fits_none() {
+    let td = forms();
+    for bad in ["AB-CD", "AB-CD-12ab", "ab-7", "AB-7-"] {
+        let o = ingest(&td, &rec(1, json!({"requirements": [bad]})));
+        assert!(!o.status.success(), "{bad} was accepted");
+        assert!(stderr(&o).contains(bad), "{}", stderr(&o));
+    }
+}
+
+#[test]
+fn the_requirements_command_reads_every_form_in_the_list() {
+    let td = forms();
+    let o = parse_body(&td, "Requirements: AB-CD-12a, AB-7, AB-CD\n");
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert_eq!(ids(&o), json!(["AB-CD-12a", "AB-7"]));
+}
+
+#[test]
+fn a_malformed_form_in_the_list_is_named_when_the_intent_loads() {
+    let text = intent(
+        "acme/widget",
+        "requirements:\n  pattern:\n    - \"{a}-{n}\"\n    - \"{q}\"\n",
+    );
+    let td = workspace(&text, &[run_row(1)]);
+    let o = ingest(&td, &rec(1, json!({"requirements": ["AB-7"]})));
+    assert!(!o.status.success());
+    assert!(stderr(&o).contains("{q}"), "{}", stderr(&o));
+}
+
+#[test]
+fn an_empty_list_of_forms_is_refused() {
+    let td = workspace(
+        &intent("acme/widget", "requirements:\n  pattern: []\n"),
+        &[run_row(1)],
+    );
+    let o = ingest(&td, &rec(1, json!({"requirements": ["AB-7"]})));
+    assert!(!o.status.success());
+    assert!(stderr(&o).contains("pattern"), "{}", stderr(&o));
 }
