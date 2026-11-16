@@ -10,6 +10,8 @@ that manifest and weights them by what the named **maintainers** actually act on
 |---|---|---|
 | `vsdd-factory.intent.yaml` | `BOHICA-LABS/vsdd-factory` | populated (v0) |
 | `prism.intent.yaml` | DrBothen's Prism | **draft — unpopulated** |
+| `marvel.intent.yaml` | `ArcavenAE/marvel` | populated (draft 0.3, not yet ratified by a maintainer) |
+| `director.intent.yaml` | `ArcavenAE/director` | populated (draft 0.3, not yet ratified by a maintainer) |
 
 ## Adding a target
 

@@ -1,0 +1,96 @@
+# beadle intent manifest for ArcavenAE/director. Populated from targets/_template.intent.yaml
+# (schema 0.3) against director's README.md, docs/architecture.md and sim/requirements.md. This
+# is the manifest the dashboard issue ArcavenAE/director#158 has been scored against since its
+# first run (it reports the intent as director@draft-0.3). Status: draft; not yet ratified by a
+# maintainer.
+# No maintainer_capacity block: the template carries none at 0.3, and the class value is for a
+# maintainer to declare. Without it beadle scores the instrument at v1 and says so.
+schema_version: 0.3
+
+target:
+  repo: ArcavenAE/director
+  default_branch: main
+  local_checkout: null
+
+# director is an ordinary product: the bus does not build itself.
+self_referential: false
+
+maintainers:
+  - arcaven
+measured_contributors:
+  - arcavenai
+
+intent_sources:
+  static:
+    - path: README.md
+      weight: high
+    - path: docs/architecture.md
+      weight: high
+    - path: sim/requirements.md
+      weight: high
+      note: "the requirements register, R-01 onward; the README calls the requirements the point"
+    - path: docs/shim-reference.md
+      weight: medium
+  dynamic:
+    - source: maintainer-comments
+      weight: high
+    - source: git-history
+      weight: medium
+
+goals:
+  - "Custody: nothing an agent session produces is lost and nothing it asks is dropped"
+  - Carry the director envelope between sessions across harnesses (Claude Code, codex, others), hosts and accounts
+  - Store-and-forward delivery with dedup, presence, and broker-enforced authorization
+  - A global tier that reaches a remote supervisor through a hub without holding a hub credential
+  - "Honest delivery signals: accepted is not delivered, and silence is reported as silence, not success"
+  - Requirements traced to observations (sim/requirements.md)
+
+non_goals:
+  - Depending on one harness vendor's cross-session messaging
+  - Building the director software before the requirements and transport are proven (the simulation phase)
+
+scope_boundaries:
+  - The shim is a thin MCP layer over NATS; authorization is the broker's, not the shim's
+
+# Systems-of-record ranked by recoverability. The silent-integrity classifier uses these to
+# ground its top-severity class: a defect that makes any of them disagree with reality without
+# a signal is source-of-truth corruption.
+integrity_anchors:
+  regenerable:
+    - shim builds
+    - broker configs rendered from recipes
+  spec_process:
+    - broker authorization blocks and grants
+    - "address resolution (agent://, role://, global://, broadcast://)"
+    - the delivery or refusal signal a sender receives
+  learning:
+    - durable consumer state and queued mail (an unread message is custody)
+    - the requirements register
+
+provenance_signal:
+  pilot_derived_markers:
+    - observed on a live cluster with a bus sequence, log line or reproduction
+    - cites a real commit sha / PR / run with a reproduction
+  speculative_markers:
+    - proposes a mechanism with no observed failure
+
+alignment_rubric:
+  advances:
+    - closes a path where mail is accepted and never delivered, or delivered and never read
+    - makes a refusal, a timeout or a silence report say what actually happened
+    - closes an authorization gap in the broker
+  neutral:
+    - documentation, recipes, release plumbing
+  drifts:
+    - depending on one vendor harness feature
+    - machinery before the requirement exists
+
+minutiae_signals:
+  - low_leverage_ratio_rising
+  - filed_vs_acted_gap_widening
+  - cluster_same_lever_filed_n_times
+  - over_engineering_fingerprints
+
+composes_skill: arcavenai-issue-review
+
+status: draft
