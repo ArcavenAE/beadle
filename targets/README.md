@@ -41,7 +41,7 @@ axes:
     propose: marker         # an unscoped marker, present or absent
     values: [fast]
 requirements:
-  pattern: "{a}-{n}{l?}"    # the id pattern, see below
+  pattern: "{a}-{n}{l?}"    # the id pattern, or a list of forms; see below
   list: requirements.txt    # optional; one id per line, relative to --root
   version: 3                # optional; shown on the board
 ```
@@ -57,7 +57,9 @@ requirements:
 - The id pattern is a small declared form, not a regular expression. Literal text is
   letters, digits, `-`, `.` and `_`. Tokens: `{n}` one or more digits, `{a}` one or more
   capital letters, `{l}` one or more lowercase letters, `{l?}` zero or one lowercase letter
-  (a split row's trailing letter). An id must match whole, case as written. The list file
+  (a split row's trailing letter). An id must match whole, case as written. `pattern` may
+  also be a list of such forms (`pattern: ["{a}-{a}-{n}{l?}", "{a}-{n}"]`); an id fits when it
+  fits any one of them, and a list may not be empty. The list file
   never renumbers or repeats an id.
 - `beadle requirements <target> --file BODY` prints the ids on a body's `Requirements:` line
   as a JSON array. Ids elsewhere in the text are not read. `classify ingest` records them
@@ -65,11 +67,15 @@ requirements:
 - The evidence axis is the same for every target: `none`, `test`, `live`, `soc-confirmed`.
   Beadle proposes only `none` or `test`, as the label `evidence.<value>`; a payload with
   `live` or `soc-confirmed` is refused.
-- Where a label may be applied, and where it is only proposed, is read from
-  `<root>/.beadle/propose-only.yaml` (`owners:` list). A missing, empty or unparsable file
-  makes every repo propose-only. With a non-empty list, a repo is applied to only when its
-  owner is absent from the list. A target that is not an `owner/name` pair is always
-  propose-only. `classify ingest` prints one `label-plan:` line per proposed evidence label.
+- Where a label may be applied is an allow-list, read from
+  `<root>/.beadle/propose-only.yaml` as `apply_owners:` (bare logins). An owner the list does
+  not name, including one the policy has never heard of, is propose-only. A missing, empty or
+  unparsable file makes every repo propose-only, and so does one malformed entry (a `/`, a
+  `:`, a space or a blank): the whole file is then unparsable. Owners compare without regard
+  to case. A target that is not an `owner/name` pair is always propose-only.
+  `classify ingest` prints one `label-plan:` line per proposed evidence label.
+- `.beadle/propose-only.yaml` and `.beadle/intent.yaml` are per-checkout files and are listed
+  in `.gitignore`: neither is committed to this repository.
 - A target that declares no `axes:` renders the board it always did.
 
 ## Adding a target

@@ -244,7 +244,7 @@ classification payload (`beadle classify ingest` checks them; schema in `targets
 - `evidence`: `test` when the row cites a test, else `none`. Never `live` or `soc-confirmed`;
   those are set by a person and ingest refuses them.
 - Labels from this section are proposals. Read the `label-plan:` lines `ingest` prints: only a
-  line ending `apply` may be applied, and `propose-only` lines go on the board for a person.
+  line ending `apply` may be applied (its owner is on the allow-list), and `propose-only` lines go on the board for a person.
 
 ### 4. score-intent  (read-only): MANDATORY PER ARTIFACT, never skipped
 This is beadle's differentiator (B4). You MUST read each enumerated issue's BODY

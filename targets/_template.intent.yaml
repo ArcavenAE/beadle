@@ -89,7 +89,7 @@ minutiae_signals:
 #     propose: label
 #     values: [a, b]
 # requirements:
-#   pattern: "{a}-{n}{l?}"
+#   pattern: "{a}-{n}{l?}"   # or a list of forms
 #   list: requirements.txt
 #   version: 1
 
