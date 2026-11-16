@@ -165,6 +165,17 @@ pub struct ClassificationRecord {
     /// found still open.
     #[serde(default)]
     pub possibly_fixed: Option<PossiblyFixed>,
+    /// Per-target axis values, keyed by the axis name the target's intent file
+    /// declares. Absent on rows written before the axes existed.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub axes: std::collections::BTreeMap<String, Vec<String>>,
+    /// The evidence axis: `none` or `test`. Beadle never writes `live` or
+    /// `soc-confirmed`; those are set by a person.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<String>,
+    /// Requirement ids the issue or PR cites on its `Requirements:` line.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requirements: Vec<String>,
 }
 
 impl ClassificationRecord {
@@ -512,6 +523,7 @@ mod tests {
                 confidence: "low".into(),
                 verify: Some("treat as open".into()),
             }),
+            ..Default::default()
         }
     }
 

@@ -14,17 +14,22 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
+mod axes;
+mod axes_board;
 mod classify;
 mod controls;
 mod dash;
 mod direction;
 mod enumerate;
+mod evidence;
 mod gh;
 mod intent;
 mod migrate;
 mod note;
+mod policy;
 mod push;
 mod render;
+mod requirements;
 mod sync;
 #[cfg(test)]
 mod testsupport;
@@ -90,6 +95,13 @@ enum Cmd {
         /// `targets/<target>.verify.json` when it exists.
         #[arg(long)]
         renames: Option<PathBuf>,
+    },
+    /// Print the requirement ids on a body's `Requirements:` line as JSON, using
+    /// the id pattern the target declares. Reads stdin when `--file` is absent.
+    Requirements {
+        target: String,
+        #[arg(long)]
+        file: Option<PathBuf>,
     },
     /// Print the stored issue titles of a target, one per line, for the
     /// Python gate's `--titles FILE`. Reads the store; changes nothing.
@@ -162,6 +174,9 @@ fn main() -> Result<()> {
             candidate,
             renames,
         } => verify::run(&root, &target, &before, &candidate, renames.as_deref()),
+        Cmd::Requirements { target, file } => {
+            requirements::run(&root, &target, file.as_deref())
+        }
         Cmd::Titles { target } => verify::titles(&root, &target),
         Cmd::Note {
             target,
