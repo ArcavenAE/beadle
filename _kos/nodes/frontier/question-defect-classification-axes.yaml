@@ -50,6 +50,12 @@ content: |
      reference for finding-004's visibility×compounding axis, or keep that axis
      beadle-original?
 
+  HARVEST 2026-11-17: beadle#135 (e80bfa0, 2026-11-16) answers part of open
+  question 3 by making axes per target and optional (`targets/README.md`, "Axes,
+  requirements and evidence (schema 0.7, all optional)"); a target with no axes
+  renders its board unchanged. Which axes are primary facets, badges or drill-in
+  only is still open.
+
   HARVEST 2026-10-09 (finding-027): the daily refresh graded by a working
   convention the skill did not state. RULED 2026-10-08 (operator; recorded in
   the finding's Ruling section and written into skills/beadle-triage step 3,

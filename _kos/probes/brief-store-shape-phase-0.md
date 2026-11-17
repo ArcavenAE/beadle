@@ -3,6 +3,8 @@
 Date opened: 2026-07-01 (retroactive; work executed in-session before this brief
 was written — captured now per ADR-006 harvest discipline).
 
+Status: complete, see finding-011. The store and renderer it scoped have shipped.
+
 ## Question
 
 `elem-state-out-of-band` establishes that beadle's durable state lives outside
