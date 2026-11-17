@@ -27,7 +27,7 @@ content: |
     grounded, not inferred.
 
   Two data points after the last harvest, neither closing a sub-question.
-  beadle#134 (5ef8d1e, 2026-11-15) adds draft manifests for marvel and director
+  beadle#134 (5ef8d1e, 2026-11-16) adds draft manifests for marvel and director
   with no capacity block, for the maintainer to ratify. beadle#135 (e80bfa0,
   2026-11-16) moves the schema to 0.7 with optional `axes:` and `requirements:`.
 
