@@ -25,6 +25,13 @@ content: |
      read-only" — exactly the cross-machine gap here. So the move is already
      designed; only the trigger is open.
 
+  Harvest 2026-11-17: the premise that a shared instance does not exist is out
+  of date for the orc. aae-orc finding-149 (2026-08-28) records kinu's Phase-0
+  server extended to accept one LAN peer as a second live writer; its status
+  reads "probe complete, direction reconciliation open" (aae-orc-k41dg), so the
+  direction is not ruled. Decision 1 still holds: beadle has no `.beads` entry
+  at origin/main e80bfa0d. The trigger below is unchanged.
+
   PROPOSED TRIGGER (the forcing function):
     beadle Phase 1 — the scheduled gh-aw workflow running AS arcavenai — is the
     first time state must be (a) written by a non-interactive agent and (b)
