@@ -5,7 +5,15 @@
 [advisories]
 version = 2
 yanked = "warn"
-ignore = []
+ignore = [
+    # chrono 0.4 is unmaintained per RUSTSEC-2026-0543, with no patched version.
+    # It reaches beadle only through crates/director-envelope, in the three
+    # date-time fields of the typify-generated envelope.gen.rs. The migration
+    # (jiff or time) belongs to director's envelope contract and generator: the
+    # wire form is 3, 6 or 9 fractional digits plus a :60 leap second, which a
+    # swap must reproduce. Re-check 2026-12-18.
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no patched version; via director-envelope's typify-generated envelope.gen.rs; migration belongs to director's envelope contract and generator; re-check 2026-12-18" },
+]
 
 [licenses]
 version = 2
