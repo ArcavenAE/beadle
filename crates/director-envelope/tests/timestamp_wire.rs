@@ -14,7 +14,7 @@
 //! decimal mark, and out-of-range fields are refused.
 
 use director_envelope::Envelope;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 const FIELDS: [&str; 3] = ["sent_at", "expires_at", "reply_by"];
 
