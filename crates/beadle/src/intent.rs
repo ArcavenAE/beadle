@@ -586,8 +586,8 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let i = load(&root, "vsdd-factory").unwrap();
         let names: Vec<&str> = i.axes.iter().map(|a| a.name.as_str()).collect();
-        assert_eq!(names, ["capability", "step", "principle"]);
-        assert!(i.axes[0].scoped && i.axes[1].scoped && !i.axes[2].scoped);
+        assert_eq!(names, ["capability", "step", "principle", "iso25010"]);
+        assert!(i.axes[0].scoped && i.axes[1].scoped && !i.axes[2].scoped && i.axes[3].scoped);
         let req = i.requirements.expect("a requirements block");
         assert_eq!(req.patterns, vec!["{a}-{n}".to_string()]);
         assert!(req.list.is_none(), "no public requirement list exists to name");
