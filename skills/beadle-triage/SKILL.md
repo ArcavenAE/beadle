@@ -458,9 +458,25 @@ add the section "## Quality characteristic groups (ISO/IEC 25010:2023)" with a c
 characteristic and the rows by `#NN`, and carry the characteristic in the Classification
 index title ("... + ISO/IEC 25010"). Keep the `iso25010` map in the `beadle-state` payload,
 characteristic name to issue numbers: the gate fails a candidate that drops the section,
-a grouped lane, the index suffix or any characteristic's issues. A board that already
-carries these headings keeps its own spelling; a retitle is a loss the gate fails. The
-operator dropped this grouping on 2026-09-30 and reversed that on 2026-11-24.
+a grouped lane, the index suffix or any characteristic's issues. The map's keys are the
+sentinel's spelling, not the intent's slugs, and the gate compares them exactly (a slug key
+fails check 3b for every characteristic):
+
+- `functional-suitability` -> `Functional suitability`
+- `performance-efficiency` -> `Performance efficiency`
+- `compatibility` -> `Compatibility`
+- `interaction-capability` -> `Interaction capability`
+- `reliability` -> `Reliability`
+- `security` -> `Security`
+- `maintainability` -> `Maintainability`
+- `flexibility` -> `Flexibility`
+- `safety` -> `Safety` (add it when a row first uses it)
+
+A board that already carries these headings keeps its own spelling; a retitle is a loss the
+gate fails. A Classification index titled without the "+ ISO/IEC 25010" suffix (a plain
+"## Classification index") stays: keep it as it is and do not add the suffix, since a retitle fails
+check 2 as HEADING LOST. The operator dropped this grouping on 2026-09-30 and reversed that
+on 2026-11-24.
 
 **Row legibility; title leads, verdict trails (finding-005).** A human scanning the
 board orients on *what an issue is*, not its number, and will not hover. Every
