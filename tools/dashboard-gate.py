@@ -20,14 +20,43 @@ def sentinel(t):
 
 sb, sc = sentinel(before), sentinel(cand)
 
+# A run that is not the plain next run says so in its payload: `gate_kind` is
+# one of KINDS, and an undeclared run keeps the rules below exactly.
+#   reclassification  run = before + 1 at the SAME watermark (a regrouping of
+#                     the issues already on the board); needs the 25010 sections.
+#   first-run-replace run 1 over a body that already exists (a cold-started
+#                     store); needs a `board_history` note saying so. Checks 2
+#                     (headings of the old body) and the carried-index rule do
+#                     not apply to this kind alone.
+KINDS = ("reclassification", "first-run-replace")
+kind = sc.get("gate_kind") if sc else None
+
 # ---- 1. section presence -------------------------------------------------
 if sc is None:
     fails.append("1: candidate sentinel missing or unparseable")
 else:
-    if sc.get("run") != sb["run"] + 1:
-        fails.append(f"1: run must be {sb['run']+1}, got {sc.get('run')}")
-    if not (sc.get("watermark", 0) > sb["watermark"]):
-        fails.append(f"1: watermark must exceed {sb['watermark']}, got {sc.get('watermark')}")
+    if kind is not None and kind not in KINDS:
+        fails.append(f"1: unknown gate_kind {kind!r}, expected one of {', '.join(KINDS)}")
+        kind = None
+    if kind == "first-run-replace":
+        if sc.get("run") != 1:
+            fails.append(f"1: first-run-replace must be run 1, got {sc.get('run')}")
+        note = sc.get("board_history")
+        if not (isinstance(note, str) and note.strip()):
+            fails.append("1: first-run-replace requires a board_history note "
+                         "saying the store was started fresh")
+        warns.append("1: declared first-run-replace; the old body's run, watermark and "
+                     "headings are not compared")
+    else:
+        if sc.get("run") != sb["run"] + 1:
+            fails.append(f"1: run must be {sb['run']+1}, got {sc.get('run')}")
+        if kind == "reclassification":
+            if sc.get("watermark") != sb["watermark"]:
+                fails.append(f"1: reclassification run must keep watermark "
+                             f"{sb['watermark']}, got {sc.get('watermark')}")
+            warns.append(f"1: declared reclassification at watermark {sb['watermark']}")
+        elif not (sc.get("watermark", 0) > sb["watermark"]):
+            fails.append(f"1: watermark must exceed {sb['watermark']}, got {sc.get('watermark')}")
 
 required = [
     (r'^## Baseline', "## Baseline"),
@@ -47,6 +76,18 @@ for pat, label in required:
     if not re.search(pat, cand, re.M):
         fails.append(f"1: required section missing -> {label}")
 
+# a reclassification carries the 25010 grouping whole: section, lanes, map
+if kind == "reclassification":
+    if not re.search(r'^## Quality characteristic groups \(ISO/IEC 25010:2023\)', cand, re.M):
+        fails.append("1: reclassification run requires section -> "
+                     "## Quality characteristic groups (ISO/IEC 25010:2023)")
+    for lane in ("P2", "P3"):
+        if not re.search(rf'^### 🟢 {lane}\b.*grouped by ISO/IEC 25010 characteristic', cand, re.M):
+            fails.append(f"1: reclassification run requires a grouped {lane} lane "
+                         f"(### 🟢 {lane} ... grouped by ISO/IEC 25010 characteristic)")
+    if not (isinstance(sc.get("iso25010"), dict) and sc["iso25010"]):
+        fails.append("1: reclassification run requires the iso25010 map in state")
+
 # direction verdict paragraph near the top, bolded
 _post = cand.split('beadle-state -->', 1)[-1]
 if not re.search(r'\*\*Direction verdict:', _post[:3000]):
@@ -55,7 +96,7 @@ if not re.search(r'\*\*Direction verdict:', _post[:3000]):
 # carried-forward prior index(es) must survive
 prior_idx = re.findall(r'^### Run-(\d+) index', before, re.M)
 cand_idx = re.findall(r'^### Run-(\d+) index', cand, re.M)
-for r in prior_idx:
+for r in ([] if kind == "first-run-replace" else prior_idx):
     if r not in cand_idx:
         fails.append(f"1/2: prior classification index for run-{r} dropped")
 if sc and str(sc["run"]) not in cand_idx:
@@ -98,7 +139,7 @@ def retire(h):
     """A heading with every spaced em dash replaced by a colon and a space."""
     return h.replace(f" {DASH} ", ": ")
 
-for h in hb:
+for h in ([] if kind == "first-run-replace" else hb):
     if h in hc:
         continue
     tgt, why = DECLARED_RENAMES.get(h, (None, None))

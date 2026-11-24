@@ -132,6 +132,18 @@ retired heading or cumulative sentinel axis) are hardcoded in the script
 (`DECLARED_RENAMES`, `DECLARED_REMOVALS`), so a rename or removal the refresh
 relies on needs an entry there, with its reason.
 
+A run that is not the plain next run declares its kind in the beadle-state
+payload, with `"gate_kind": "reclassification"` or `"gate_kind": "first-run-replace"`.
+The script reads no other signal, and an undeclared run keeps every rule above.
+A `reclassification` is run = before + 1 at the same watermark (a regrouping of
+the issues already on the board); it must keep every open row and carry the
+25010 section, the grouped P2 and P3 lanes and the `iso25010` map.
+A `first-run-replace` is run 1 over a body that already exists (a cold-started
+store); it needs a non-empty `board_history` string in the payload saying the
+store was started fresh, and the old body's headings and indexes are not
+compared. Neither kind carries to the next run. `beadle verify` does not read
+`gate_kind` yet, so these runs are gated by the script alone.
+
 `beadle verify` is the Rust port of the same gate. It agrees with the script
 check for check (verified differentially; see `tools/README.md`) and differs in
 one place: it reads declared renames and removals from
