@@ -237,6 +237,7 @@ ISO_MAP = {
     "Functional suitability": [5],
     "Reliability": [6, 7],
     "Security": [8],
+    "Safety": [],  # a 2023 characteristic, empty until used, still carried
 }
 
 
@@ -293,6 +294,12 @@ class Reversal25010(unittest.TestCase):
         rc, out = run_gate(body(self.s), body(cand))
         self.assertEqual(rc, 1, out)
         self.assertIn("3b: axis 'iso25010.Reliability' lost 1 issue(s): [7]", out)
+
+    def test_control_dropping_the_string_valued_taxonomy_group_is_not_an_axis_loss(self):
+        # Pins today's behavior, unchanged here: a string key is not a cumulative axis.
+        before = {**self.s, "taxonomy_group": "ISO/IEC 25010:2023 product quality characteristics"}
+        rc, out = run_gate(body(before), body(self.c))
+        self.assertEqual(rc, 0, out)
 
     def test_control_carrying_the_axis_whole_passes(self):
         rc, out = run_gate(body(self.s), body(self.c))

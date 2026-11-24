@@ -642,6 +642,41 @@ mod tests {
     }
 
     #[test]
+    fn marvel_and_director_declare_the_iso25010_axis_with_all_nine_characteristics() {
+        // ISO/IEC 25010:2023 names nine product quality characteristics. Each
+        // board that groups by them declares one scoped axis, read from the row,
+        // with all nine values; Safety stays empty until a row uses it.
+        let nine = [
+            "functional-suitability",
+            "performance-efficiency",
+            "compatibility",
+            "interaction-capability",
+            "reliability",
+            "security",
+            "maintainability",
+            "flexibility",
+            "safety",
+        ];
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for target in ["marvel", "director"] {
+            let i = load(&root, target).unwrap_or_else(|e| panic!("{target}: {e}"));
+            let axis = i.axes.iter().find(|a| a.name == "iso25010");
+            assert!(axis.is_some(), "{target}: no `iso25010` axis declared under `axes:`");
+            let axis = axis.unwrap();
+            assert!(axis.scoped, "{target}: iso25010 must be scoped (one value per row)");
+            assert_eq!(axis.propose, crate::axes::Propose::Label, "{target}: propose");
+            assert_eq!(axis.values, nine, "{target}: the nine 25010:2023 characteristics");
+        }
+    }
+
+    #[test]
+    fn vsdd_factory_keeps_its_three_axes_and_gains_no_iso25010() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let i = load(&root, "vsdd-factory").unwrap();
+        assert!(i.axes.iter().all(|a| a.name != "iso25010"), "vsdd-factory carries no 25010 board");
+    }
+
+    #[test]
     fn parses_sequence() {
         let yaml = "maintainers:\n  - drbothen\n  - Zious11\nother_key: hello\n";
         assert_eq!(
