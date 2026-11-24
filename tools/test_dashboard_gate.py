@@ -302,6 +302,40 @@ class Reversal25010(unittest.TestCase):
             self.assertNotIn(needle, text, f"the gate still declares {needle!r} as retired")
 
 
+SKILL = pathlib.Path(__file__).resolve().parent.parent / "skills" / "beadle-triage" / "SKILL.md"
+SLUG_TO_KEY = {
+    "functional-suitability": "Functional suitability",
+    "performance-efficiency": "Performance efficiency",
+    "compatibility": "Compatibility",
+    "interaction-capability": "Interaction capability",
+    "reliability": "Reliability",
+    "security": "Security",
+    "maintainability": "Maintainability",
+    "flexibility": "Flexibility",
+    "safety": "Safety",
+}
+
+
+class SkillPinsTheSentinelSpelling(unittest.TestCase):
+    """SKILL.md is read by the run that writes the state map; the gate (3b)
+    compares keys by exact spelling, so the skill must pin the key for each
+    slug, and must say an index title without the suffix is kept as is."""
+
+    def setUp(self):
+        text = SKILL.read_text()
+        start = text.index("**Quality characteristic groups (ISO/IEC 25010:2023).**")
+        self.para = text[start:text.index("\n\n**Row legibility", start)]
+
+    def test_each_slug_maps_to_its_sentinel_key(self):
+        for slug, key in SLUG_TO_KEY.items():
+            with self.subTest(slug=slug):
+                self.assertIn(f"`{slug}` -> `{key}`", self.para)
+
+    def test_a_plain_classification_index_title_stays_as_it_is(self):
+        self.assertIn("without the \"+ ISO/IEC 25010\" suffix", self.para)
+        self.assertIn("keep it as it is", self.para)
+
+
 # The em dash is built at run time so this file carries no raw character.
 D = chr(0x2013 + 1)
 
