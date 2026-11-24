@@ -658,15 +658,25 @@ mod tests {
             "safety",
         ];
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut misses = Vec::new();
         for target in ["marvel", "director", "vsdd-factory"] {
             let i = load(&root, target).unwrap_or_else(|e| panic!("{target}: {e}"));
-            let axis = i.axes.iter().find(|a| a.name == "iso25010");
-            assert!(axis.is_some(), "{target}: no `iso25010` axis declared under `axes:`");
-            let axis = axis.unwrap();
-            assert!(axis.scoped, "{target}: iso25010 must be scoped (one value per row)");
-            assert_eq!(axis.propose, crate::axes::Propose::Label, "{target}: propose");
-            assert_eq!(axis.values, nine, "{target}: the nine 25010:2023 characteristics");
+            match i.axes.iter().find(|a| a.name == "iso25010") {
+                None => misses.push(format!("{target}: no `iso25010` axis declared under `axes:`")),
+                Some(axis) => {
+                    if !axis.scoped {
+                        misses.push(format!("{target}: iso25010 must be scoped (one value per row)"));
+                    }
+                    if axis.propose != crate::axes::Propose::Label {
+                        misses.push(format!("{target}: iso25010 must propose from the row's label or text"));
+                    }
+                    if axis.values != nine {
+                        misses.push(format!("{target}: values {:?} are not the nine 25010:2023 characteristics", axis.values));
+                    }
+                }
+            }
         }
+        assert!(misses.is_empty(), "{}", misses.join("\n"));
     }
 
     #[test]

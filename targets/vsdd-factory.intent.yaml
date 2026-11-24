@@ -22,7 +22,8 @@
 #       Nothing above this line changed.
 # v0.7 (amended): added the `iso25010` axis, the nine product quality characteristics of
 #       the public ISO/IEC 25010:2023 standard; unlike the three axes before it, its
-#       values come from that standard and not from the repository's own docs.
+#       values come from that standard, declared by operator ruling (2026-11-24), and not from
+#       the repository's own docs.
 schema_version: 0.7
 
 target:
@@ -239,7 +240,8 @@ composes_skill: arcavenai-issue-review
 # v0.7 axes. Every value below is from the repository's public README and docs/guide
 # (pipeline-overview.md, id-reference.md). No roadmap or PRD file exists in the public
 # tree, so no list of requirements is declared, and only the axes the public docs name
-# are declared, plus `iso25010`, whose values are the public ISO/IEC 25010:2023 standard's.
+# are declared, plus `iso25010`, which is declared by operator ruling (2026-11-24) and not
+# from a repository source; its values are the public ISO/IEC 25010:2023 standard's.
 # Add more here when a public source names them.
 axes:
   # What the plugin does: the README's "What does this plugin do?" list.
