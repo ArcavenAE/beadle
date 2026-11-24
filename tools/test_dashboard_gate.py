@@ -4,9 +4,10 @@
 Run: python3 -m unittest tools/test_dashboard_gate.py
 
 The gate is a script, not a module, so each case writes a before/candidate
-pair to a temp dir and runs it. The declared entries are read from the
-script's own DECLARED_REMOVALS literal, so these tests exercise whatever the
-script declares rather than a copy of it.
+pair to a temp dir and runs it. The gate's own allow-list is empty, so the
+mechanism tests run a copy of the script whose DECLARED_REMOVALS literal is
+replaced by a test-only list (see `patched_gate`); the 25010 tests run the
+script as shipped.
 """
 import ast
 import json
@@ -19,18 +20,31 @@ import unittest
 GATE = pathlib.Path(__file__).with_name("dashboard-gate.py")
 
 
-def declared_removals():
-    # Run only the constant assignments the allowlist is built from, not the
-    # gate itself (which reads argv at import).
-    tree = ast.parse(GATE.read_text())
-    keep = [
-        n for n in tree.body
+def patched_gate(dest, decl):
+    """Write a copy of the gate to `dest` with DECLARED_REMOVALS set to `decl`."""
+    src = GATE.read_text()
+    node = next(
+        n for n in ast.parse(src).body
         if isinstance(n, ast.Assign)
-        and any(isinstance(t, ast.Name) and t.id in ("_G25010", "DECLARED_REMOVALS") for t in n.targets)
-    ]
-    ns = {}
-    exec(compile(ast.Module(body=keep, type_ignores=[]), str(GATE), "exec"), ns)
-    return ns.get("DECLARED_REMOVALS")
+        and any(isinstance(t, ast.Name) and t.id == "DECLARED_REMOVALS" for t in n.targets)
+    )
+    lines = src.split("\n")
+    lines[node.lineno - 1:node.end_lineno] = ["DECLARED_REMOVALS = " + repr(decl)]
+    dest.write_text("\n".join(lines))
+    return dest
+
+
+# A test-only allow-list for the mechanism tests; the shipped one is empty.
+TEST_DECL = {
+    "headings": {
+        "### Retired lane": "test: lane retired",
+        "## Retired section": "test: section retired",
+    },
+    "axes": {
+        "retired_axis": "test: axis retired",
+        "retired_group": "test: group retired",
+    },
+}
 
 
 REQUIRED = [
@@ -57,13 +71,17 @@ def body(state, extra_headings=()):
     return "\n\n".join([sentinel, "**Direction verdict:** steady."] + heads) + "\n"
 
 
-def run_gate(before, cand, titles=None):
-    """Run the gate. `titles` is a list written to a --titles file, or None."""
+def run_gate(before, cand, titles=None, decl=None):
+    """Run the gate. `titles` is a list written to a --titles file, or None.
+
+    `decl` runs a copy of the gate with that DECLARED_REMOVALS; None runs it as shipped.
+    """
     with tempfile.TemporaryDirectory() as d:
         b, c = pathlib.Path(d, "before.md"), pathlib.Path(d, "cand.md")
         b.write_text(before)
         c.write_text(cand)
-        cmd = [sys.executable, str(GATE), str(b), str(c)]
+        gate = GATE if decl is None else patched_gate(pathlib.Path(d, "gate.py"), decl)
+        cmd = [sys.executable, str(gate), str(b), str(c)]
         if titles is not None:
             t = pathlib.Path(d, "titles.txt")
             t.write_text("".join(x + "\n" for x in titles))
@@ -86,28 +104,31 @@ class Harness(unittest.TestCase):
 
 
 class DeclaredRemovals(unittest.TestCase):
-    def setUp(self):
-        self.decl = declared_removals()
-        self.assertIsNotNone(self.decl, "DECLARED_REMOVALS is not defined in dashboard-gate.py")
+    """The declared-removal mechanism, run against a test-only allow-list."""
 
-    def test_every_declared_removal_carries_a_why(self):
+    def setUp(self):
+        self.decl = TEST_DECL
+
+    def gate(self, before, cand):
+        return run_gate(before, cand, decl=self.decl)
+
+    def test_every_shipped_declared_removal_carries_a_why(self):
+        shipped = gate_constants()["DECLARED_REMOVALS"]
         for kind in ("headings", "axes"):
-            self.assertTrue(self.decl.get(kind), f"no declared {kind}")
-            for name, why in self.decl[kind].items():
+            for name, why in shipped[kind].items():
                 self.assertTrue(str(why).strip(), f"declared {kind} removal {name!r} has no why")
 
     def test_declared_heading_removal_warns_and_passes(self):
         heads = list(self.decl["headings"])
-        self.assertTrue(heads, "no declared headings; this test would pass vacuously")
         s = {"run": 1, "watermark": 10, "tracked": [5]}
-        rc, out = run_gate(body(s, heads), body({**s, "run": 2, "watermark": 11}))
+        rc, out = self.gate(body(s, heads), body({**s, "run": 2, "watermark": 11}))
         self.assertEqual(rc, 0, out)
         self.assertEqual(out.count("WARN 2: declared removal ->"), len(heads), out)
         self.assertNotIn("2: stale", out)
 
     def test_a_declared_removal_the_board_never_carried_warns_as_stale(self):
         s = {"run": 1, "watermark": 10, "tracked": [5]}
-        rc, out = run_gate(body(s), body({**s, "run": 2, "watermark": 11}))
+        rc, out = self.gate(body(s), body({**s, "run": 2, "watermark": 11}))
         self.assertEqual(rc, 0, out)
         self.assertEqual(
             out.count("WARN 2: stale declared removal"), len(self.decl["headings"]), out
@@ -117,7 +138,7 @@ class DeclaredRemovals(unittest.TestCase):
     def test_a_declared_heading_still_in_the_candidate_warns(self):
         h = next(iter(self.decl["headings"]))
         s = {"run": 1, "watermark": 10, "tracked": [5]}
-        rc, out = run_gate(body(s, [h]), body({**s, "run": 2, "watermark": 11}, [h]))
+        rc, out = self.gate(body(s, [h]), body({**s, "run": 2, "watermark": 11}, [h]))
         self.assertEqual(rc, 0, out)
         self.assertIn("WARN 2: declared removal still present in candidate", out)
 
@@ -131,7 +152,7 @@ class DeclaredRemovals(unittest.TestCase):
 
     def test_undeclared_heading_loss_still_fails(self):
         s = {"run": 1, "watermark": 10, "tracked": [5]}
-        rc, out = run_gate(
+        rc, out = self.gate(
             body(s, ["### Something undeclared"]), body({**s, "run": 2, "watermark": 11})
         )
         self.assertEqual(rc, 1, out)
@@ -143,14 +164,14 @@ class DeclaredRemovals(unittest.TestCase):
             # one list-valued and one dict-valued shape, both must be exempt
             before[axis] = [5, 6] if i % 2 else {"groupA": [5], "groupB": [6, 7]}
         cand = {"run": 2, "watermark": 11, "tracked": [5, 6, 7]}
-        rc, out = run_gate(body(before), body(cand))
+        rc, out = self.gate(body(before), body(cand))
         self.assertEqual(rc, 0, out)
         self.assertIn("WARN 3b: declared removal", out)
 
     def test_undeclared_axis_disappearance_still_fails(self):
         before = {"run": 1, "watermark": 10, "tracked": [5], "not_declared": [5]}
         cand = {"run": 2, "watermark": 11, "tracked": [5]}
-        rc, out = run_gate(body(before), body(cand))
+        rc, out = self.gate(body(before), body(cand))
         self.assertEqual(rc, 1, out)
         self.assertIn("3b: cumulative axis 'not_declared' disappeared from state", out)
 
@@ -158,7 +179,7 @@ class DeclaredRemovals(unittest.TestCase):
         axis = next(iter(self.decl["axes"]))
         before = {"run": 1, "watermark": 10, "tracked": [5], axis: [5, 99]}
         cand = {"run": 2, "watermark": 11, "tracked": [5]}
-        rc, out = run_gate(body(before), body(cand))
+        rc, out = self.gate(body(before), body(cand))
         self.assertEqual(rc, 1, out)
         self.assertIn("3: 1 tracked issue(s) dropped from state: [99]", out)
 
@@ -179,36 +200,140 @@ P3_DEPENDENCY_VARIANT = (
 )
 
 
-class Transition25010(unittest.TestCase):
-    """One-time ISO/IEC 25010 transition entries, pinned by their exact text."""
+def gate_constants():
+    """The allow-list constants of the gate, by name, without running the gate."""
+    names = {"_RUN18", "_T25010", "_G25010", "DECLARED_RENAMES", "DECLARED_REMOVALS"}
+    tree = ast.parse(GATE.read_text())
+    keep = [
+        n for n in tree.body
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id in names for t in n.targets)
+    ]
+    ns = {}
+    exec(compile(ast.Module(body=keep, type_ignores=[]), str(GATE), "exec"), ns)
+    return {k: v for k, v in ns.items() if k in ("DECLARED_RENAMES", "DECLARED_REMOVALS")}
+
+
+QC_SECTION = "## Quality characteristic groups (ISO/IEC 25010:2023)"
+GROUPED_LANES = [
+    "### 🟢 P2: Correctness and operability defects, grouped by ISO/IEC 25010 characteristic",
+    "### 🟢 P3: Papercuts, docs, tests, and design questions, grouped by ISO/IEC 25010 characteristic",
+    "### 🟢 P2: Correctness and operability, grouped by ISO/IEC 25010 characteristic",
+    "### 🟢 P3: Papercuts, docs, diagnostics and design questions, grouped by ISO/IEC 25010 characteristic",
+    P3_DEPENDENCY_VARIANT,
+]
+ISO_MAP = {
+    "Functional suitability": [5],
+    "Reliability": [6, 7],
+    "Security": [8],
+    "Safety": [],  # a 2023 characteristic, empty until used, still carried
+}
+
+
+class Reversal25010(unittest.TestCase):
+    """The operator reversed the 2026-09-30 drop: 25010 grouping is carried again.
+
+    Dropping the section, a grouped lane, the index suffix or the `iso25010`
+    state axis is a loss the gate fails, not a declared removal it excuses.
+    """
 
     def setUp(self):
-        self.s = {"run": 1, "watermark": 10, "tracked": [5]}
+        self.s = {"run": 1, "watermark": 10, "tracked": [5, 6, 7, 8], "iso25010": ISO_MAP}
         self.c = {**self.s, "run": 2, "watermark": 11}
 
-    def test_the_dependency_bumps_p3_variant_is_a_declared_removal(self):
-        rc, out = run_gate(body(self.s, [P3_DEPENDENCY_VARIANT]), body(self.c))
-        self.assertEqual(rc, 0, out)
-        self.assertIn("WARN 2: declared removal -> '### 🟢 P3: Papercuts, docs, design questions, and d", out)
+    def lost(self, out, heading):
+        self.assertIn("2: HEADING LOST -> " + heading[:95], out)
 
-    def test_each_classification_index_retitle_is_a_declared_rename(self):
+    def test_dropping_the_quality_characteristic_section_fails(self):
+        rc, out = run_gate(body(self.s, [QC_SECTION]), body(self.c))
+        self.assertEqual(rc, 1, out)
+        self.lost(out, QC_SECTION)
+
+    def test_dropping_a_grouped_lane_fails_for_every_spelling(self):
+        for lane in GROUPED_LANES:
+            with self.subTest(lane=lane):
+                rc, out = run_gate(body(self.s, [lane]), body(self.c))
+                self.assertEqual(rc, 1, out)
+                self.lost(out, lane)
+
+    def test_retitling_the_index_without_the_25010_suffix_fails(self):
         for old, new in CI_RENAMES:
             with self.subTest(old=old):
                 rc, out = run_gate(body(self.s, [old]), body(self.c, [new]))
-                self.assertEqual(rc, 0, out)
-                self.assertIn("WARN 2: declared rename", out)
+                self.assertEqual(rc, 1, out)
+                self.lost(out, old)
 
-    def test_a_retitle_to_anything_else_still_fails(self):
-        old, _ = CI_RENAMES[0]
-        rc, out = run_gate(body(self.s, [old]), body(self.c, ["## Classification index (other)"]))
+    def test_keeping_every_25010_heading_passes_without_an_allow_list_warning(self):
+        heads = [QC_SECTION, *GROUPED_LANES, CI_RENAMES[0][0]]
+        rc, out = run_gate(body(self.s, heads), body(self.c, heads))
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("declared removal", out)
+        self.assertNotIn("declared rename", out)
+        self.assertNotIn("stale declared removal", out)
+
+    def test_dropping_the_iso25010_axis_fails_per_characteristic(self):
+        cand = {k: v for k, v in self.c.items() if k != "iso25010"}
+        rc, out = run_gate(body(self.s), body(cand))
         self.assertEqual(rc, 1, out)
-        self.assertIn("2: HEADING LOST -> " + old[:60], out)
+        self.assertIn("3b: cumulative axis 'iso25010.Reliability' disappeared from state", out)
+        self.assertNotIn("declared removal", out)
 
-    def test_the_rename_warning_does_not_claim_the_run18_precedent(self):
-        old, new = CI_RENAMES[0]
-        rc, out = run_gate(body(self.s, [old]), body(self.c, [new]))
-        line = next(l for l in out.splitlines() if l.startswith("WARN 2: declared rename"))
-        self.assertNotIn("run-18", line)
+    def test_control_losing_one_issue_from_a_characteristic_fails(self):
+        cand = {**self.c, "iso25010": {**ISO_MAP, "Reliability": [6]}}
+        rc, out = run_gate(body(self.s), body(cand))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("3b: axis 'iso25010.Reliability' lost 1 issue(s): [7]", out)
+
+    def test_control_dropping_the_string_valued_taxonomy_group_is_not_an_axis_loss(self):
+        # Pins today's behavior, unchanged here: a string key is not a cumulative axis.
+        before = {**self.s, "taxonomy_group": "ISO/IEC 25010:2023 product quality characteristics"}
+        rc, out = run_gate(body(before), body(self.c))
+        self.assertEqual(rc, 0, out)
+
+    def test_control_carrying_the_axis_whole_passes(self):
+        rc, out = run_gate(body(self.s), body(self.c))
+        self.assertEqual(rc, 0, out)
+
+    def test_the_allow_lists_name_nothing_25010(self):
+        consts = gate_constants()
+        self.assertEqual(set(consts), {"DECLARED_RENAMES", "DECLARED_REMOVALS"})
+        text = json.dumps(consts, ensure_ascii=False).lower()
+        for needle in ("25010", "iso25010", "taxonomy_group"):
+            self.assertNotIn(needle, text, f"the gate still declares {needle!r} as retired")
+
+
+SKILL = pathlib.Path(__file__).resolve().parent.parent / "skills" / "beadle-triage" / "SKILL.md"
+SLUG_TO_KEY = {
+    "functional-suitability": "Functional suitability",
+    "performance-efficiency": "Performance efficiency",
+    "compatibility": "Compatibility",
+    "interaction-capability": "Interaction capability",
+    "reliability": "Reliability",
+    "security": "Security",
+    "maintainability": "Maintainability",
+    "flexibility": "Flexibility",
+    "safety": "Safety",
+}
+
+
+class SkillPinsTheSentinelSpelling(unittest.TestCase):
+    """SKILL.md is read by the run that writes the state map; the gate (3b)
+    compares keys by exact spelling, so the skill must pin the key for each
+    slug, and must say an index title without the suffix is kept as is."""
+
+    def setUp(self):
+        text = SKILL.read_text()
+        start = text.index("**Quality characteristic groups (ISO/IEC 25010:2023).**")
+        self.para = text[start:text.index("\n\n**Row legibility", start)]
+
+    def test_each_slug_maps_to_its_sentinel_key(self):
+        for slug, key in SLUG_TO_KEY.items():
+            with self.subTest(slug=slug):
+                self.assertIn(f"`{slug}` -> `{key}`", self.para)
+
+    def test_a_plain_classification_index_title_stays_as_it_is(self):
+        self.assertIn("without the \"+ ISO/IEC 25010\" suffix", self.para)
+        self.assertIn("keep it as it is", self.para)
 
 
 # The em dash is built at run time so this file carries no raw character.

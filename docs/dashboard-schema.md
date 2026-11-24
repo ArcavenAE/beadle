@@ -165,6 +165,16 @@ frontier F2).
     `<details>` may carry the one-line fix sketch. Cold-start note (ADR-005): this lane
     is the **cheapest first maintainer pass**; resolving one here is a low-risk way to
     turn the process and begin the baseline.
+3c. **Quality characteristic groups (ISO/IEC 25010:2023)**, for a target that
+    declares the `iso25010` axis in its intent. The P2 and P3 lanes are grouped by the
+    standard's nine product quality characteristics, and this section counts rows per
+    characteristic. The state payload carries `iso25010` as a map from characteristic
+    to issue numbers, a cumulative axis: the regression gate fails a candidate that
+    drops the section, a grouped lane, the Classification index suffix or any issue
+    from a characteristic, and its allow-lists name nothing 25010. History: the
+    grouping was dropped on 2026-09-30 and restored on 2026-11-24 at the operator's
+    request; boards that kept the headings and the state key through the gap need no
+    migration, and the one-time transition entries are gone from the gate.
 4. **Direction health** (the differentiator); minutiae ratio, scope-drift
    candidates, issues contradicting declared intent, over-engineering smells
    (premature abstraction, speculative config, build-what-you-might-need),

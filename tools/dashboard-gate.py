@@ -65,39 +65,23 @@ if sc and str(sc["run"]) not in cand_idx:
 # Each rename maps the before heading to (candidate heading, reason); the
 # reason is printed with the warning, as `beadle verify` prints its `why`.
 _RUN18 = "run-18 carry precedent"
-# One-time ISO/IEC 25010 transition entries, not a category schema: they let
-# the boards retire today's grouping once. They do not fix which categories
-# a board carries, and new categories need no entry here.
-_T25010 = "one-time ISO/IEC 25010 transition: the index stops naming the retired grouping"
 DECLARED_RENAMES = {
  "### Run-18 index (NEW)":
    ("### Run-18 index (carried forward — folded)", _RUN18),
  "### 🟢 P1/P2/P3 — Run-18 findings (NEW · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)":
    ("### 🟢 P1/P2/P3 — Run-18 findings (carried — folded · 13 P2 rows + 12 P3 by cluster; P0b/P1 rows ride their lanes above)", _RUN18),
- "## Classification index (finding-005 + finding-009 + attn facet + IEEE 1044 + ODC + ISO/IEC 25010)":
-   ("## Classification index (finding-005 + finding-009 + attn facet + IEEE 1044 + ODC)", _T25010),
- "## Classification index (report type + defect nature + reproducibility + IEEE 1044 + ODC + ISO/IEC 25010)":
-   ("## Classification index (report type + defect nature + reproducibility + IEEE 1044 + ODC)", _T25010),
 }
 # A removal the run intends, with the reason. Headings are H2/H3 lines, exact.
 # Axes are top-level sentinel keys: one covers its `key.sub` sub-axes too. A
 # declared axis only excuses the axis vanishing (3b); its issue numbers must
 # still survive somewhere in state (3). The list serves every board, so an
 # entry a board never carried warns as stale rather than failing.
-_G25010 = "ISO/IEC 25010 grouping retired from the board; its rows stay in the P2/P3 lanes"
+# No entry names ISO/IEC 25010: the operator reversed its 2026-09-30 retirement,
+# so its section, grouped lanes, index suffix and `iso25010` axis are carried and
+# dropping any of them fails checks 2 and 3b like any other loss.
 DECLARED_REMOVALS = {
- "headings": {
-  "### 🟢 P2: Correctness and operability defects, grouped by ISO/IEC 25010 characteristic": _G25010,
-  "### 🟢 P3: Papercuts, docs, tests, and design questions, grouped by ISO/IEC 25010 characteristic": _G25010,
-  "### 🟢 P2: Correctness and operability, grouped by ISO/IEC 25010 characteristic": _G25010,
-  "### 🟢 P3: Papercuts, docs, diagnostics and design questions, grouped by ISO/IEC 25010 characteristic": _G25010,
-  "### 🟢 P3: Papercuts, docs, design questions, and dependency bumps, grouped by ISO/IEC 25010 characteristic": _G25010,
-  "## Quality characteristic groups (ISO/IEC 25010:2023)": _G25010,
- },
- "axes": {
-  "iso25010": "ISO/IEC 25010 grouping retired from the board; issues stay tracked on their other axes",
-  "taxonomy_group": "the taxonomy group axis went with the ISO/IEC 25010 grouping it indexed",
- },
+ "headings": {},
+ "axes": {},
 }
 hb = re.findall(r'^#{2,3} .*$', before, re.M)
 hc = set(re.findall(r'^#{2,3} .*$', cand, re.M))

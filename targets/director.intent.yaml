@@ -91,6 +91,25 @@ minutiae_signals:
   - cluster_same_lever_filed_n_times
   - over_engineering_fingerprints
 
+# Quality characteristic groups. The nine product quality characteristics of ISO/IEC
+# 25010:2023, a public standard. The board groups its P2 and P3 lanes by them and
+# counts rows per characteristic. One value per row, read from the row's own text.
+# Safety stays empty until a row uses it.
+axes:
+  - name: iso25010
+    scoped: true
+    propose: label
+    values:
+      - functional-suitability
+      - performance-efficiency
+      - compatibility
+      - interaction-capability
+      - reliability
+      - security
+      - maintainability
+      - flexibility
+      - safety
+
 composes_skill: arcavenai-issue-review
 
 status: draft

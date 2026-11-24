@@ -586,8 +586,8 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let i = load(&root, "vsdd-factory").unwrap();
         let names: Vec<&str> = i.axes.iter().map(|a| a.name.as_str()).collect();
-        assert_eq!(names, ["capability", "step", "principle"]);
-        assert!(i.axes[0].scoped && i.axes[1].scoped && !i.axes[2].scoped);
+        assert_eq!(names, ["capability", "step", "principle", "iso25010"]);
+        assert!(i.axes[0].scoped && i.axes[1].scoped && !i.axes[2].scoped && i.axes[3].scoped);
         let req = i.requirements.expect("a requirements block");
         assert_eq!(req.patterns, vec!["{a}-{n}".to_string()]);
         assert!(req.list.is_none(), "no public requirement list exists to name");
@@ -638,6 +638,54 @@ mod tests {
             for key in ["advances", "neutral", "drifts"] {
                 assert!(!sequence(&rubric, key).is_empty(), "{target}: alignment_rubric.{key} is empty");
             }
+        }
+    }
+
+    #[test]
+    fn every_25010_board_declares_the_iso25010_axis_with_all_nine_characteristics() {
+        // ISO/IEC 25010:2023 names nine product quality characteristics. Each
+        // board that groups by them declares one scoped axis, read from the row,
+        // with all nine values; Safety stays empty until a row uses it.
+        let nine = [
+            "functional-suitability",
+            "performance-efficiency",
+            "compatibility",
+            "interaction-capability",
+            "reliability",
+            "security",
+            "maintainability",
+            "flexibility",
+            "safety",
+        ];
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut misses = Vec::new();
+        for target in ["marvel", "director", "vsdd-factory"] {
+            let i = load(&root, target).unwrap_or_else(|e| panic!("{target}: {e}"));
+            match i.axes.iter().find(|a| a.name == "iso25010") {
+                None => misses.push(format!("{target}: no `iso25010` axis declared under `axes:`")),
+                Some(axis) => {
+                    if !axis.scoped {
+                        misses.push(format!("{target}: iso25010 must be scoped (one value per row)"));
+                    }
+                    if axis.propose != crate::axes::Propose::Label {
+                        misses.push(format!("{target}: iso25010 must propose from the row's label or text"));
+                    }
+                    if axis.values != nine {
+                        misses.push(format!("{target}: values {:?} are not the nine 25010:2023 characteristics", axis.values));
+                    }
+                }
+            }
+        }
+        assert!(misses.is_empty(), "{}", misses.join("\n"));
+    }
+
+    #[test]
+    fn vsdd_factory_keeps_its_three_axes_beside_iso25010() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let i = load(&root, "vsdd-factory").unwrap();
+        let names: Vec<&str> = i.axes.iter().map(|a| a.name.as_str()).collect();
+        for kept in ["capability", "step", "principle"] {
+            assert!(names.contains(&kept), "vsdd-factory lost its `{kept}` axis: {names:?}");
         }
     }
 
