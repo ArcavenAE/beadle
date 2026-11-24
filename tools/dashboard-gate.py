@@ -47,6 +47,9 @@ else:
                          "saying the store was started fresh")
         warns.append("1: declared first-run-replace; the old body's run, watermark and "
                      "headings are not compared")
+    elif sb is None:
+        fails.append("1: before body has no beadle-state sentinel; only a declared "
+                     "first-run-replace may replace it")
     else:
         if sc.get("run") != sb["run"] + 1:
             fails.append(f"1: run must be {sb['run']+1}, got {sc.get('run')}")

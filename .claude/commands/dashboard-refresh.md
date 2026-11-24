@@ -145,8 +145,9 @@ compared. Neither kind carries to the next run. `beadle verify` does not read
 `gate_kind` yet, so these runs are gated by the script alone.
 
 `beadle verify` is the Rust port of the same gate. It agrees with the script
-check for check (verified differentially; see `tools/README.md`) and differs in
-one place: it reads declared renames and removals from
+check for check on an ordinary run (verified differentially; see `tools/README.md`)
+and differs in two places. It does not read `gate_kind`, so it still refuses the
+two declared kinds above. And it reads declared renames and removals from
 `targets/<target>.verify.json`, where an entry without a `why` is a hard
 config error. The scheduled refresh does not call it, so an entry in a
 target's `verify.json` has no effect on a scheduled post. Run it by hand to
