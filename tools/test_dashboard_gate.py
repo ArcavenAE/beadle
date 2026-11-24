@@ -433,5 +433,157 @@ class EmDashRetirement(unittest.TestCase):
         self.assertEqual(len(self.nine(out)), 1, out)
 
 
+DOC = GATE.parent.parent / ".claude" / "commands" / "dashboard-refresh.md"
+LANES_P2_P3 = [GROUPED_LANES[0], GROUPED_LANES[1]]
+
+
+class ReclassificationRun(unittest.TestCase):
+    """A run that regroups the same issues: run = before + 1 at the same watermark.
+
+    The payload declares it with gate_kind "reclassification". An undeclared run
+    at an unchanged watermark is still refused by check 1.
+    """
+
+    def setUp(self):
+        self.s = {"run": 1, "watermark": 10, "tracked": [5, 6, 7, 8], "iso25010": ISO_MAP}
+        self.before = body(self.s, [QC_SECTION] + LANES_P2_P3)
+        self.c = {**self.s, "run": 2, "gate_kind": "reclassification"}
+
+    def cand(self, state=None, extra=None):
+        extra = [QC_SECTION] + LANES_P2_P3 if extra is None else extra
+        return body(self.c if state is None else state, extra)
+
+    def test_a_declared_reclassification_at_the_same_watermark_passes(self):
+        rc, out = run_gate(self.before, self.cand())
+        self.assertEqual(rc, 0, out)
+
+    def test_the_declaration_is_what_lets_it_through(self):
+        undeclared = {k: v for k, v in self.c.items() if k != "gate_kind"}
+        rc, out = run_gate(self.before, self.cand(undeclared))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: watermark must exceed 10, got 10", out)
+
+    def test_a_declared_run_must_keep_the_watermark(self):
+        for wm in (11, 9):
+            with self.subTest(watermark=wm):
+                rc, out = run_gate(self.before, self.cand({**self.c, "watermark": wm}))
+                self.assertEqual(rc, 1, out)
+                self.assertIn("1: reclassification run must keep watermark 10, got " + str(wm), out)
+
+    def test_a_declared_run_must_still_be_before_plus_one(self):
+        rc, out = run_gate(self.before, self.cand({**self.c, "run": 3}))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: run must be 2, got 3", out)
+
+    def test_dropping_an_open_row_fails(self):
+        c = {**self.c, "tracked": [5, 6, 7], "iso25010": {**ISO_MAP, "Security": []}}
+        rc, out = run_gate(self.before, self.cand(c))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("3: 1 tracked issue(s) dropped from state: [8]", out)
+
+    def test_the_quality_characteristic_section_is_required(self):
+        rc, out = run_gate(self.before, self.cand(extra=LANES_P2_P3))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: reclassification run requires section -> " + QC_SECTION, out)
+
+    def test_each_grouped_lane_is_required(self):
+        for lane, label in ((GROUPED_LANES[0], "P2"), (GROUPED_LANES[1], "P3")):
+            with self.subTest(lane=label):
+                extra = [QC_SECTION] + [x for x in LANES_P2_P3 if x != lane]
+                rc, out = run_gate(self.before, self.cand(extra=extra))
+                self.assertEqual(rc, 1, out)
+                self.assertIn(f"1: reclassification run requires a grouped {label} lane", out)
+
+    def test_the_iso25010_map_is_required(self):
+        c = {k: v for k, v in self.c.items() if k != "iso25010"}
+        rc, out = run_gate(self.before, self.cand(c))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: reclassification run requires the iso25010 map in state", out)
+
+    def test_an_unknown_kind_is_refused(self):
+        rc, out = run_gate(self.before, self.cand({**self.c, "gate_kind": "regroup"}))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: unknown gate_kind 'regroup'", out)
+
+    def test_the_next_run_needs_no_declaration(self):
+        nxt = {**self.s, "run": 3, "watermark": 12}
+        rc, out = run_gate(self.cand(), self.cand(nxt))
+        self.assertEqual(rc, 0, out)
+
+
+class FirstRunReplace(unittest.TestCase):
+    """Run 1 on a board that already holds a body, as when its store is cold-started.
+
+    The payload declares gate_kind "first-run-replace" and carries a board_history
+    note. Only checks 1 (run and watermark against the old body) and 2 (headings
+    of the old body) are relaxed; the rest of the gate applies.
+    """
+
+    NOTE = "The store was started fresh on 2026-11-24; earlier runs live only in the old body."
+
+    def setUp(self):
+        self.old = {"run": 4, "watermark": 500, "tracked": [5, 6]}
+        self.before = body(self.old, ["### Old lane", "## Old section"])
+        self.c = {
+            "run": 1, "watermark": 3, "tracked": [5, 6],
+            "gate_kind": "first-run-replace", "board_history": self.NOTE,
+        }
+
+    def test_a_declared_first_run_over_an_existing_body_passes(self):
+        rc, out = run_gate(self.before, body(self.c))
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("HEADING LOST", out)
+
+    def test_a_body_with_no_sentinel_can_be_replaced(self):
+        plain = "# Old board\n\n## Notes\n\nWritten by hand.\n"
+        rc, out = run_gate(plain, body({**self.c, "tracked": []}))
+        self.assertEqual(rc, 0, out)
+
+    def test_undeclared_run_1_over_a_body_is_still_refused(self):
+        undeclared = {k: v for k, v in self.c.items() if k not in ("gate_kind", "board_history")}
+        rc, out = run_gate(self.before, body(undeclared))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: run must be 5, got 1", out)
+        self.assertIn("2: HEADING LOST -> ### Old lane", out)
+
+    def test_the_board_history_note_is_required(self):
+        for c in ({k: v for k, v in self.c.items() if k != "board_history"},
+                  {**self.c, "board_history": "  "}):
+            with self.subTest(note=c.get("board_history")):
+                rc, out = run_gate(self.before, body(c))
+                self.assertEqual(rc, 1, out)
+                self.assertIn("1: first-run-replace requires a board_history note", out)
+
+    def test_a_declared_first_run_must_be_run_1(self):
+        rc, out = run_gate(self.before, body({**self.c, "run": 2}))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: first-run-replace must be run 1, got 2", out)
+
+    def test_the_candidate_still_needs_its_required_sections(self):
+        rc, out = run_gate(self.before, body(self.c).replace("## Controls", "## Other"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: required section missing -> ## Controls", out)
+
+    def test_an_em_dash_in_the_candidate_is_still_refused(self):
+        rc, out = run_gate(self.before, body(self.c, ["### Lane " + D + " x"]))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("9: em dash in candidate", out)
+
+    def test_the_next_run_gets_the_ordinary_rules_back(self):
+        first = body(self.c, ["### Fresh lane"])
+        nxt = {"run": 2, "watermark": 4, "tracked": [5, 6]}
+        rc, out = run_gate(first, body(nxt))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("2: HEADING LOST -> ### Fresh lane", out)
+
+
+class DocTellsARunHowToDeclare(unittest.TestCase):
+    def test_the_refresh_doc_names_both_kinds_and_the_key(self):
+        text = DOC.read_text()
+        for needle in ("gate_kind", "reclassification", "first-run-replace", "board_history"):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, text)
+
+
 if __name__ == "__main__":
     unittest.main()
