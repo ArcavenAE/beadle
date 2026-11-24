@@ -211,6 +211,101 @@ class Transition25010(unittest.TestCase):
         self.assertNotIn("run-18", line)
 
 
+def gate_constants():
+    """The allow-list constants of the gate, by name, without running the gate."""
+    names = {"_RUN18", "_T25010", "_G25010", "DECLARED_RENAMES", "DECLARED_REMOVALS"}
+    tree = ast.parse(GATE.read_text())
+    keep = [
+        n for n in tree.body
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id in names for t in n.targets)
+    ]
+    ns = {}
+    exec(compile(ast.Module(body=keep, type_ignores=[]), str(GATE), "exec"), ns)
+    return {k: v for k, v in ns.items() if k in ("DECLARED_RENAMES", "DECLARED_REMOVALS")}
+
+
+QC_SECTION = "## Quality characteristic groups (ISO/IEC 25010:2023)"
+GROUPED_LANES = [
+    "### 🟢 P2: Correctness and operability defects, grouped by ISO/IEC 25010 characteristic",
+    "### 🟢 P3: Papercuts, docs, tests, and design questions, grouped by ISO/IEC 25010 characteristic",
+    "### 🟢 P2: Correctness and operability, grouped by ISO/IEC 25010 characteristic",
+    "### 🟢 P3: Papercuts, docs, diagnostics and design questions, grouped by ISO/IEC 25010 characteristic",
+    P3_DEPENDENCY_VARIANT,
+]
+ISO_MAP = {
+    "Functional suitability": [5],
+    "Reliability": [6, 7],
+    "Security": [8],
+}
+
+
+class Reversal25010(unittest.TestCase):
+    """The operator reversed the 2026-09-30 drop: 25010 grouping is carried again.
+
+    Dropping the section, a grouped lane, the index suffix or the `iso25010`
+    state axis is a loss the gate fails, not a declared removal it excuses.
+    """
+
+    def setUp(self):
+        self.s = {"run": 1, "watermark": 10, "tracked": [5, 6, 7, 8], "iso25010": ISO_MAP}
+        self.c = {**self.s, "run": 2, "watermark": 11}
+
+    def lost(self, out, heading):
+        self.assertIn("2: HEADING LOST -> " + heading[:95], out)
+
+    def test_dropping_the_quality_characteristic_section_fails(self):
+        rc, out = run_gate(body(self.s, [QC_SECTION]), body(self.c))
+        self.assertEqual(rc, 1, out)
+        self.lost(out, QC_SECTION)
+
+    def test_dropping_a_grouped_lane_fails_for_every_spelling(self):
+        for lane in GROUPED_LANES:
+            with self.subTest(lane=lane):
+                rc, out = run_gate(body(self.s, [lane]), body(self.c))
+                self.assertEqual(rc, 1, out)
+                self.lost(out, lane)
+
+    def test_retitling_the_index_without_the_25010_suffix_fails(self):
+        for old, new in CI_RENAMES:
+            with self.subTest(old=old):
+                rc, out = run_gate(body(self.s, [old]), body(self.c, [new]))
+                self.assertEqual(rc, 1, out)
+                self.lost(out, old)
+
+    def test_keeping_every_25010_heading_passes_without_an_allow_list_warning(self):
+        heads = [QC_SECTION, *GROUPED_LANES, CI_RENAMES[0][0]]
+        rc, out = run_gate(body(self.s, heads), body(self.c, heads))
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("declared removal", out)
+        self.assertNotIn("declared rename", out)
+        self.assertNotIn("stale declared removal", out)
+
+    def test_dropping_the_iso25010_axis_fails_per_characteristic(self):
+        cand = {k: v for k, v in self.c.items() if k != "iso25010"}
+        rc, out = run_gate(body(self.s), body(cand))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("3b: cumulative axis 'iso25010.Reliability' disappeared from state", out)
+        self.assertNotIn("declared removal", out)
+
+    def test_control_losing_one_issue_from_a_characteristic_fails(self):
+        cand = {**self.c, "iso25010": {**ISO_MAP, "Reliability": [6]}}
+        rc, out = run_gate(body(self.s), body(cand))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("3b: axis 'iso25010.Reliability' lost 1 issue(s): [7]", out)
+
+    def test_control_carrying_the_axis_whole_passes(self):
+        rc, out = run_gate(body(self.s), body(self.c))
+        self.assertEqual(rc, 0, out)
+
+    def test_the_allow_lists_name_nothing_25010(self):
+        consts = gate_constants()
+        self.assertEqual(set(consts), {"DECLARED_RENAMES", "DECLARED_REMOVALS"})
+        text = json.dumps(consts, ensure_ascii=False).lower()
+        for needle in ("25010", "iso25010", "taxonomy_group"):
+            self.assertNotIn(needle, text, f"the gate still declares {needle!r} as retired")
+
+
 # The em dash is built at run time so this file carries no raw character.
 D = chr(0x2013 + 1)
 
