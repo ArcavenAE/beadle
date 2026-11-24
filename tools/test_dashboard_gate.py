@@ -569,12 +569,53 @@ class FirstRunReplace(unittest.TestCase):
         self.assertEqual(rc, 1, out)
         self.assertIn("9: em dash in candidate", out)
 
+    def test_checks_3_and_3b_still_apply_when_the_old_body_has_a_sentinel(self):
+        c = {**self.c, "tracked": [5]}
+        rc, out = run_gate(self.before, body(c))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("3: 1 tracked issue(s) dropped from state: [6]", out)
+
+    def test_an_axis_dropped_from_the_old_sentinel_still_fails(self):
+        before = body({**self.old, "lane_a": [5]})
+        rc, out = run_gate(before, body(self.c))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("3b: cumulative axis 'lane_a' disappeared from state", out)
+
     def test_the_next_run_gets_the_ordinary_rules_back(self):
         first = body(self.c, ["### Fresh lane"])
         nxt = {"run": 2, "watermark": 4, "tracked": [5, 6]}
         rc, out = run_gate(first, body(nxt))
         self.assertEqual(rc, 1, out)
         self.assertIn("2: HEADING LOST -> ### Fresh lane", out)
+
+
+class OldBodyWithNoSentinel(unittest.TestCase):
+    """An old body with no beadle-state sentinel is refused, not a crash, unless
+    the candidate declares first-run-replace."""
+
+    PLAIN = "# Old board\n\n## Notes\n\nWritten by hand.\n"
+
+    def refused(self, state):
+        rc, out = run_gate(self.PLAIN, body(state))
+        self.assertEqual(rc, 1, out)
+        self.assertNotIn("Traceback", out)
+        self.assertIn("1: before body has no beadle-state sentinel", out)
+
+    def test_an_undeclared_run_over_it_is_refused_cleanly(self):
+        self.refused({"run": 1, "watermark": 10, "tracked": []})
+
+    def test_a_reclassification_over_it_is_refused_cleanly(self):
+        self.refused({"run": 1, "watermark": 10, "tracked": [], "gate_kind": "reclassification"})
+
+
+class UnknownKind(unittest.TestCase):
+    def test_an_unknown_kind_gets_no_declared_rules(self):
+        s = {"run": 1, "watermark": 10, "tracked": [5]}
+        c = {**s, "run": 2, "gate_kind": "regroup"}
+        rc, out = run_gate(body(s), body(c))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("1: unknown gate_kind 'regroup'", out)
+        self.assertIn("1: watermark must exceed 10, got 10", out)
 
 
 class DocTellsARunHowToDeclare(unittest.TestCase):
