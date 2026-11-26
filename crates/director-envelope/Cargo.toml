@@ -19,7 +19,7 @@ jsonschema = { version = "0.56", default-features = false }
 
 [dev-dependencies]
 # The generator and its drift guard only; nothing here ships in the binary.
-typify = { version = "0.8", default-features = false }
+typify = { version = "0.10", default-features = false }
 schemars = "0.8"
 prettyplease = "0.2"
 syn = { version = "2", features = ["full"] }
