@@ -67,10 +67,13 @@ convention** (GitHub doesn't enforce it). Before applying a label in an exclusiv
 scope (`type.*`, `priority.*`, `triage.*`, `scope.*`, `resolution.*`): query
 current labels → remove the existing one in that scope → apply the new one.
 
-| Scope | beadle authority |
-|---|---|
-| `type.*`, `priority.*`, `triage.*`, `contrib.*`, `status.stale`, `agent.*` | set autonomously |
-| `scope.*`, `resolution.*` | **propose only** — human/supervisor confirms |
+**beadle's code writes no GitHub label.** Its one GitHub write is `beadle push`,
+which edits the dashboard issue body. `beadle classify ingest` prints a
+`label-plan:` line for each classification record that carries an evidence value
+(`evidence.<value>`), marked `apply` when the repo owner is on the allow-list
+(`targets/README.md`) and `propose-only` otherwise. Printing the line applies
+nothing. `scope.*` and `resolution.*` are **propose only**: a human or
+supervisor confirms.
 
 ## Incident-hardened rules (carried from multiclaude)
 
