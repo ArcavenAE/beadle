@@ -111,13 +111,23 @@ or a one-line diff must never mask it. (vsdd-factory #313/#314 are this class; t
 ratchet certifies PASS against state that doesn't exist on disk; the hash disagrees
 with reality. They are source-of-truth corruption, not a "CI cluster.")
 
-**Operational impact; does the defect stop the factory? Its own axis, set
+**Operational impact; does the defect stop the factory? Its own axis, classified
 autonomously (finding-009).** ORTHOGONAL to defect-nature: a one-character typo that
 crashes the session is maximum operational impact at minimum nature-complexity, so it
 **cannot** be inferred from nature or priority. Grounded in ODC's *Impact* attribute
 (its `Reliability` value verbatim covers "ABEND and WAIT" = crash and hang); we split
-ODC-Reliability along the failure-model spine. Set the `impact.*` label autonomously
-(it is a classification, like `type.*`):
+ODC-Reliability along the failure-model spine. Record it in the classification
+record as `operational_impact`.
+
+**beadle's code writes no GitHub label.** Its one GitHub write is `beadle push`,
+which edits the dashboard issue body. `beadle classify ingest` prints a
+`label-plan:` line for each classification record that carries an evidence value
+(`evidence.<value>`), marked `apply` when the repo owner is on the allow-list
+(`targets/README.md`) and `propose-only` otherwise. Printing the line applies
+nothing. `scope.*` and `resolution.*` are **propose only**: a human or
+supervisor confirms.
+
+The values, in their label forms:
 - **`impact.panic`**: the agent (Claude Code) session terminates abnormally; context
   is **lost**, recovery required. Crash / fail-stop. Worst recovery cost, but
   self-announcing.
